@@ -1,0 +1,4 @@
+name = "Harpy"
+uuid = "bf947970-47e9-4a05-b1e2-e770fd76d85d"
+authors = ["Lucas C Wilcox <lucas@swirlee.com>"]
+version = "0.1.0"
