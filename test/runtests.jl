@@ -4,4 +4,5 @@ using Test
 
 MPI.Initialized() || MPI.Init()
 
-Harpy.greet()
+Harpy.Testsuite.testsuite(Array, Float64)
+Harpy.Testsuite.testsuite(Array, BigFloat)
