@@ -7,7 +7,7 @@ using KernelAbstractions.Extras: @unroll
 using LinearAlgebra
 using MPI
 using OneDimensionalNodes
-using P4est
+using P4estTypes
 using SnoopPrecompile
 using StaticArrays
 using StaticArrays: tuple_prod, tuple_length, size_to_tuple
