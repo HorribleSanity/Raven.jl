@@ -51,9 +51,7 @@ function fill_adapt_flags(::P4estTypes.Pxest{X}, _, quadrant, _, _, flags) where
     if d.old_level < P4estTypes.level(quadrant)
         flags[d.old_id] = AdaptRefine
     elseif d.old_level > P4estTypes.level(quadrant)
-        for i = 0:X-1
-            flags[d.old_id+i] = AdaptCoarsen
-        end
+        flags[d.old_id] = AdaptCoarsen
     else
         flags[d.old_id] = AdaptNone
     end
@@ -96,6 +94,5 @@ function adapt!(gm::GridManager, flags)
     P4estTypes.refine!(gm.forest; refine = refine_quads, replace = replace_quads)
     P4estTypes.balance!(gm.forest, replace = replace_quads)
 
-    flags .= AdaptNone
     P4estTypes.iterateforest(gm.forest; userdata = flags, volume = fill_adapt_flags)
 end
