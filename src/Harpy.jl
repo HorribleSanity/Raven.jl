@@ -7,7 +7,8 @@ using KernelAbstractions.Extras: @unroll
 using LinearAlgebra
 using MPI
 using OneDimensionalNodes
-using P4estTypes
+import P4estTypes
+using RecipesBase
 using SnoopPrecompile
 using StaticArrays
 using StaticArrays: tuple_prod, tuple_length, size_to_tuple
@@ -20,9 +21,17 @@ export derivatives, facemass, mass, points, toequallyspaced
 export derivatives_1d, points_1d, weights_1d
 export referencecell, levels, trees, offset
 
+export brick
+
+export GridManager
+
+export adapt!
+
 include("arrays.jl")
 include("kron.jl")
 include("cells.jl")
+include("coarsegrids.jl")
+include("gridmanager.jl")
 
 @precompile_setup begin
     @precompile_all_calls begin
