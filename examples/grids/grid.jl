@@ -26,18 +26,27 @@ end
 # coarsegrid = extrude(cubesphere(2, 2), 1)
 # gm = GridManager(cell, coarsegrid; level = (2, 3))
 
-gm = GridManager(LobattoCell(3, 4, 2), brick(2, 3, 1); min_level = 2)
+gm = GridManager(
+    LobattoCell{Float64,arraytype}(3, 4),
+    Harpy.brick(2, 5);
+    comm = comm,
+    min_level = 2,
+)
 
 indicator = fill(Harpy.AdaptNone, length(gm))
 indicator[1] = Harpy.AdaptRefine
 
 adapt!(gm, indicator)
 
-#grid = generate(gm)
-#
-#vtk_grid("grid", grid) do vtk
-#    vtk["CellNumber"] = 1:length(grid)
-#end
+grid = generate(gm)
+
+vtk_grid("grid", grid) do vtk
+    vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
+    P = toequallyspaced(referencecell(grid))
+    x = P * reshape(points(grid), size(P, 2), :)
+    vtk["x"] = collect(x)
+end
+
 #
 ## (g, J) = metrics(grid)
 ## M = mass(grid)

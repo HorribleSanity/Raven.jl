@@ -370,6 +370,247 @@ end
     return (0, 1, 2, 3, 4, 5, 6, 7, 8)
 end
 
+@kernel function quadpoints!(
+    points,
+    ri,
+    si,
+    coarsegridcells,
+    coarsegridvertices,
+    numberofquadrants,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    ::Val{I},
+    ::Val{J},
+    ::Val{Q},
+) where {I,J,Q}
+    i, j, q1 = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(eltype(points))
+
+    treecoords = @localmem eltype(points) (2, 2, Q)
+    rl = @localmem eltype(ri) (I,)
+    sl = @localmem eltype(si) (J,)
+
+    begin
+        if q ≤ numberofquadrants
+            if j == 1 && q1 == 1
+                rl[i] = ri[i]
+            end
+
+            if i == 1 && q1 == 1
+                sl[j] = si[j]
+            end
+
+            if i ≤ 2 && j ≤ 2
+                treeid = quadranttotreeid[q]
+                vids = coarsegridcells[treeid]
+                treecoords[i, j, q1] = coarsegridvertices[vids[i+2*(j-1)]]
+            end
+        end
+    end
+
+    @synchronize
+
+    begin
+        if q ≤ numberofquadrants
+            treeid = quadranttotreeid[q]
+            level = quadranttolevel[q]
+            ix = quadranttocoordinate[q, 1]
+            iy = quadranttocoordinate[q, 2]
+
+            P4EST_MAXLEVEL = 30
+            P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
+
+            cr = ix / P4EST_ROOT_LEN
+            cs = iy / P4EST_ROOT_LEN
+
+            h = one(T) / (1 << (level + 1))
+
+            r = cr + h * (rl[i] + 1)
+            s = cs + h * (sl[j] + 1)
+
+            w1 = (1 - r) * (1 - s)
+            w2 = r * (1 - s)
+            w3 = (1 - r) * s
+            w4 = r * s
+
+            c1 = treecoords[1, 1, q1]
+            c2 = treecoords[2, 1, q1]
+            c3 = treecoords[1, 2, q1]
+            c4 = treecoords[2, 2, q1]
+
+            points[i, j, q] = w1 * c1 + w2 * c2 + w3 * c3 + w4 * c4
+        end
+    end
+end
+
+function materializepoints(
+    referencecell::LobattoQuad,
+    coarsegridcells,
+    coarsegridvertices,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+)
+
+    A = arraytype(referencecell)
+    r = vec.(points_1d(referencecell))
+    Q = max(512 ÷ prod(length.(r)), 1)
+
+    # FIXME use cell array here; think about storage order
+    points = A{eltype(coarsegridvertices)}(undef, length.(r)..., length(quadranttolevel))
+
+    device = get_device(points)
+
+    kernel! = quadpoints!(device, (length.(r)..., Q))
+    event = kernel!(
+        points,
+        r...,
+        coarsegridcells,
+        coarsegridvertices,
+        length(quadranttolevel),
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        Val.(length.(r))...,
+        Val(Q);
+        ndrange = size(points),
+        dependencies = Event(device),
+    )
+    wait(device, event)
+
+    return points
+end
+
+@kernel function hexpoints!(
+    points,
+    ri,
+    si,
+    ti,
+    coarsegridcells,
+    coarsegridvertices,
+    numberofquadrants,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    ::Val{I},
+    ::Val{J},
+    ::Val{K},
+) where {I,J,K}
+    i, j, k = @index(Local, NTuple)
+    q = @index(Group, Linear)
+
+    @uniform T = eltype(eltype(points))
+
+    treecoords = @localmem eltype(points) (2, 2, 2)
+    rl = @localmem eltype(ri) (I,)
+    sl = @localmem eltype(si) (J,)
+    tl = @localmem eltype(ti) (K,)
+
+    begin
+        if q ≤ numberofquadrants
+            if j == 1 && k == 1
+                rl[i] = ri[i]
+            end
+
+            if i == 1 && k == 1
+                sl[j] = si[j]
+            end
+
+            if i == 1 && j == 1
+                tl[k] = ti[k]
+            end
+
+            if i ≤ 2 && j ≤ 2 && k ≤ 2
+                treeid = quadranttotreeid[q]
+                vids = coarsegridcells[treeid]
+                id = i + 2 * (j - 1) + 4 * (k - 1)
+                treecoords[i, j, k] = coarsegridvertices[vids[id]]
+            end
+        end
+    end
+
+    @synchronize
+
+    begin
+        if q ≤ numberofquadrants
+            treeid = quadranttotreeid[q]
+            level = quadranttolevel[q]
+            ix = quadranttocoordinate[q, 1]
+            iy = quadranttocoordinate[q, 2]
+            iz = quadranttocoordinate[q, 3]
+
+            P4EST_MAXLEVEL = 30
+            P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
+
+            cr = ix / P4EST_ROOT_LEN
+            cs = iy / P4EST_ROOT_LEN
+            ct = iz / P4EST_ROOT_LEN
+
+            h = one(T) / (1 << (level + 1))
+
+            r = cr + h * (rl[i] + 1)
+            s = cs + h * (sl[j] + 1)
+            t = ct + h * (tl[k] + 1)
+
+            w1 = (1 - r) * (1 - s) * (1 - t)
+            w2 = r * (1 - s) * (1 - t)
+            w3 = (1 - r) * s * (1 - t)
+            w4 = r * s * (1 - t)
+            w5 = (1 - r) * (1 - s) * t
+            w6 = r * (1 - s) * t
+            w7 = (1 - r) * s * t
+            w8 = r * s * t
+
+            points[i, j, k, q] =
+                w1 * treecoords[1] +
+                w2 * treecoords[2] +
+                w3 * treecoords[3] +
+                w4 * treecoords[4] +
+                w5 * treecoords[5] +
+                w6 * treecoords[6] +
+                w7 * treecoords[7] +
+                w8 * treecoords[8]
+        end
+    end
+end
+
+function materializepoints(
+    referencecell::LobattoHex,
+    coarsegridcells,
+    coarsegridvertices,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+)
+
+    A = arraytype(referencecell)
+    r = vec.(points_1d(referencecell))
+
+    # FIXME use cell array here; think about storage order
+    points = A{eltype(coarsegridvertices)}(undef, length.(r)..., length(quadranttolevel))
+
+    device = get_device(points)
+    kernel! = hexpoints!(device, length.(r))
+    event = kernel!(
+        points,
+        r...,
+        coarsegridcells,
+        coarsegridvertices,
+        length(quadranttolevel),
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        Val.(length.(r))...;
+        ndrange = size(points),
+        dependencies = Event(device),
+    )
+    wait(device, event)
+
+    return points
+end
 
 #function materializepoints(referencecell::LobattoLine, vertices, connectivity)
 #    T = floattype(referencecell)

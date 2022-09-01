@@ -23,7 +23,7 @@ export referencecell, levels, trees, offset
 
 export brick
 
-export GridManager
+export GridManager, generate
 
 export adapt!
 
@@ -31,6 +31,7 @@ include("arrays.jl")
 include("kron.jl")
 include("cells.jl")
 include("coarsegrids.jl")
+include("grids.jl")
 include("gridmanager.jl")
 
 @precompile_setup begin
