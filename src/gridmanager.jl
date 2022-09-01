@@ -11,9 +11,11 @@ const AdaptNone = 0x01
 const AdaptRefine = 0x10
 const AdaptTouched = 0x11
 
-struct GridManager{C<:AbstractCell,G<:AbstractCoarseGrid,V,P} <: AbstractGridManager
+struct GridManager{C<:AbstractCell,G<:AbstractCoarseGrid,E,V,P} <: AbstractGridManager
+    comm::MPI.Comm
     referencecell::C
     coarsegrid::G
+    coarsegridcells::E
     coarsegridvertices::V
     forest::P
 end
@@ -33,9 +35,10 @@ function GridManager(
         fill_uniform,
     )
 
+    coarsegridcells = adapt(arraytype(referencecell), cells(coarsegrid))
     coarsegridvertices = adapt(arraytype(referencecell), vertices(coarsegrid))
 
-    return GridManager(referencecell, coarsegrid, coarsegridvertices, p)
+    return GridManager(comm, referencecell, coarsegrid, coarsegridcells, coarsegridvertices, p)
 end
 
 Base.length(gm::GridManager) = P4estTypes.lengthoflocalquadrants(gm.forest)
@@ -99,4 +102,58 @@ function adapt!(gm::GridManager, flags)
     P4estTypes.iterateforest(gm.forest; userdata = flags, volume = fill_adapt_flags)
 
     return
+end
+
+generate(gm::GridManager) = generate(identity, gm)
+
+function materializeforestvolumedata(forest, _, quadrant, quadid, treeid, data)
+    id = quadid + P4estTypes.offset(forest[treeid])
+
+    data.quadranttolevel[id] = P4estTypes.level(quadrant)
+    data.quadranttotreeid[id] = treeid
+    data.quadranttocoordinate[id, :] .= P4estTypes.coordinates(quadrant)
+
+    return
+end
+
+function generate(warp::Function, gm::GridManager)
+    # Need to get integer coordinates of cells
+
+    A = arraytype(gm.referencecell)
+
+    quadranttolevel = Array{Int8}(undef, length(gm))
+    quadranttotreeid = Array{Int32}(undef, length(gm))
+    quadranttocoordinate =
+        Array{Int32}(undef, length(gm), P4estTypes.quadrantndims(gm.forest))
+    data = (; quadranttolevel, quadranttotreeid, quadranttocoordinate)
+
+    pin.(A, values(data))
+
+    P4estTypes.iterateforest(
+        gm.forest;
+        userdata = data,
+        volume = materializeforestvolumedata,
+    )
+
+    # Send data to the device
+    quadranttolevel = A(quadranttolevel)
+    quadranttotreeid = A(quadranttotreeid)
+    quadranttocoordinate = A(quadranttocoordinate)
+
+    points = materializepoints(
+        gm.referencecell,
+        gm.coarsegridcells,
+        gm.coarsegridvertices,
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+    )
+
+    points = warp.(points)
+
+    part = MPI.Comm_rank(gm.comm) + 1
+    nparts = MPI.Comm_size(gm.comm)
+    offset = MPI.Scan(Int(length(gm)), MPI.MPI_SUM, MPI.COMM_WORLD) - length(gm)
+
+    return Grid(part, nparts, gm.referencecell, offset, points, quadranttolevel, quadranttotreeid)
 end
