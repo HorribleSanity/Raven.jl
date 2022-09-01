@@ -68,6 +68,8 @@ function replace_quads(_, _, outgoing, incoming)
             QuadData(outd.old_id, outd.old_level, AdaptTouched),
         )
     end
+
+    return
 end
 
 function refine_quads(_, _, quadrant)
@@ -92,7 +94,9 @@ function adapt!(gm::GridManager, flags)
 
     P4estTypes.coarsen!(gm.forest; coarsen = coarsen_quads, replace = replace_quads)
     P4estTypes.refine!(gm.forest; refine = refine_quads, replace = replace_quads)
-    P4estTypes.balance!(gm.forest, replace = replace_quads)
+    P4estTypes.balance!(gm.forest; replace = replace_quads)
 
     P4estTypes.iterateforest(gm.forest; userdata = flags, volume = fill_adapt_flags)
+
+    return
 end
