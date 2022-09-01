@@ -168,57 +168,57 @@ celltype_vtk(::LobattoHex) = VTKCellTypes.VTK_LAGRANGE_HEXAHEDRON
 function connectivity_vtk(cell::LobattoLine)
     L = LinearIndices(size(cell))
     return [
-        L[begin],      # corners
+        L[1],      # corners
         L[end],
-        L[begin+1:end-1]..., # interior
+        L[2:(end-1)]..., # interior
     ]
 end
 
 function connectivity_vtk(cell::LobattoQuad)
     L = LinearIndices(size(cell))
     return [
-        L[begin, begin], # corners
-        L[end, begin],
+        L[1, 1], # corners
+        L[end, 1],
         L[end, end],
-        L[begin, end],
-        L[begin+1:end-1, begin]..., # edges
-        L[end, begin+1:end-1]...,
-        L[begin+1:end-1, end]...,
-        L[begin, begin+1:end-1]...,
-        L[begin+1:end-1, begin+1:end-1]..., # interior
+        L[1, end],
+        L[2:(end-1), 1]..., # edges
+        L[end, 2:(end-1)]...,
+        L[2:(end-1), end]...,
+        L[1, 2:(end-1)]...,
+        L[2:(end-1), 2:(end-1)]..., # interior
     ]
 end
 
 function connectivity_vtk(cell::LobattoHex)
     L = LinearIndices(size(cell))
     return [
-        L[begin, begin, begin], # corners
-        L[end, begin, begin],
-        L[end, end, begin],
-        L[begin, end, begin],
-        L[begin, begin, end],
-        L[end, begin, end],
+        L[1, 1, 1], # corners
+        L[end, 1, 1],
+        L[end, end, 1],
+        L[1, end, 1],
+        L[1, 1, end],
+        L[end, 1, end],
         L[end, end, end],
-        L[begin, end, end],
-        L[begin+1:end-1, begin, begin]..., # edges
-        L[end, begin+1:end-1, begin]...,
-        L[begin+1:end-1, end, begin]...,
-        L[begin, begin+1:end-1, begin]...,
-        L[begin+1:end-1, begin, end]...,
-        L[end, begin+1:end-1, end]...,
-        L[begin+1:end-1, end, end]...,
-        L[begin, begin+1:end-1, end]...,
-        L[begin, begin, begin+1:end-1]...,
-        L[end, begin, begin+1:end-1]...,
-        L[begin, end, begin+1:end-1]...,
-        L[end, end, begin+1:end-1]...,
-        L[begin, begin+1:end-1, begin+1:end-1]..., # faces
-        L[end, begin+1:end-1, begin+1:end-1]...,
-        L[begin+1:end-1, begin, begin+1:end-1]...,
-        L[begin+1:end-1, end, begin+1:end-1]...,
-        L[begin+1:end-1, begin+1:end-1, begin]...,
-        L[begin+1:end-1, begin+1:end-1, end]...,
-        L[begin+1:end-1, begin+1:end-1, begin+1:end-1]..., # interior
+        L[1, end, end],
+        L[2:(end-1), 1, 1]..., # edges
+        L[end, 2:(end-1), 1]...,
+        L[2:(end-1), end, 1]...,
+        L[1, 2:(end-1), 1]...,
+        L[2:(end-1), 1, end]...,
+        L[end, 2:(end-1), end]...,
+        L[2:(end-1), end, end]...,
+        L[1, 2:(end-1), end]...,
+        L[1, 1, 2:(end-1)]...,
+        L[end, 1, 2:(end-1)]...,
+        L[1, end, 2:(end-1)]...,
+        L[end, end, 2:(end-1)]...,
+        L[1, 2:(end-1), 2:(end-1)]..., # faces
+        L[end, 2:(end-1), 2:(end-1)]...,
+        L[2:(end-1), 1, 2:(end-1)]...,
+        L[2:(end-1), end, 2:(end-1)]...,
+        L[2:(end-1), 2:(end-1), 1]...,
+        L[2:(end-1), 2:(end-1), end]...,
+        L[2:(end-1), 2:(end-1), 2:(end-1)]..., # interior
     ]
 end
 
