@@ -8,6 +8,8 @@ using Harpy
 Harpy.get_device(::Type{T}) where {T<:CuArray} = CUDADevice()
 Harpy.arraytype(::Type{T}) where {T<:CuArray} = CuArray
 
+Harpy.pin(::Type{T}, A::Array) where {T<:CuArray} = CUDA.Mem.pin(A)
+
 # Speed up time to first cell by building the cell on the CPU and copying it to
 # the device.
 function Harpy.LobattoCell{T,A}(dims...) where {T,A<:CuArray}

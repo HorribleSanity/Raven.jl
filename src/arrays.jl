@@ -56,3 +56,10 @@ arraytype(A) = arraytype(typeof(A))
 arraytype(::Type) = nothing
 arraytype(::Type{T}) where {T<:Array} = Array
 arraytype(::Type{T}) where {T<:AbstractArray} = arraytype(parenttype(T))
+
+"""
+    pin(T::Type, A::Array)
+
+    Pins the host array A for coping to arrays of type T
+"""
+pin(::Type, A::Array) = nothing
