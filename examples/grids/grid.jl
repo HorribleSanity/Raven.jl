@@ -3,6 +3,7 @@
 using Harpy
 using MPI
 using WriteVTK
+using StaticArrays
 
 
 MPI.Initialized() || MPI.Init()
@@ -12,13 +13,13 @@ const comm = MPI.COMM_WORLD
 if true
     using HarpyCUDA
     using CUDA
-    const arraytype = CuArray
+    const AT = CuArray
     const local_comm =
         MPI.Comm_split_type(comm, MPI.MPI_COMM_TYPE_SHARED, MPI.Comm_rank(comm))
     CUDA.device!(MPI.Comm_rank(local_comm) % length(CUDA.devices()))
     CUDA.allowscalar(false)
 else
-    arraytype = Array
+    AT = Array
 end
 
 
@@ -27,18 +28,22 @@ end
 # gm = GridManager(cell, coarsegrid; level = (2, 3))
 
 gm = GridManager(
-    LobattoCell{Float64,arraytype}(3, 4),
-    Harpy.brick(2, 5);
+    LobattoCell{Float64,AT}(3, 2),
+    Harpy.brick(1, 1, coordinates = ((-1.0, 1.0), (-1.0, 1.0)));
     comm = comm,
-    min_level = 2,
+    min_level = 4,
 )
 
-indicator = fill(Harpy.AdaptNone, length(gm))
-indicator[1] = Harpy.AdaptRefine
+indicator = rand((Harpy.AdaptNone, Harpy.AdaptRefine), length(gm))
 
 adapt!(gm, indicator)
 
-grid = generate(gm)
+warp(x) = SVector(
+    x[1] + cospi(3x[2] / 2) * cospi(x[1] / 2) * cospi(x[2] / 2) / 5,
+    x[2] + sinpi(3x[1] / 2) * cospi(x[1] / 2) * cospi(x[2] / 2) / 5,
+)
+
+grid = generate(warp, gm)
 
 vtk_grid("grid", grid) do vtk
     vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
