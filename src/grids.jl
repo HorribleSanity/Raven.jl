@@ -77,6 +77,8 @@ function data_vtk!(vtk, grid::Grid)
     higherorderdegrees[1:length(ds), :] .= repeat(ds, 1, length(grid))
 
     vtk["HigherOrderDegrees", VTKCellData()] = higherorderdegrees
+    vtk[VTKCellData()] = Dict("HigherOrderDegrees" => "HigherOrderDegrees")
+
     vtk["PartitionNumber", VTKCellData()] = fill(partitionnumber(grid), length(grid))
     vtk["Level", VTKCellData()] = collect(levels(grid))
     vtk["Tree", VTKCellData()] = collect(trees(grid))
