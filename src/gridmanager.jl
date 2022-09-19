@@ -20,6 +20,13 @@ struct GridManager{C<:AbstractCell,G<:AbstractCoarseGrid,E,V,P} <: AbstractGridM
     forest::P
 end
 
+comm(gm::GridManager) = gm.comm
+referencecell(gm::GridManager) = gm.referencecell
+coarsegrid(gm::GridManager) = gm.coarsegrid
+coarsegridcells(gm::GridManager) = gm.coarsegridcells
+coarsegridvertices(gm::GridManager) = gm.coarsegridvertices
+forest(gm::GridManager) = gm.forest
+
 function GridManager(
     referencecell,
     coarsegrid;
@@ -48,7 +55,9 @@ function GridManager(
     )
 end
 
-Base.length(gm::GridManager) = P4estTypes.lengthoflocalquadrants(gm.forest)
+
+
+Base.length(gm::GridManager) = P4estTypes.lengthoflocalquadrants(forest(gm))
 
 function fill_quadrant_user_data(forest, _, quadrant, quadrantid, treeid, flags)
     id = quadrantid + P4estTypes.offset(forest[treeid])
@@ -100,13 +109,13 @@ end
 function adapt!(gm::GridManager, flags)
     @assert length(gm) == length(flags)
 
-    P4estTypes.iterateforest(gm.forest; userdata = flags, volume = fill_quadrant_user_data)
+    P4estTypes.iterateforest(forest(gm); userdata = flags, volume = fill_quadrant_user_data)
 
-    P4estTypes.coarsen!(gm.forest; coarsen = coarsen_quads, replace = replace_quads)
-    P4estTypes.refine!(gm.forest; refine = refine_quads, replace = replace_quads)
-    P4estTypes.balance!(gm.forest; replace = replace_quads)
+    P4estTypes.coarsen!(forest(gm); coarsen = coarsen_quads, replace = replace_quads)
+    P4estTypes.refine!(forest(gm); refine = refine_quads, replace = replace_quads)
+    P4estTypes.balance!(forest(gm); replace = replace_quads)
 
-    P4estTypes.iterateforest(gm.forest; userdata = flags, volume = fill_adapt_flags)
+    P4estTypes.iterateforest(forest(gm); userdata = flags, volume = fill_adapt_flags)
 
     return
 end
@@ -126,18 +135,18 @@ end
 function generate(warp::Function, gm::GridManager)
     # Need to get integer coordinates of cells
 
-    A = arraytype(gm.referencecell)
+    A = arraytype(referencecell(gm))
 
     quadranttolevel = Array{Int8}(undef, length(gm))
     quadranttotreeid = Array{Int32}(undef, length(gm))
     quadranttocoordinate =
-        Array{Int32}(undef, length(gm), P4estTypes.quadrantndims(gm.forest))
+        Array{Int32}(undef, length(gm), P4estTypes.quadrantndims(forest(gm)))
     data = (; quadranttolevel, quadranttotreeid, quadranttocoordinate)
 
     pin.(A, values(data))
 
     P4estTypes.iterateforest(
-        gm.forest;
+        forest(gm);
         userdata = data,
         volume = materializeforestvolumedata,
     )
@@ -148,9 +157,9 @@ function generate(warp::Function, gm::GridManager)
     quadranttocoordinate = A(quadranttocoordinate)
 
     points = materializepoints(
-        gm.referencecell,
-        gm.coarsegridcells,
-        gm.coarsegridvertices,
+        referencecell(gm),
+        coarsegridcells(gm),
+        coarsegridvertices(gm),
         quadranttolevel,
         quadranttotreeid,
         quadranttocoordinate,
@@ -158,14 +167,14 @@ function generate(warp::Function, gm::GridManager)
 
     points = warp.(points)
 
-    part = MPI.Comm_rank(gm.comm) + 1
-    nparts = MPI.Comm_size(gm.comm)
+    part = MPI.Comm_rank(comm(gm)) + 1
+    nparts = MPI.Comm_size(comm(gm))
     offset = MPI.Scan(Int(length(gm)), MPI.MPI_SUM, MPI.COMM_WORLD) - length(gm)
 
     return Grid(
         part,
         nparts,
-        gm.referencecell,
+        referencecell(gm),
         offset,
         points,
         quadranttolevel,
