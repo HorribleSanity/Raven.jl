@@ -38,7 +38,14 @@ function GridManager(
     coarsegridcells = adapt(arraytype(referencecell), cells(coarsegrid))
     coarsegridvertices = adapt(arraytype(referencecell), vertices(coarsegrid))
 
-    return GridManager(comm, referencecell, coarsegrid, coarsegridcells, coarsegridvertices, p)
+    return GridManager(
+        comm,
+        referencecell,
+        coarsegrid,
+        coarsegridcells,
+        coarsegridvertices,
+        p,
+    )
 end
 
 Base.length(gm::GridManager) = P4estTypes.lengthoflocalquadrants(gm.forest)
@@ -155,5 +162,13 @@ function generate(warp::Function, gm::GridManager)
     nparts = MPI.Comm_size(gm.comm)
     offset = MPI.Scan(Int(length(gm)), MPI.MPI_SUM, MPI.COMM_WORLD) - length(gm)
 
-    return Grid(part, nparts, gm.referencecell, offset, points, quadranttolevel, quadranttotreeid)
+    return Grid(
+        part,
+        nparts,
+        gm.referencecell,
+        offset,
+        points,
+        quadranttolevel,
+        quadranttotreeid,
+    )
 end
