@@ -55,8 +55,6 @@ function GridManager(
     )
 end
 
-
-
 Base.length(gm::GridManager) = P4estTypes.lengthoflocalquadrants(forest(gm))
 
 function fill_quadrant_user_data(forest, _, quadrant, quadrantid, treeid, flags)
