@@ -37,6 +37,14 @@ function brick(
     coordinates = (zero(T):n[1], zero(T):n[2]),
     mapping = identity,
 )
+    if length.(coordinates) != n .+ 1
+        throw(
+            DimensionMismatch(
+                "coordinates lengths $(length.(coordinates)) should correspond to the number of trees + 1, $(n .+ 1)",
+            ),
+        )
+    end
+
 
     connectivity = P4estTypes.brick(n, p)
 
@@ -54,6 +62,13 @@ function brick(
     coordinates = (zero(T):n[1], zero(T):n[2], zero(T):n[3]),
     mapping = identity,
 )
+    if length.(coordinates) != n .+ 1
+        throw(
+            DimensionMismatch(
+                "Coordinate lengths $(length.(coordinates)) should correspond to the number of trees + 1, $(n .+ 1)",
+            ),
+        )
+    end
 
     connectivity = P4estTypes.brick(n, p)
 
