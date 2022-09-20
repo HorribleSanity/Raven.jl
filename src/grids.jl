@@ -39,17 +39,34 @@ struct Grid{C<:AbstractCell,P,L,T} <: AbstractGrid{C}
     nparts::Int
     cell::C
     offset::Int
+    locallength::Int32
     points::P
     levels::L
     trees::T
 end
 
 referencecell(grid::Grid) = grid.cell
-points(grid::Grid) = grid.points
-levels(grid::Grid) = grid.levels
-trees(grid::Grid) = grid.trees
+
+points(grid::Grid) = points(grid, Val(false))
+function points(grid::Grid, withghostlayer::Val{false})
+    colons = ntuple(_ -> Colon(), ndims(grid.points) - 1)
+    return view(grid.points, colons..., Base.OneTo(grid.locallength))
+end
+points(grid::Grid, withghostlayer::Val{true}) = grid.points
+
+
+levels(grid::Grid) = levels(grid, Val(false))
+levels(grid::Grid, ::Val{false}) = view(grid.levels, Base.OneTo(grid.locallength))
+levels(grid::Grid, ::Val{true}) = grid.levels
+
+trees(grid::Grid) = trees(grid, Val(false))
+trees(grid::Grid, ::Val{false}) = view(grid.trees, Base.OneTo(grid.locallength))
+trees(grid::Grid, ::Val{true}) = grid.trees
+
+
 offset(grid::Grid) = grid.offset
-Base.length(grid::Grid) = last(size(grid.points))
+lengthwithghostlayer(grid::Grid) = last(size(pointswithghostlayer(grid)))
+Base.length(grid::Grid) = last(size(points(grid)))
 partitionnumber(grid::Grid) = grid.part
 numberofpartitions(grid::Grid) = grid.nparts
 
