@@ -27,21 +27,27 @@ end
 # coarsegrid = extrude(cubesphere(2, 2), 1)
 # gm = GridManager(cell, coarsegrid; level = (2, 3))
 
+N = (3, 2, 5)
+K = (2, 3, 4)
+coordinates = ntuple(d -> range(start = -1.0, stop = 1.0, length = K[d] + 1), length(K))
+
 gm = GridManager(
-    LobattoCell{Float64,AT}(3, 2),
-    Harpy.brick(1, 1, coordinates = ((-1.0, 1.0), (-1.0, 1.0)));
+    LobattoCell{Float64,AT}(N...),
+    Harpy.brick(K...; coordinates);
     comm = comm,
-    min_level = 4,
+    min_level = 2,
 )
 
 indicator = rand((Harpy.AdaptNone, Harpy.AdaptRefine), length(gm))
 
 adapt!(gm, indicator)
 
-warp(x) = SVector(
+warp(x::SVector{2}) = SVector(
     x[1] + cospi(3x[2] / 2) * cospi(x[1] / 2) * cospi(x[2] / 2) / 5,
     x[2] + sinpi(3x[1] / 2) * cospi(x[1] / 2) * cospi(x[2] / 2) / 5,
 )
+
+warp(x::SVector{3}) = x
 
 grid = generate(warp, gm)
 
