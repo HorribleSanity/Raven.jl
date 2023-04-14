@@ -15,7 +15,7 @@ if true
     using CUDA
     const AT = CuArray
     const local_comm =
-        MPI.Comm_split_type(comm, MPI.MPI_COMM_TYPE_SHARED, MPI.Comm_rank(comm))
+        MPI.Comm_split_type(comm, MPI.COMM_TYPE_SHARED, MPI.Comm_rank(comm))
     CUDA.device!(MPI.Comm_rank(local_comm) % length(CUDA.devices()))
     CUDA.allowscalar(false)
 else
