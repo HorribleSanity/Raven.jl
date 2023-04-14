@@ -188,7 +188,7 @@ function generate(warp::Function, gm::GridManager)
     part = MPI.Comm_rank(comm(gm)) + 1
     nparts = MPI.Comm_size(comm(gm))
     offset =
-        MPI.Scan(convert(Int, localnumberofquadrants), MPI.MPI_SUM, MPI.COMM_WORLD) -
+        MPI.Scan(convert(Int, localnumberofquadrants), MPI.SUM, MPI.COMM_WORLD) -
         localnumberofquadrants
 
     return Grid(
