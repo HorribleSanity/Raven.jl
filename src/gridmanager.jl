@@ -165,7 +165,7 @@ function generate(warp::Function, gm::GridManager)
         id = quadid + length(gm)
 
         quadranttolevel[id] = P4estTypes.level(quadrant)
-        quadranttotreeid[id] = P4estTypes.which_tree(quadrant)
+        quadranttotreeid[id] = P4estTypes.unsafe_which_tree(quadrant)
         quadranttocoordinate[id, :] .= P4estTypes.coordinates(quadrant)
     end
 
