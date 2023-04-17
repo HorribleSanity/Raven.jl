@@ -393,7 +393,7 @@ end
     rl = @localmem eltype(ri) (I,)
     sl = @localmem eltype(si) (J,)
 
-    begin
+    @inbounds begin
         if q ≤ numberofquadrants
             if j == 1 && q1 == 1
                 rl[i] = ri[i]
@@ -413,7 +413,7 @@ end
 
     @synchronize
 
-    begin
+    @inbounds begin
         if q ≤ numberofquadrants
             treeid = quadranttotreeid[q]
             level = quadranttolevel[q]
@@ -509,7 +509,7 @@ end
     sl = @localmem eltype(si) (J,)
     tl = @localmem eltype(ti) (K,)
 
-    begin
+    @inbounds begin
         if q ≤ numberofquadrants
             if j == 1 && k == 1
                 rl[i] = ri[i]
@@ -534,7 +534,7 @@ end
 
     @synchronize
 
-    begin
+    @inbounds begin
         if q ≤ numberofquadrants
             treeid = quadranttotreeid[q]
             level = quadranttolevel[q]
