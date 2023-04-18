@@ -12,22 +12,37 @@ MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 OneDimensionalNodes = "c5182250-406c-41f5-b9da-836c94d3c2ab"
 P4estTypes = "f636fe8e-398d-42a9-9d15-dd2c0670d30f"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SnoopPrecompile = "66db9d55-30c0-4569-8b51-7e840670fc0c"
 StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
+[weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57"
+
+[extensions]
+CUDAExt = ["CUDA", "CUDAKernels"]
+
 [compat]
 Adapt = "3"
+CUDA = "3"
+CUDAKernels = "0.4"
 FillArrays = "1"
 KernelAbstractions = "0.8"
 MPI = "0.20"
 OneDimensionalNodes = "1"
 P4estTypes = "0.1.1"
 RecipesBase = "1"
+Requires = "1"
 SnoopPrecompile = "1"
 StableRNGs = "1"
 StaticArrays = "1"
 WriteVTK = "1.16"
 julia = "1.6"
+
+[extras]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57"
