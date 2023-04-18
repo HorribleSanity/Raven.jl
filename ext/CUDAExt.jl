@@ -3,9 +3,9 @@ module CUDAExt
 import Harpy
 import Adapt
 isdefined(Base, :get_extension) ? (using CUDA) : (using ..CUDA)
-isdefined(Base, :get_extension) ? (using CUDAKernels) : (using ..CUDAKernels)
+isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAKernels)
 
-Harpy.get_device(::Type{T}) where {T<:CuArray} = CUDADevice()
+Harpy.get_device(::Type{T}) where {T<:CuArray} = CUDABackend()
 Harpy.arraytype(::Type{T}) where {T<:CuArray} = CuArray
 
 Harpy.pin(::Type{T}, A::Array) where {T<:CuArray} = CUDA.Mem.pin(A)

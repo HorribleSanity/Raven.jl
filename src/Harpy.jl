@@ -40,9 +40,7 @@ end
 
 @static if !isdefined(Base, :get_extension)
     function __init__()
-        @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
-            @require CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57" include("../ext/CUDAExt.jl")
-        end
+        @require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" include("../ext/CUDAExt.jl")
     end
 end
 

@@ -33,9 +33,7 @@ function (*)(K::Kron{Tuple{D}}, f::F) where {D<:AbstractMatrix,F<:AbstractVecOrM
 
     device = get_device(r)
     kernel! = kron_D_kernel(device, size(r, 1))
-    event = Event(device)
-    event = kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r), dependencies = event)
-    wait(device, event)
+    kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
@@ -59,9 +57,7 @@ function (*)(K::Kron{Tuple{E,D}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:Abstr
 
     device = get_device(r)
     kernel! = kron_ED_kernel(device, size(r)[begin:end-1])
-    event = Event(device)
-    event = kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r), dependencies = event)
-    wait(device, event)
+    kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
@@ -85,9 +81,7 @@ function (*)(K::Kron{Tuple{D,E}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:Abstr
 
     device = get_device(r)
     kernel! = kron_DE_kernel(device, size(r)[begin:end-1])
-    event = Event(device)
-    event = kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r), dependencies = event)
-    wait(device, event)
+    kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
@@ -124,18 +118,7 @@ function (*)(
 
     device = get_device(r)
     kernel! = kron_BA_kernel(device, size(r)[begin:end-1])
-    event = Event(device)
-    event = kernel!(
-        r,
-        a,
-        b,
-        g,
-        Val(axes(a, 2)),
-        Val(axes(b, 2));
-        ndrange = size(r),
-        dependencies = event,
-    )
-    wait(device, event)
+    kernel!(r, a, b, g, Val(axes(a, 2)), Val(axes(b, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
@@ -162,9 +145,7 @@ function (*)(
 
     device = get_device(r)
     kernel! = kron_EED_kernel(device, size(r)[begin:end-1])
-    event = Event(device)
-    event = kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r), dependencies = event)
-    wait(device, event)
+    kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
@@ -191,9 +172,7 @@ function (*)(
 
     device = get_device(r)
     kernel! = kron_EDE_kernel(device, size(r)[begin:end-1])
-    event = Event(device)
-    event = kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r), dependencies = event)
-    wait(device, event)
+    kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
@@ -220,9 +199,7 @@ function (*)(
 
     device = get_device(r)
     kernel! = kron_DEE_kernel(device, size(r)[begin:end-1])
-    event = Event(device)
-    event = kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r), dependencies = event)
-    wait(device, event)
+    kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
@@ -263,8 +240,7 @@ function (*)(
 
     device = get_device(r)
     kernel! = kron_CBA_kernel(device, size(r)[begin:end-1])
-    event = Event(device)
-    event = kernel!(
+    kernel!(
         r,
         a,
         b,
@@ -274,9 +250,7 @@ function (*)(
         Val(axes(b, 2)),
         Val(axes(c, 2));
         ndrange = size(r),
-        dependencies = event,
     )
-    wait(device, event)
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
