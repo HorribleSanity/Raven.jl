@@ -465,7 +465,7 @@ function materializepoints(
     device = get_device(points)
 
     kernel! = quadpoints!(device, (length.(r)..., Q))
-    event = kernel!(
+    kernel!(
         points,
         r...,
         coarsegridcells,
@@ -477,9 +477,7 @@ function materializepoints(
         Val.(length.(r))...,
         Val(Q);
         ndrange = size(points),
-        dependencies = Event(device),
     )
-    wait(device, event)
 
     return points
 end
@@ -594,7 +592,7 @@ function materializepoints(
 
     device = get_device(points)
     kernel! = hexpoints!(device, length.(r))
-    event = kernel!(
+    kernel!(
         points,
         r...,
         coarsegridcells,
@@ -605,9 +603,7 @@ function materializepoints(
         quadranttocoordinate,
         Val.(length.(r))...;
         ndrange = size(points),
-        dependencies = Event(device),
     )
-    wait(device, event)
 
     return points
 end

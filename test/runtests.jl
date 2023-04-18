@@ -1,5 +1,5 @@
 using CUDA
-using CUDAKernels
+using CUDA.CUDAKernels
 using Harpy
 using MPI
 using Test
