@@ -1,27 +1,29 @@
-# export JULIA_LOAD_PATH="${PWD}/../..:${PWD}/../../lib/HarpyCUDA:" 
-
-using Harpy
 using MPI
-using WriteVTK
-using StaticArrays
-
 
 MPI.Initialized() || MPI.Init()
 
 const comm = MPI.COMM_WORLD
 
 if true
-    using HarpyCUDA
     using CUDA
-    const AT = CuArray
-    const local_comm =
-        MPI.Comm_split_type(comm, MPI.COMM_TYPE_SHARED, MPI.Comm_rank(comm))
-    CUDA.device!(MPI.Comm_rank(local_comm) % length(CUDA.devices()))
-    CUDA.allowscalar(false)
+    using CUDAKernels
+
+    if CUDA.functional()
+        const AT = CuArray
+        const local_comm =
+            MPI.Comm_split_type(comm, MPI.COMM_TYPE_SHARED, MPI.Comm_rank(comm))
+        CUDA.device!(MPI.Comm_rank(local_comm) % length(CUDA.devices()))
+        CUDA.allowscalar(false)
+    else
+        const AT = Array
+    end
 else
-    AT = Array
+    const AT = Array
 end
 
+using Harpy
+using WriteVTK
+using StaticArrays
 
 # here the level is a tuple to 
 # coarsegrid = extrude(cubesphere(2, 2), 1)

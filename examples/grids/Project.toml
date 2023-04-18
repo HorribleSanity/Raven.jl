@@ -1,5 +1,7 @@
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57"
+Harpy = "bf947970-47e9-4a05-b1e2-e770fd76d85d"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
