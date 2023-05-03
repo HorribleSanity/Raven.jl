@@ -9,7 +9,7 @@ using MPI
 using OneDimensionalNodes
 import P4estTypes
 using RecipesBase
-using SnoopPrecompile
+using PrecompileTools
 using StaticArrays
 using StaticArrays: tuple_prod, tuple_length, size_to_tuple
 using WriteVTK
@@ -44,8 +44,8 @@ end
     end
 end
 
-@precompile_setup begin
-    @precompile_all_calls begin
+@setup_workload begin
+    @compile_workload begin
         include("../test/testsuite.jl")
         for T in (Float64, Float32, BigFloat)
             Testsuite.cells_testsuite(Array, T)
