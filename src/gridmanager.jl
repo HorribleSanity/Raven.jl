@@ -137,6 +137,7 @@ function generate(warp::Function, gm::GridManager)
 
     ghost = P4estTypes.ghostlayer(forest(gm))
     nodes = P4estTypes.lnodes(forest(gm); ghost)
+    P4estTypes.expand!(ghost, forest(gm), nodes)
 
     ghosts = P4estTypes.ghosts(ghost)
 
