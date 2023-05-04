@@ -136,7 +136,7 @@ function generate(warp::Function, gm::GridManager)
     A = arraytype(referencecell(gm))
 
     ghost = P4estTypes.ghostlayer(forest(gm))
-    nodes = P4estTypes.lnodes(forest(gm); ghost)
+    nodes = P4estTypes.lnodes(forest(gm); ghost, degree = 2)
     P4estTypes.expand!(ghost, forest(gm), nodes)
 
     ghosts = P4estTypes.ghosts(ghost)
