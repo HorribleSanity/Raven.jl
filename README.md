@@ -1,7 +1,7 @@
 # Raven 𓅂
 <p align="center">
   <a href="https://lcw.github.io/Raven.jl/dev/">Documentation</a> •
-  <a href="#contributing">Contributing</a> •
+  <a href="#contributing">Contributing</a>
 </p>
 
 [Raven](https://github.com/lcw/Raven.jl)
