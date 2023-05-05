@@ -21,7 +21,7 @@ else
     const AT = Array
 end
 
-using Harpy
+using Raven
 using WriteVTK
 using StaticArrays
 
@@ -35,12 +35,12 @@ coordinates = ntuple(d -> range(start = -1.0, stop = 1.0, length = K[d] + 1), le
 
 gm = GridManager(
     LobattoCell{Float64,AT}(N...),
-    Harpy.brick(K...; coordinates);
+    Raven.brick(K...; coordinates);
     comm = comm,
     min_level = 2,
 )
 
-indicator = rand((Harpy.AdaptNone, Harpy.AdaptRefine), length(gm))
+indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
 
 adapt!(gm, indicator)
 

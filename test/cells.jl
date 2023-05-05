@@ -27,8 +27,8 @@ function cells_testsuite(AT, FT)
             }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
         end,
     )
-    @test (1, 4, 4) == size.(Harpy.materializefaces(cell), 2)
-    @test Harpy.connectivity(cell) == adapt(
+    @test (1, 4, 4) == size.(Raven.materializefaces(cell), 2)
+    @test Raven.connectivity(cell) == adapt(
         AT,
         (
             ([1 4 7; 2 5 8; 3 6 9],),
@@ -36,9 +36,9 @@ function cells_testsuite(AT, FT)
             (1, 3, 7, 9),
         ),
     )
-    @test Harpy.connectivityoffsets(cell, Val(1)) == (0, 9)
-    @test Harpy.connectivityoffsets(cell, Val(2)) == (0, 3, 6, 9, 12)
-    @test Harpy.connectivityoffsets(cell, Val(3)) == (0, 1, 2, 3, 4)
+    @test Raven.connectivityoffsets(cell, Val(1)) == (0, 9)
+    @test Raven.connectivityoffsets(cell, Val(2)) == (0, 3, 6, 9, 12)
+    @test Raven.connectivityoffsets(cell, Val(3)) == (0, 1, 2, 3, 4)
     @test adapt(Array, cell) isa LobattoCell{FT,Array}
 
     s = (3, 4, 2)
@@ -66,9 +66,9 @@ function cells_testsuite(AT, FT)
             }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
         end,
     )
-    @test (1, 6, 12, 8) == size.(Harpy.materializefaces(cell), 2)
-    @test Harpy.connectivity(cell)[1] == (adapt(AT, reshape(collect(1:24), 3, 4, 2)),)
-    @test Harpy.connectivity(cell)[2:end] == adapt(
+    @test (1, 6, 12, 8) == size.(Raven.materializefaces(cell), 2)
+    @test Raven.connectivity(cell)[1] == (adapt(AT, reshape(collect(1:24), 3, 4, 2)),)
+    @test Raven.connectivity(cell)[2:end] == adapt(
         AT,
         (
             (
@@ -96,11 +96,11 @@ function cells_testsuite(AT, FT)
             (1, 3, 10, 12, 13, 15, 22, 24),
         ),
     )
-    @test Harpy.connectivityoffsets(cell, Val(1)) == (0, 24)
-    @test Harpy.connectivityoffsets(cell, Val(2)) == (0, 8, 16, 22, 28, 40, 52)
-    @test Harpy.connectivityoffsets(cell, Val(3)) ==
+    @test Raven.connectivityoffsets(cell, Val(1)) == (0, 24)
+    @test Raven.connectivityoffsets(cell, Val(2)) == (0, 8, 16, 22, 28, 40, 52)
+    @test Raven.connectivityoffsets(cell, Val(3)) ==
           (0, 2, 4, 6, 8, 12, 16, 20, 24, 27, 30, 33, 36)
-    @test Harpy.connectivityoffsets(cell, Val(4)) == (0, 1, 2, 3, 4, 5, 6, 7, 8)
+    @test Raven.connectivityoffsets(cell, Val(4)) == (0, 1, 2, 3, 4, 5, 6, 7, 8)
 
     cell = LobattoCell{FT,AT}(5)
     @test floattype(cell) == FT
@@ -124,8 +124,8 @@ function cells_testsuite(AT, FT)
             }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
         end,
     )
-    @test (1, 2) == size.(Harpy.materializefaces(cell), 2)
-    @test Harpy.connectivity(cell) == adapt(AT, (([1, 2, 3, 4, 5],), (1, 5)))
-    @test Harpy.connectivityoffsets(cell, Val(1)) == (0, 5)
-    @test Harpy.connectivityoffsets(cell, Val(2)) == (0, 1, 2)
+    @test (1, 2) == size.(Raven.materializefaces(cell), 2)
+    @test Raven.connectivity(cell) == adapt(AT, (([1, 2, 3, 4, 5],), (1, 5)))
+    @test Raven.connectivityoffsets(cell, Val(1)) == (0, 5)
+    @test Raven.connectivityoffsets(cell, Val(2)) == (0, 1, 2)
 end

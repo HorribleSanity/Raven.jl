@@ -14,17 +14,17 @@ function kron_testsuite(AT, FT)
         (a, Eye{FT}(4), Eye{FT}(7)),
         (a, b, c),
     )
-        K = adapt(AT, collect(Harpy.Kron(adapt(Array, args))))
+        K = adapt(AT, collect(Raven.Kron(adapt(Array, args))))
         d = adapt(AT, rand(SVector{2,FT}, size(K, 2), 12))
         e = adapt(AT, rand(SVector{2,FT}, size(K, 2)))
-        @test Array(Harpy.Kron(args) * e) ≈ Array(K * e)
-        @test Array(Harpy.Kron(args) * d) ≈ Array(K * d)
+        @test Array(Raven.Kron(args) * e) ≈ Array(K * e)
+        @test Array(Raven.Kron(args) * d) ≈ Array(K * d)
 
         g = adapt(AT, rand(FT, 4, size(K, 2), 6))
         gv1 = @view g[1, :, :]
         gv2 = @view g[1, :, 1]
-        @test Array(Harpy.Kron(args) * gv1) ≈ Array(K * gv1)
-        @test Array(Harpy.Kron(args) * gv2) ≈ Array(K * gv2)
+        @test Array(Raven.Kron(args) * gv1) ≈ Array(K * gv1)
+        @test Array(Raven.Kron(args) * gv2) ≈ Array(K * gv2)
 
         if isbits(FT)
             f = rand(rng, FT, size(K, 2), 3, 2)
@@ -32,9 +32,9 @@ function kron_testsuite(AT, FT)
                 AT,
                 reinterpret(reshape, SVector{2,FT}, PermutedDimsArray(f, (3, 1, 2))),
             )
-            @test Array(Harpy.Kron(args) * f) ≈ Array(K * f)
+            @test Array(Raven.Kron(args) * f) ≈ Array(K * f)
         end
 
-        @test adapt(Array, Harpy.Kron(args)) == Harpy.Kron(adapt.(Array, args))
+        @test adapt(Array, Raven.Kron(args)) == Raven.Kron(adapt.(Array, args))
     end
 end
