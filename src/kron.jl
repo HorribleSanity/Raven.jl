@@ -38,7 +38,7 @@ function (*)(K::Kron{Tuple{D}}, f::F) where {D<:AbstractMatrix,F<:AbstractVecOrM
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
-@kernel function kron_ED_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
+@kernel function kron_E_D_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k) = @index(Global, NTuple)
     acc = zero(T)
     @inbounds begin
@@ -56,13 +56,13 @@ function (*)(K::Kron{Tuple{E,D}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:Abstr
     r = similar(f, size(d, 1), size(e, 1), size(g, 3))
 
     device = get_device(r)
-    kernel! = kron_ED_kernel(device, size(r)[begin:end-1])
+    kernel! = kron_E_D_kernel(device, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
-@kernel function kron_DE_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
+@kernel function kron_D_E_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k) = @index(Global, NTuple)
     acc = zero(T)
     @inbounds begin
@@ -80,13 +80,13 @@ function (*)(K::Kron{Tuple{D,E}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:Abstr
     r = similar(f, size(e, 1), size(d, 1), size(g, 3))
 
     device = get_device(r)
-    kernel! = kron_DE_kernel(device, size(r)[begin:end-1])
+    kernel! = kron_D_E_kernel(device, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
-@kernel function kron_BA_kernel(
+@kernel function kron_B_A_kernel(
     r::AbstractArray{T},
     a,
     b,
@@ -117,13 +117,13 @@ function (*)(
     r = similar(f, size(a, 1), size(b, 1), size(g, 3))
 
     device = get_device(r)
-    kernel! = kron_BA_kernel(device, size(r)[begin:end-1])
+    kernel! = kron_B_A_kernel(device, size(r)[begin:end-1])
     kernel!(r, a, b, g, Val(axes(a, 2)), Val(axes(b, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
-@kernel function kron_EED_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
+@kernel function kron_E_E_D_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k, e) = @index(Global, NTuple)
     acc = zero(T)
     @inbounds begin
@@ -144,13 +144,13 @@ function (*)(
     r = similar(f, size(d, 1), size(e₂, 1), size(e₃, 1), size(g, 4))
 
     device = get_device(r)
-    kernel! = kron_EED_kernel(device, size(r)[begin:end-1])
+    kernel! = kron_E_E_D_kernel(device, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
-@kernel function kron_EDE_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
+@kernel function kron_E_D_E_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k, e) = @index(Global, NTuple)
     acc = zero(T)
     @inbounds begin
@@ -171,13 +171,13 @@ function (*)(
     r = similar(f, size(e₁, 1), size(d, 1), size(e₃, 1), size(g, 4))
 
     device = get_device(r)
-    kernel! = kron_EDE_kernel(device, size(r)[begin:end-1])
+    kernel! = kron_E_D_E_kernel(device, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
-@kernel function kron_DEE_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
+@kernel function kron_D_E_E_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k, e) = @index(Global, NTuple)
     acc = zero(T)
     @inbounds begin
@@ -198,13 +198,13 @@ function (*)(
     r = similar(f, size(e₁, 1), size(e₂, 1), size(d, 1), size(g, 4))
 
     device = get_device(r)
-    kernel! = kron_DEE_kernel(device, size(r)[begin:end-1])
+    kernel! = kron_D_E_E_kernel(device, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
-@kernel function kron_CBA_kernel(
+@kernel function kron_C_B_A_kernel(
     r::AbstractArray{T},
     a,
     b,
@@ -239,7 +239,7 @@ function (*)(
     r = similar(f, size(a, 1), size(b, 1), size(c, 1), size(g, 4))
 
     device = get_device(r)
-    kernel! = kron_CBA_kernel(device, size(r)[begin:end-1])
+    kernel! = kron_C_B_A_kernel(device, size(r)[begin:end-1])
     kernel!(
         r,
         a,
