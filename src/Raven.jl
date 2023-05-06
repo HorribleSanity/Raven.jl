@@ -1,7 +1,6 @@
 module Raven
 
 using Adapt
-using FillArrays
 using KernelAbstractions
 using KernelAbstractions.Extras: @unroll
 using LinearAlgebra
@@ -28,6 +27,7 @@ export GridManager, generate
 export adapt!
 
 include("arrays.jl")
+include("eye.jl")
 include("kron.jl")
 include("cells.jl")
 include("coarsegrids.jl")
