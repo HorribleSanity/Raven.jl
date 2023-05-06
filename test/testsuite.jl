@@ -2,7 +2,6 @@ module Testsuite
 
 using ..Raven
 using ..Raven.Adapt
-using ..Raven.FillArrays
 using ..Raven.LinearAlgebra
 using ..Raven.OneDimensionalNodes
 using ..Raven.StaticArrays

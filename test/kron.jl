@@ -6,12 +6,12 @@ function kron_testsuite(AT, FT)
 
     for args in (
         (a,),
-        (a, Eye{FT}(5)),
-        (Eye{FT}(2), b),
+        (a, Raven.Eye{FT,5}()),
+        (Raven.Eye{FT,2}(), b),
         (a, b),
-        (Eye{FT}(3), Eye{FT}(2), c),
-        (Eye{FT}(2), b, Eye{FT}(7)),
-        (a, Eye{FT}(4), Eye{FT}(7)),
+        (Raven.Eye{FT,3}(), Raven.Eye{FT,2}(), c),
+        (Raven.Eye{FT,2}(), b, Raven.Eye{FT,7}()),
+        (a, Raven.Eye{FT,4}(), Raven.Eye{FT,7}()),
         (a, b, c),
     )
         K = adapt(AT, collect(Raven.Kron(adapt(Array, args))))

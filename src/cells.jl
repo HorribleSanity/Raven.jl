@@ -89,7 +89,7 @@ function LobattoCell{T,A}(dims...) where {T,A}
     # end
 
     derivatives = ntuple(N) do i
-        tup = ntuple(j -> ifelse(i == j, o[i].derivative, Eye{T}(dims[j])), N)
+        tup = ntuple(j -> ifelse(i == j, o[i].derivative, Eye{T,dims[j]}()), N)
         return Kron(reverse(tup))
     end
 
