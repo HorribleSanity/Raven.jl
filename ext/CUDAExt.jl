@@ -5,7 +5,7 @@ import Adapt
 isdefined(Base, :get_extension) ? (using CUDA) : (using ..CUDA)
 isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAKernels)
 
-Raven.get_backend(::Type{T}) where {T<:CuArray} = CUDABackend()
+Raven.get_backend(::Type{T}) where {T<:CuArray} = CUDABackend(; always_inline = true)
 Raven.arraytype(::Type{T}) where {T<:CuArray} = CuArray
 
 Raven.pin(::Type{T}, A::Array) where {T<:CuArray} = CUDA.Mem.pin(A)
