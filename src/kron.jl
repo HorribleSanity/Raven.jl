@@ -31,8 +31,8 @@ function (*)(K::Kron{Tuple{D}}, f::F) where {D<:AbstractMatrix,F<:AbstractVecOrM
     g = reshape(f, size(d, 2), :)
     r = similar(f, size(d, 1), size(g, 2))
 
-    device = get_device(r)
-    kernel! = kron_D_kernel(device, size(r, 1))
+    backend = get_backend(r)
+    kernel! = kron_D_kernel(backend, size(r, 1))
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
@@ -55,8 +55,8 @@ function (*)(K::Kron{Tuple{E,D}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:Abstr
     g = reshape(f, size(d, 2), size(e, 1), :)
     r = similar(f, size(d, 1), size(e, 1), size(g, 3))
 
-    device = get_device(r)
-    kernel! = kron_E_D_kernel(device, size(r)[begin:end-1])
+    backend = get_backend(r)
+    kernel! = kron_E_D_kernel(backend, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
@@ -79,8 +79,8 @@ function (*)(K::Kron{Tuple{D,E}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:Abstr
     g = reshape(f, size(e, 1), size(d, 2), :)
     r = similar(f, size(e, 1), size(d, 1), size(g, 3))
 
-    device = get_device(r)
-    kernel! = kron_D_E_kernel(device, size(r)[begin:end-1])
+    backend = get_backend(r)
+    kernel! = kron_D_E_kernel(backend, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
@@ -116,8 +116,8 @@ function (*)(
     g = reshape(f, size(a, 2), size(b, 2), :)
     r = similar(f, size(a, 1), size(b, 1), size(g, 3))
 
-    device = get_device(r)
-    kernel! = kron_B_A_kernel(device, size(r)[begin:end-1])
+    backend = get_backend(r)
+    kernel! = kron_B_A_kernel(backend, size(r)[begin:end-1])
     kernel!(r, a, b, g, Val(axes(a, 2)), Val(axes(b, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
@@ -143,8 +143,8 @@ function (*)(
     g = reshape(f, size(d, 2), size(e₂, 1), size(e₃, 1), :)
     r = similar(f, size(d, 1), size(e₂, 1), size(e₃, 1), size(g, 4))
 
-    device = get_device(r)
-    kernel! = kron_E_E_D_kernel(device, size(r)[begin:end-1])
+    backend = get_backend(r)
+    kernel! = kron_E_E_D_kernel(backend, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
@@ -170,8 +170,8 @@ function (*)(
     g = reshape(f, size(e₁, 1), size(d, 2), size(e₃, 1), :)
     r = similar(f, size(e₁, 1), size(d, 1), size(e₃, 1), size(g, 4))
 
-    device = get_device(r)
-    kernel! = kron_E_D_E_kernel(device, size(r)[begin:end-1])
+    backend = get_backend(r)
+    kernel! = kron_E_D_E_kernel(backend, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
@@ -197,8 +197,8 @@ function (*)(
     g = reshape(f, size(e₁, 1), size(e₂, 1), size(d, 2), :)
     r = similar(f, size(e₁, 1), size(e₂, 1), size(d, 1), size(g, 4))
 
-    device = get_device(r)
-    kernel! = kron_D_E_E_kernel(device, size(r)[begin:end-1])
+    backend = get_backend(r)
+    kernel! = kron_D_E_E_kernel(backend, size(r)[begin:end-1])
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
@@ -238,8 +238,8 @@ function (*)(
     g = reshape(f, size(a, 2), size(b, 2), size(c, 2), :)
     r = similar(f, size(a, 1), size(b, 1), size(c, 1), size(g, 4))
 
-    device = get_device(r)
-    kernel! = kron_C_B_A_kernel(device, size(r)[begin:end-1])
+    backend = get_backend(r)
+    kernel! = kron_C_B_A_kernel(backend, size(r)[begin:end-1])
     kernel!(
         r,
         a,

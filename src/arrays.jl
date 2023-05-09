@@ -1,4 +1,4 @@
-# The parenttype function and get_device were adapted from ArrayInterfaceCore
+# The parenttype function and get_backend were adapted from ArrayInterfaceCore
 # with the following license.
 # MIT License
 # 
@@ -42,15 +42,15 @@ parenttype(::Type{Diagonal{T,V}}) where {T,V} = V
 parenttype(T::Type) = T
 
 """
-    get_type(::Type{T}) -> Type
+    get_backend(::Type{T}) -> Type
 
-Returns the KernelAbstractions device to use with kernels where `A` is an
+Returns the KernelAbstractions backend to use with kernels where `A` is an
 argument.
 """
-get_device(A) = get_device(typeof(A))
-get_device(::Type) = nothing
-get_device(::Type{T}) where {T<:Array} = CPU()
-get_device(::Type{T}) where {T<:AbstractArray} = get_device(parenttype(T))
+get_backend(A) = get_backend(typeof(A))
+get_backend(::Type) = nothing
+get_backend(::Type{T}) where {T<:Array} = CPU()
+get_backend(::Type{T}) where {T<:AbstractArray} = get_backend(parenttype(T))
 
 arraytype(A) = arraytype(typeof(A))
 arraytype(::Type) = nothing

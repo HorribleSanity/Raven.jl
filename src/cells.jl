@@ -462,9 +462,9 @@ function materializepoints(
     # FIXME use cell array here; think about storage order
     points = A{eltype(coarsegridvertices)}(undef, length.(r)..., length(quadranttolevel))
 
-    device = get_device(points)
+    backend = get_backend(points)
 
-    kernel! = quadpoints!(device, (length.(r)..., Q))
+    kernel! = quadpoints!(backend, (length.(r)..., Q))
     kernel!(
         points,
         r...,
@@ -590,8 +590,8 @@ function materializepoints(
     # FIXME use cell array here; think about storage order
     points = A{eltype(coarsegridvertices)}(undef, length.(r)..., length(quadranttolevel))
 
-    device = get_device(points)
-    kernel! = hexpoints!(device, length.(r))
+    backend = get_backend(points)
+    kernel! = hexpoints!(backend, length.(r))
     kernel!(
         points,
         r...,
