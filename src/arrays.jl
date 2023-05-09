@@ -60,6 +60,6 @@ arraytype(::Type{T}) where {T<:AbstractArray} = arraytype(parenttype(T))
 """
     pin(T::Type, A::Array)
 
-    Pins the host array A for coping to arrays of type T
+    Pins the host array A for copying to arrays of type T
 """
 pin(::Type, A::Array) = nothing
