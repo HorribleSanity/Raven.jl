@@ -31,6 +31,7 @@ include("eye.jl")
 include("kron.jl")
 include("cells.jl")
 include("coarsegrids.jl")
+include("communication.jl")
 include("grids.jl")
 include("gridmanager.jl")
 
