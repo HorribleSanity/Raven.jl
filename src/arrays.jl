@@ -62,4 +62,4 @@ arraytype(::Type{T}) where {T<:AbstractArray} = arraytype(parenttype(T))
 
     Pins the host array A for copying to arrays of type T
 """
-pin(::Type, A::Array) = nothing
+pin(::Type, A::Array) = A
