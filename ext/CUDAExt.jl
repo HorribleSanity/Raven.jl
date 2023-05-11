@@ -3,6 +3,7 @@ module CUDAExt
 import Raven
 import Adapt
 import MPI
+using PrecompileTools
 
 isdefined(Base, :get_extension) ? (using CUDA) : (using ..CUDA)
 isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAKernels)
@@ -19,6 +20,15 @@ Raven.usetriplebuffer(::Type{T}) where {T<:CuArray} = !MPI.has_cuda()
 function Raven.LobattoCell{T,A}(dims...) where {T,A<:CuArray}
     cell = Raven.LobattoCell{T,Array}(dims...)
     return Adapt.adapt(A, cell)
+end
+
+@setup_workload begin
+    @compile_workload begin
+        for T in (Float64, Float32)
+            Raven.Testsuite.cells_testsuite(CuArray, T)
+            Raven.Testsuite.kron_testsuite(CuArray, T)
+        end
+    end
 end
 
 end # module CUDAExt
