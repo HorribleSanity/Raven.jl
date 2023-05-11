@@ -1,9 +1,12 @@
+using Aqua
 using CUDA
 using CUDA.CUDAKernels
 using MPI
 using Pkg
 using Raven
 using Test
+
+Aqua.test_all(Raven)
 
 function runmpitests()
     test_dir = @__DIR__
