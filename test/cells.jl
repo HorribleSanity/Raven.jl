@@ -1,5 +1,7 @@
+using StaticArrays: size_to_tuple
+
 function cells_testsuite(AT, FT)
-    cell = LobattoCell{FT,AT}(3, 3)
+    cell = LobattoCell{Tuple{3,3},FT,AT}()
     @test floattype(typeof(cell)) == FT
     @test arraytype(typeof(cell)) <: AT
     @test ndims(typeof(cell)) == 2
@@ -39,23 +41,26 @@ function cells_testsuite(AT, FT)
     @test Raven.connectivityoffsets(cell, Val(1)) == (0, 9)
     @test Raven.connectivityoffsets(cell, Val(2)) == (0, 3, 6, 9, 12)
     @test Raven.connectivityoffsets(cell, Val(3)) == (0, 1, 2, 3, 4)
-    @test adapt(Array, cell) isa LobattoCell{FT,Array}
+    @test adapt(Array, cell) isa LobattoCell{S,FT,Array} where {S}
 
-    s = (3, 4, 2)
-    cell = LobattoCell{FT,AT}(s...)
+    S = Tuple{3,4,2}
+    cell = LobattoCell{S,FT,AT}()
     @test floattype(cell) == FT
     @test arraytype(cell) <: AT
     @test Base.ndims(cell) == 3
-    @test size(cell) == s
-    @test length(cell) == prod(s)
+    @test size(cell) == size_to_tuple(S)
+    @test length(cell) == prod(size_to_tuple(S))
     @test sum(mass(cell)) .≈ 8
     @test mass(cell) isa Diagonal
     @test sum(facemass(cell)) .≈ 24
     @test facemass(cell) isa Diagonal
     D = derivatives(cell)
-    @test Array(D[1] * points(cell)) ≈ fill(SVector(one(FT), zero(FT), zero(FT)), prod(s))
-    @test Array(D[2] * points(cell)) ≈ fill(SVector(zero(FT), one(FT), zero(FT)), prod(s))
-    @test Array(D[3] * points(cell)) ≈ fill(SVector(zero(FT), zero(FT), one(FT)), prod(s))
+    @test Array(D[1] * points(cell)) ≈
+          fill(SVector(one(FT), zero(FT), zero(FT)), prod(size_to_tuple(S)))
+    @test Array(D[2] * points(cell)) ≈
+          fill(SVector(zero(FT), one(FT), zero(FT)), prod(size_to_tuple(S)))
+    @test Array(D[3] * points(cell)) ≈
+          fill(SVector(zero(FT), zero(FT), one(FT)), prod(size_to_tuple(S)))
     D1d = derivatives_1d(cell)
     @test length(D1d) == ndims(cell)
     @test all(
@@ -102,7 +107,7 @@ function cells_testsuite(AT, FT)
           (0, 2, 4, 6, 8, 12, 16, 20, 24, 27, 30, 33, 36)
     @test Raven.connectivityoffsets(cell, Val(4)) == (0, 1, 2, 3, 4, 5, 6, 7, 8)
 
-    cell = LobattoCell{FT,AT}(5)
+    cell = LobattoCell{Tuple{5},FT,AT}()
     @test floattype(cell) == FT
     @test arraytype(cell) <: AT
     @test Base.ndims(cell) == 1

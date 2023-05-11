@@ -1,11 +1,11 @@
-abstract type AbstractCell{T,A<:AbstractArray,S<:Tuple,N} end
+abstract type AbstractCell{S<:Tuple,T,A<:AbstractArray,N} end
 
-floattype(::Type{<:AbstractCell{T}}) where {T} = T
-arraytype(::Type{<:AbstractCell{T,A}}) where {T,A} = A
-Base.ndims(::Type{<:AbstractCell{T,A,S,N}}) where {T,A,S,N} = N
-Base.size(::Type{<:AbstractCell{T,A,S}}) where {T,A,S} = size_to_tuple(S)
-Base.length(::Type{<:AbstractCell{T,A,S}}) where {T,A,S} = tuple_prod(S)
-Base.strides(::Type{<:AbstractCell{T,A,S}}) where {T,A,S} =
+floattype(::Type{<:AbstractCell{S,T}}) where {S,T} = T
+arraytype(::Type{<:AbstractCell{S,T,A}}) where {S,T,A} = A
+Base.ndims(::Type{<:AbstractCell{S,T,A,N}}) where {S,T,A,N} = N
+Base.size(::Type{<:AbstractCell{S,T,A}}) where {S,T,A} = size_to_tuple(S)
+Base.length(::Type{<:AbstractCell{S,T,A}}) where {S,T,A} = tuple_prod(S)
+Base.strides(::Type{<:AbstractCell{T,A,S}}) where {S,T,A} =
     Base.size_to_strides(1, size_to_tuple(S)...)
 
 floattype(cell::AbstractCell) = floattype(typeof(cell))
@@ -41,7 +41,7 @@ function lobattooperators_1d(::Type{T}, M) where {T}
     )
 end
 
-struct LobattoCell{T,A,S,N,O,P,D,M,FM,E,C} <: AbstractCell{T,A,S,N}
+struct LobattoCell{S,T,A,N,O,P,D,M,FM,E,C} <: AbstractCell{S,T,A,N}
     points_1d::O
     weights_1d::O
     points::P
@@ -52,68 +52,27 @@ struct LobattoCell{T,A,S,N,O,P,D,M,FM,E,C} <: AbstractCell{T,A,S,N}
     connectivity::C
 end
 
-function Base.show(io::IO, ::LobattoCell{T,A,N}) where {T,A,N}
+function Base.show(io::IO, ::LobattoCell{S,T,A}) where {S,T,A}
     print(io, "LobattoCell{")
+    Base.show(io, S)
+    print(io, ", ")
     Base.show(io, T)
     print(io, ", ")
     Base.show(io, A)
-    print(io, ", ")
-    Base.show(io, N)
     print(io, "}")
 end
 
-function LobattoCell{T,A}(dims...) where {T,A}
-    N = length(dims)
-    if all(dims[1] .== dims)
-        oall = adapt(A, lobattooperators_1d(T, first(dims)))
-        o = ntuple(i -> oall, N)
-    else
-        o = ntuple(i -> adapt(A, lobattooperators_1d(T, dims[i])), N)
-    end
-
-    points_1d = ntuple(N) do i
-        return reshape(o[i].points, ntuple(j -> ifelse(i == j, dims[i], 1), N))
-    end
-    weights_1d = ntuple(N) do i
-        return reshape(o[i].weights, ntuple(j -> ifelse(i == j, dims[i], 1), N))
-    end
+function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
+    o = adapt(A, lobattooperators_1d(T, S1))
+    points_1d = (o.points,)
+    weights_1d = (o.weights,)
 
     points = vec(SVector.(points_1d...))
-    # TODO Should we use a struct of arrays style layout?
-    # if isbitstype(T) && N > 1
-    #     # Setup struct of arrays style layout of the points
-    #     points = reinterpret(reshape, T, points)
-    #     points = permutedims(points, (2, 1))
-    #     points = PermutedDimsArray(points, (2, 1))
-    #     points = reinterpret(reshape, SVector{N, T}, points)
-    # end
-
-    derivatives = ntuple(N) do i
-        tup = ntuple(j -> ifelse(i == j, o[i].derivative, Eye{T,dims[j]}()), N)
-        return Kron(reverse(tup))
-    end
-
+    derivatives = (Kron((o.derivative,)),)
     mass = Diagonal(vec(.*(weights_1d...)))
-
-    facemass = if N == 1
-        adapt(A, Diagonal([T(1), T(1)]))
-    elseif N == 2
-        ω1, ω2 = weights_1d
-        Diagonal(vcat(repeat(vec(ω2), 2), repeat(vec(ω1), 2)))
-    elseif N == 3
-        ω1, ω2, ω3 = weights_1d
-        Diagonal(
-            vcat(
-                repeat(vec(ω2 .* ω3), 2),
-                repeat(vec(ω1 .* ω3), 2),
-                repeat(vec(ω1 .* ω2), 2),
-            ),
-        )
-    end
-
-    toequallyspaced = Kron(reverse(ntuple(i -> o[i].toequallyspaced, N)))
-
-    connectivity = adapt(A, materializeconnectivity(LobattoCell, dims...))
+    facemass = adapt(A, Diagonal([T(1), T(1)]))
+    toequallyspaced = Kron((o.toequallyspaced,))
+    connectivity = materializeconnectivity(LobattoCell{Tuple{S1},T,A})
 
     args = (
         points_1d,
@@ -125,27 +84,98 @@ function LobattoCell{T,A}(dims...) where {T,A}
         toequallyspaced,
         connectivity,
     )
-    LobattoCell{T,A,Tuple{dims...},N,typeof.(args[2:end])...}(args...)
+    LobattoCell{Tuple{S1},T,A,1,typeof.(args[2:end])...}(args...)
 end
 
-LobattoCell{T}(dims...) where {T} = LobattoCell{T,Array}(dims...)
-LobattoCell(dims...) = LobattoCell{Float64}(dims...)
+function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
+    o = adapt(A, (lobattooperators_1d(T, S1), lobattooperators_1d(T, S2)))
 
-function Base.similar(::LobattoCell{T,A}, dims...) where {T,A}
-    LobattoCell{T,A}(dims...)
+    points_1d = (reshape(o[1].points, (S1, 1)), reshape(o[2].points, (1, S2)))
+    weights_1d = (reshape(o[1].weights, (S1, 1)), reshape(o[2].weights, (1, S2)))
+    points = vec(SVector.(points_1d...))
+    derivatives =
+        (Kron((Eye{T,S2}(), o[1].derivative)), Kron((o[2].derivative, Eye{T,S1}())))
+    mass = Diagonal(vec(.*(weights_1d...)))
+    ω1, ω2 = weights_1d
+    facemass = Diagonal(vcat(repeat(vec(ω2), 2), repeat(vec(ω1), 2)))
+    toequallyspaced = Kron((o[2].toequallyspaced, o[1].toequallyspaced))
+    connectivity = materializeconnectivity(LobattoCell{Tuple{S1,S2},T,A})
+
+    args = (
+        points_1d,
+        weights_1d,
+        points,
+        derivatives,
+        mass,
+        facemass,
+        toequallyspaced,
+        connectivity,
+    )
+    LobattoCell{Tuple{S1,S2},T,A,2,typeof.(args[2:end])...}(args...)
 end
 
-function Adapt.adapt_structure(to, cell::LobattoCell{T,A,S,N}) where {T,A,S,N}
+function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
+    o = adapt(
+        A,
+        (
+            lobattooperators_1d(T, S1),
+            lobattooperators_1d(T, S2),
+            lobattooperators_1d(T, S3),
+        ),
+    )
+
+    points_1d = (
+        reshape(o[1].points, (S1, 1, 1)),
+        reshape(o[2].points, (1, S2, 1)),
+        reshape(o[3].points, (1, 1, S3)),
+    )
+    weights_1d = (
+        reshape(o[1].weights, (S1, 1, 1)),
+        reshape(o[2].weights, (1, S2, 1)),
+        reshape(o[3].weights, (1, 1, S3)),
+    )
+    points = vec(SVector.(points_1d...))
+    derivatives = (
+        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].derivative)),
+        Kron((Eye{T,S3}(), o[2].derivative, Eye{T,S1}())),
+        Kron((o[3].derivative, Eye{T,S2}(), Eye{T,S1}())),
+    )
+    mass = Diagonal(vec(.*(weights_1d...)))
+    ω1, ω2, ω3 = weights_1d
+    facemass = Diagonal(
+        vcat(repeat(vec(ω2 .* ω3), 2), repeat(vec(ω1 .* ω3), 2), repeat(vec(ω1 .* ω2), 2)),
+    )
+    toequallyspaced =
+        Kron((o[3].toequallyspaced, o[2].toequallyspaced, o[1].toequallyspaced))
+    connectivity = materializeconnectivity(LobattoCell{Tuple{S1,S2,S3},T,A})
+
+    args = (
+        points_1d,
+        weights_1d,
+        points,
+        derivatives,
+        mass,
+        facemass,
+        toequallyspaced,
+        connectivity,
+    )
+    LobattoCell{Tuple{S1,S2,S3},T,A,3,typeof.(args[2:end])...}(args...)
+end
+
+LobattoCell{S,T}() where {S,T} = LobattoCell{S,T,Array}()
+LobattoCell{S}() where {S} = LobattoCell{S,Float64}()
+
+function Adapt.adapt_structure(to, cell::LobattoCell{S,T,A,N}) where {S,T,A,N}
     names = fieldnames(LobattoCell)
     args = ntuple(j -> adapt(to, getfield(cell, names[j])), length(names))
     B = arraytype(to)
 
-    LobattoCell{T,B,S,N,typeof.(args[2:end])...}(args...)
+    LobattoCell{S,T,B,N,typeof.(args[2:end])...}(args...)
 end
 
-const LobattoLine{T,A} = LobattoCell{T,A,Tuple{B}} where {B}
-const LobattoQuad{T,A} = LobattoCell{T,A,Tuple{B,C}} where {B,C}
-const LobattoHex{T,A} = LobattoCell{T,A,Tuple{B,C,D}} where {B,C,D}
+const LobattoLine{T,A} = LobattoCell{Tuple{B},T,A} where {B}
+const LobattoQuad{T,A} = LobattoCell{Tuple{B,C},T,A} where {B,C}
+const LobattoHex{T,A} = LobattoCell{Tuple{B,C,D},T,A} where {B,C,D}
 
 points_1d(cell::LobattoCell) = cell.points_1d
 weights_1d(cell::LobattoCell) = cell.weights_1d
@@ -222,11 +252,11 @@ function connectivity_vtk(cell::LobattoHex)
     ]
 end
 
-function materializeconnectivity(::Type{<:LobattoCell}, L::Integer)
+function materializeconnectivity(::Type{LobattoCell{Tuple{L},T,A}}) where {L,T,A}
     indices = collect(LinearIndices((L,)))
 
     conn = (
-        (indices,), # edge
+        (A(indices),), # edge
         ( # corners
             indices[begin],
             indices[end],
@@ -236,16 +266,16 @@ function materializeconnectivity(::Type{<:LobattoCell}, L::Integer)
     return conn
 end
 
-function materializeconnectivity(::Type{<:LobattoCell}, L::Integer, M::Integer)
+function materializeconnectivity(::Type{LobattoCell{Tuple{L,M},T,A}}) where {L,M,T,A}
     indices = collect(LinearIndices((L, M)))
 
     conn = (
-        (indices,), # face
+        (A(indices),), # face
         ( # edges
-            (indices[begin, begin:end]),
-            (indices[end, begin:end]),
-            (indices[begin:end, begin]),
-            (indices[begin:end, end]),
+            A(indices[begin, begin:end]),
+            A(indices[end, begin:end]),
+            A(indices[begin:end, begin]),
+            A(indices[begin:end, end]),
         ),
         ( # corners
             (indices[begin, begin]),
@@ -258,32 +288,32 @@ function materializeconnectivity(::Type{<:LobattoCell}, L::Integer, M::Integer)
     return conn
 end
 
-function materializeconnectivity(::Type{<:LobattoCell}, L::Integer, M::Integer, N::Integer)
+function materializeconnectivity(::Type{LobattoCell{Tuple{L,M,N},T,A}}) where {L,M,N,T,A}
     indices = collect(LinearIndices((L, M, N)))
 
     conn = (
-        (indices,), # volume
+        (A(indices),), # volume
         ( # faces
-            (indices[begin, begin:end, begin:end]),
-            (indices[end, begin:end, begin:end]),
-            (indices[begin:end, begin, begin:end]),
-            (indices[begin:end, end, begin:end]),
-            (indices[begin:end, begin:end, begin]),
-            (indices[begin:end, begin:end, end]),
+            A(indices[begin, begin:end, begin:end]),
+            A(indices[end, begin:end, begin:end]),
+            A(indices[begin:end, begin, begin:end]),
+            A(indices[begin:end, end, begin:end]),
+            A(indices[begin:end, begin:end, begin]),
+            A(indices[begin:end, begin:end, end]),
         ),
         ( # edges
-            (indices[begin, begin, begin:end]),
-            (indices[end, begin, begin:end]),
-            (indices[begin, end, begin:end]),
-            (indices[end, end, begin:end]),
-            (indices[begin, begin:end, begin]),
-            (indices[end, begin:end, begin]),
-            (indices[begin, begin:end, end]),
-            (indices[end, begin:end, end]),
-            (indices[begin:end, begin, begin]),
-            (indices[begin:end, end, begin]),
-            (indices[begin:end, begin, end]),
-            (indices[begin:end, end, end]),
+            A(indices[begin, begin, begin:end]),
+            A(indices[end, begin, begin:end]),
+            A(indices[begin, end, begin:end]),
+            A(indices[end, end, begin:end]),
+            A(indices[begin, begin:end, begin]),
+            A(indices[end, begin:end, begin]),
+            A(indices[begin, begin:end, end]),
+            A(indices[end, begin:end, end]),
+            A(indices[begin:end, begin, begin]),
+            A(indices[begin:end, end, begin]),
+            A(indices[begin:end, begin, end]),
+            A(indices[begin:end, end, end]),
         ),
         ( # corners
             (indices[begin, begin, begin]),
