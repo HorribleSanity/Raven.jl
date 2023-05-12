@@ -638,6 +638,62 @@ function materializepoints(
     return points
 end
 
+function _getdims(cellsize, dtoc_degree2_global, node, quad)
+    dims = ntuple(length(cellsize)) do n
+        # We use a StepRange here so that the return type is the same
+        # whether or not the dim gets reversed.
+        dim =
+            node[n] == 2 ? StepRange(2, Int8(1), cellsize[n] - 1) :
+            node[n] == 1 ? StepRange(1, Int8(1), 1) :
+            StepRange(cellsize[n], Int8(1), cellsize[n])
+
+        shift = ntuple(m -> m == n ? 1 : 0, length(cellsize))
+
+        # Flip the dimension to match the orientation of the degree 2 node numbering
+        if node[n] == 2 &&
+           dtoc_degree2_global[(node .+ shift)..., quad] <
+           dtoc_degree2_global[(node .- shift)..., quad]
+            dim = reverse(dim)
+        end
+
+        return dim
+    end
+
+    return dims
+end
+
+function materializedtoc(cell::LobattoCell, dtoc_degree2_local, dtoc_degree2_global)
+    cellsize = size(cell)
+
+    # Compute the offsets for the cell node numbering
+    offsets = zeros(Int, maximum(dtoc_degree2_local) + 1)
+    for i in eachindex(IndexCartesian(), dtoc_degree2_local)
+        l = dtoc_degree2_local[i]
+        I = Tuple(i)
+        node = I[1:end-1]
+        # compute the cell dofs for the corner, edge, face or volume identified by node.
+        # This is an exclusive count, so the number of dofs in the volume do not include
+        # the ones that are also on the faces, edges, or corners.
+        offsets[l+1] = prod(ntuple(n -> node[n] == 2 ? (cellsize[n] - 2) : 1, length(node)))
+    end
+    cumsum!(offsets, offsets)
+
+    dtoc = zeros(Int, cellsize..., last(size(dtoc_degree2_local)))
+    for i in eachindex(IndexCartesian(), dtoc_degree2_local)
+        l = dtoc_degree2_local[i]
+        I = Tuple(i)
+        node = I[1:end-1]
+        quad = I[end]
+
+        dims = _getdims(cellsize, dtoc_degree2_global, node, quad)
+        for (j, k) in enumerate(CartesianIndices(dims))
+            dtoc[k, quad] = j + offsets[l]
+        end
+    end
+
+    return dtoc
+end
+
 #function materializepoints(referencecell::LobattoLine, vertices, connectivity)
 #    T = floattype(referencecell)
 #    A = arraytype(referencecell)

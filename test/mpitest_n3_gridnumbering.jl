@@ -158,6 +158,19 @@ let
             dtoc_degree_2_global_self[:, :, [1, 2]],
         )
     end
+
+    cell = LobattoCell{Tuple{3,3},Float64,Array}()
+    dtoc = Raven.materializedtoc(cell, dtoc_degree_2_local, dtoc_degree_2_global)
+    if rank == 0
+        @test isisomorphic(dtoc[:, :, 1:1], dtoc_degree_2_global_self[:, :, 1:1])
+        @test isisomorphic(dtoc[:, :, 2:6], dtoc_degree_2_global_self[:, :, 2:6])
+    elseif rank == 1
+        @test isisomorphic(dtoc[:, :, 1:1], dtoc_degree_2_global_self[:, :, 2:2])
+        @test isisomorphic(dtoc[:, :, 2:6], dtoc_degree_2_global_self[:, :, vcat(1:1, 3:6)])
+    elseif rank == 2
+        @test isisomorphic(dtoc[:, :, 1:5], dtoc_degree_2_global_self[:, :, 3:7])
+        @test isisomorphic(dtoc[:, :, 6:7], dtoc_degree_2_global_self[:, :, [1, 2]])
+    end
 end
 
 let
@@ -310,5 +323,24 @@ let
             dtoc_degree_2_global[:, :, :, 10:11],
             dtoc_degree_2_global_self[:, :, :, [1, 2]],
         )
+    end
+
+    cell = LobattoCell{Tuple{3,3,3},Float64,Array}()
+    dtoc = Raven.materializedtoc(cell, dtoc_degree_2_local, dtoc_degree_2_global)
+    if rank == 0
+        @test isisomorphic(dtoc[:, :, :, 1:1], dtoc_degree_2_global_self[:, :, :, 1:1])
+        @test isisomorphic(
+            dtoc[:, :, :, 2:9],
+            dtoc_degree_2_global_self[:, :, :, [2, 3, 4, 5, 6, 8, 9, 10]],
+        )
+    elseif rank == 1
+        @test isisomorphic(dtoc[:, :, :, 1:1], dtoc_degree_2_global_self[:, :, :, 2:2])
+        @test isisomorphic(
+            dtoc[:, :, :, 2:9],
+            dtoc_degree_2_global_self[:, :, :, [1, 3, 4, 5, 6, 8, 9, 10]],
+        )
+    elseif rank == 2
+        @test isisomorphic(dtoc[:, :, :, 1:9], dtoc_degree_2_global_self[:, :, :, 3:11])
+        @test isisomorphic(dtoc[:, :, :, 10:11], dtoc_degree_2_global_self[:, :, :, [1, 2]])
     end
 end

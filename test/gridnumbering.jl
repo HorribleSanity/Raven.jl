@@ -1,4 +1,31 @@
 @testset "Grid Numbering" begin
+    function isisomorphic(a, b)
+        f = Dict{eltype(a),eltype(b)}()
+        g = Dict{eltype(b),eltype(a)}()
+
+        for i in eachindex(a, b)
+            if a[i] in keys(f)
+                if f[a[i]] != b[i]
+                    @error "$(a[i]) -> $(f[a[i]]) exists when adding $(a[i]) -> $(b[i])"
+                    return false
+                end
+            else
+                f[a[i]] = b[i]
+            end
+
+            if b[i] in keys(g)
+                if g[b[i]] != a[i]
+                    @error "$(g[b[i]]) <- $(b[i]) exists when adding $(a[i]) <- $(b[i])"
+                    return false
+                end
+            else
+                g[b[i]] = a[i]
+            end
+        end
+
+        return true
+    end
+
     let
         # Coarse Grid
         #   y
@@ -68,6 +95,22 @@
             Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
         @test dtoc_degree_2_local == dtoc_degree_2_global
         @test dtoc_degree_2_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
+
+        dtoc = Raven.materializedtoc(
+            LobattoCell{Tuple{3,3},Float64,Array}(),
+            dtoc_degree_2_local,
+            dtoc_degree_2_global,
+        )
+        @test isisomorphic(dtoc, dtoc_degree_2_global)
+
+        nodes_degree_3 = P4estTypes.lnodes(forest; ghost, degree = 3)
+        cell_degree_3 = LobattoCell{Tuple{4,4},Float64,Array}()
+        dtoc_degree_3 =
+            Raven.materializedtoc(cell_degree_3, dtoc_degree_2_local, dtoc_degree_2_global)
+        GC.@preserve nodes_degree_3 begin
+            dtoc_degree_3_p4est = P4estTypes.unsafe_element_nodes(nodes_degree_3) .+ 0x1
+            @test isisomorphic(dtoc_degree_3, dtoc_degree_3_p4est)
+        end
     end
 
     let
@@ -153,5 +196,19 @@
             Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
         @test dtoc_degree_2_local == dtoc_degree_2_global
         @test dtoc_degree_2_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
+
+        cell_degree_2 = LobattoCell{Tuple{3,3,3},Float64,Array}()
+        dtoc_degree_2 =
+            Raven.materializedtoc(cell_degree_2, dtoc_degree_2_local, dtoc_degree_2_global)
+        @test isisomorphic(dtoc_degree_2, dtoc_degree_2_global)
+
+        cell_degree_3 = LobattoCell{Tuple{4,4,4},Float64,Array}()
+        nodes_degree_3 = P4estTypes.lnodes(forest; ghost, degree = 3)
+        dtoc_degree_3 =
+            Raven.materializedtoc(cell_degree_3, dtoc_degree_2_local, dtoc_degree_2_global)
+        GC.@preserve nodes_degree_3 begin
+            dtoc_degree_3_p4est = P4estTypes.unsafe_element_nodes(nodes_degree_3) .+ 0x1
+            @test isisomorphic(dtoc_degree_3, dtoc_degree_3_p4est)
+        end
     end
 end
