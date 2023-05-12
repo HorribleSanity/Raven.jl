@@ -250,6 +250,27 @@ function materializequadranttoglobalid(forest, ghost)
     return globalquadrantids
 end
 
+function materializedtoc(forest, ghost, nodes, quadrantcommpattern, comm)
+    localnumberofquadrants = P4estTypes.lengthoflocalquadrants(forest)
+    ghostnumberofquadrants = length(P4estTypes.ghosts(ghost))
+    totalnumberofquadrants = localnumberofquadrants + ghostnumberofquadrants
+
+    dtoc_owned = P4estTypes.unsafe_element_nodes(nodes)
+    dtoc = zeros(eltype(dtoc_owned), size(dtoc_owned)[1:end-1]..., totalnumberofquadrants)
+    dtoc[1:length(dtoc_owned)] .= vec(dtoc_owned)
+    dtoc_global = P4estTypes.globalid.(Ref(nodes), dtoc) .+ 0x1
+
+    pattern = expand(quadrantcommpattern, prod(size(dtoc_owned)[1:end-1]))
+
+    cm = commmanager(eltype(dtoc_global), comm, pattern, 0)
+
+    share!(dtoc_global, cm)
+
+    dtoc_local = numbercontiguous(eltype(dtoc_owned), dtoc_global)
+
+    return (dtoc_local, dtoc_global)
+end
+
 function generate(warp::Function, gm::GridManager)
     # Need to get integer coordinates of cells
 

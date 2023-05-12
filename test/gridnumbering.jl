@@ -51,6 +51,23 @@
         @test quadrantcommpattern.sendindices == 8:7
         @test quadrantcommpattern.sendranks == []
         @test quadrantcommpattern.sendrankindices == []
+
+
+        #               21  32  33    33  36  37
+        #               18  30  31    31  34  35
+        #                9  24  25    25  28  29
+        #
+        # 19  20  21    21  24  25    25  28  29
+        # 16  17  18    18  22  23    23  26  27
+        #  7   8   9     9  11  10     9  11  10
+        #
+        #  7   8   9     9  11  10
+        #  4   5   6     6  13  12
+        #  1   2   3     3  15  14
+        (dtoc_degree_2_local, dtoc_degree_2_global) =
+            Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
+        @test dtoc_degree_2_local == dtoc_degree_2_global
+        @test dtoc_degree_2_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
     end
 
     let
@@ -131,5 +148,10 @@
         @test quadrantcommpattern.sendindices == 12:11
         @test quadrantcommpattern.sendranks == []
         @test quadrantcommpattern.sendrankindices == []
+
+        (dtoc_degree_2_local, dtoc_degree_2_global) =
+            Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
+        @test dtoc_degree_2_local == dtoc_degree_2_global
+        @test dtoc_degree_2_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
     end
 end
