@@ -807,6 +807,40 @@ function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern
         sendrankindices,
     )
 end
+
+function materializeparentnodes(
+    cell::LobattoCell,
+    ctod,
+    quadranttoglobalid,
+    quadranttolevel,
+)
+    Np = length(cell)
+    rows = rowvals(ctod)
+    m, n = size(ctod)
+    parentdofs = zeros(eltype(rows), m)
+    for j = 1:n
+        level = typemax(Int8)
+        gid = typemax(eltype(quadranttoglobalid))
+        pdof = 0
+        for ii in nzrange(ctod, j)
+            i = rows[ii]
+            e = cld(i, Np)
+            if quadranttolevel[e] ≤ level && quadranttoglobalid[e] < gid
+                level = quadranttolevel[e]
+                gid = quadranttoglobalid[e]
+                pdof = i
+            end
+        end
+        @assert pdof != 0
+        for ii in nzrange(ctod, j)
+            i = rows[ii]
+            parentdofs[i] = pdof
+        end
+    end
+
+    return reshape(parentdofs, size(cell)..., :)
+end
+
 #function materializepoints(referencecell::LobattoLine, vertices, connectivity)
 #    T = floattype(referencecell)
 #    A = arraytype(referencecell)

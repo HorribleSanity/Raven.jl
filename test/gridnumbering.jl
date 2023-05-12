@@ -134,6 +134,29 @@
         ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
         @test ctod_degree_3 isa AbstractSparseMatrix
         @test istranspose(ctod_degree_3, dtoc_degree_3)
+
+        quadranttolevel = Int8[
+            P4estTypes.level.(Iterators.flatten(forest))
+            P4estTypes.level.(P4estTypes.ghosts(ghost))
+        ]
+        parentnodes = Raven.materializeparentnodes(
+            cell_degree_3,
+            ctod_degree_3,
+            quadranttoglobalids,
+            quadranttolevel,
+        )
+        Np = length(cell_degree_3)
+        for lid in eachindex(parentnodes)
+            pid = parentnodes[lid]
+            qlid = cld(lid, Np)
+            qpid = cld(pid, Np)
+
+            @test quadranttolevel[qpid] <= quadranttolevel[qlid]
+            if quadranttolevel[qlid] == quadranttolevel[qpid]
+                @test quadranttoglobalids[qlid] >= quadranttoglobalids[qpid]
+            end
+            @test dtoc_degree_3[pid] == dtoc_degree_3[lid]
+        end
     end
 
     let
@@ -237,5 +260,28 @@
         ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
         @test ctod_degree_3 isa AbstractSparseMatrix
         @test istranspose(ctod_degree_3, dtoc_degree_3)
+
+        quadranttolevel = Int8[
+            P4estTypes.level.(Iterators.flatten(forest))
+            P4estTypes.level.(P4estTypes.ghosts(ghost))
+        ]
+        parentnodes = Raven.materializeparentnodes(
+            cell_degree_3,
+            ctod_degree_3,
+            quadranttoglobalids,
+            quadranttolevel,
+        )
+        Np = length(cell_degree_3)
+        for lid in eachindex(parentnodes)
+            pid = parentnodes[lid]
+            qlid = cld(lid, Np)
+            qpid = cld(pid, Np)
+
+            @test quadranttolevel[qpid] <= quadranttolevel[qlid]
+            if quadranttolevel[qlid] == quadranttolevel[qpid]
+                @test quadranttoglobalids[qlid] >= quadranttoglobalids[qpid]
+            end
+            @test dtoc_degree_3[pid] == dtoc_degree_3[lid]
+        end
     end
 end
