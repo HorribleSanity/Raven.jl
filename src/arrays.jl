@@ -63,3 +63,43 @@ arraytype(::Type{T}) where {T<:AbstractArray} = arraytype(parenttype(T))
     Pins the host array A for copying to arrays of type T
 """
 pin(::Type, A::Array) = A
+
+"""
+    numbercontiguous(T, A; by = identity)
+
+Renumbers `A` contiguously in an `Array{T}` and returns it. The function
+`by` is a mapping for the elements of `A` used during element comparison,
+similar to `sort`.
+
+# Examples
+```jldoctest
+julia> Raven.numbercontiguous(Int32, [13, 4, 5, 1, 5])
+5-element Vector{Int32}:
+ 4
+ 2
+ 3
+ 1
+ 3
+
+julia> Raven.numbercontiguous(Int32, [13, 4, 5, 1, 5]; by = x->-x)
+5-element Vector{Int32}:
+ 1
+ 3
+ 2
+ 4
+ 2
+```
+"""
+function numbercontiguous(::Type{T}, A; by = identity) where {T}
+    p = sortperm(vec(A); by = by)
+    notequalprevious = fill!(similar(p, Bool), false)
+
+    for i in Iterators.drop(eachindex(p), 1)
+        notequalprevious[i] = by(A[p[i]]) != by(A[p[i-1]])
+    end
+
+    B = similar(A, T)
+    B[p] .= cumsum(notequalprevious) .+ 1
+
+    return B
+end

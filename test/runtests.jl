@@ -45,6 +45,7 @@ end
 
 MPI.Initialized() || MPI.Init()
 
+include("arrays.jl")
 include("communication.jl")
 
 include("testsuite.jl")
