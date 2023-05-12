@@ -18,6 +18,12 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
+[weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+
+[extensions]
+CUDAExt = "CUDA"
+
 [compat]
 Adapt = "3"
 CUDA = "4"
@@ -33,11 +39,5 @@ StaticArrays = "1"
 WriteVTK = "1.16"
 julia = "1.6"
 
-[extensions]
-CUDAExt = "CUDA"
-
 [extras]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
-
-[weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
