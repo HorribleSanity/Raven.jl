@@ -3,6 +3,8 @@ using CUDA.CUDAKernels
 using MPI
 using Pkg
 using Raven
+import Raven.P4estTypes
+using Raven.StaticArrays
 using Test
 
 function runmpitests()
@@ -47,6 +49,7 @@ MPI.Initialized() || MPI.Init()
 
 include("arrays.jl")
 include("communication.jl")
+include("gridnumbering.jl")
 
 include("testsuite.jl")
 

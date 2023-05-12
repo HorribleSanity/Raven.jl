@@ -163,6 +163,45 @@ function materializequadrantdata(forest, ghost)
     return (quadranttolevel, quadranttotreeid, quadranttocoordinate)
 end
 
+"""
+    materializequadranttoglobalid(forest, ghost)
+
+Generate the global ids for quadrants in the `forest` and the `ghost` layer.
+"""
+function materializequadranttoglobalid(forest, ghost)
+    rank = MPI.Comm_rank(forest.comm)
+
+    ghosts = P4estTypes.ghosts(ghost)
+
+    localnumberofquadrants = P4estTypes.lengthoflocalquadrants(forest)
+    ghostnumberofquadrants = length(ghosts)
+    totalnumberofquadrants = localnumberofquadrants + ghostnumberofquadrants
+
+    GC.@preserve forest ghost begin
+        global_first_quadrant = P4estTypes.unsafe_global_first_quadrant(forest)
+        gfq = global_first_quadrant[rank+1]
+        T = eltype(global_first_quadrant)
+
+        proc_offsets = P4estTypes.unsafe_proc_offsets(ghost)
+
+        globalquadrantids = zeros(T, totalnumberofquadrants)
+        for i = 1:localnumberofquadrants
+            globalquadrantids[i] = i + gfq
+        end
+        for i = 1:ghostnumberofquadrants
+            globalquadrantids[i+localnumberofquadrants] =
+                P4estTypes.unsafe_local_num(ghosts[i])
+        end
+        for r = 1:length(proc_offsets)-1
+            for o = (proc_offsets[r]+1):proc_offsets[r+1]
+                globalquadrantids[o+localnumberofquadrants] += global_first_quadrant[r]
+            end
+        end
+    end
+
+    return globalquadrantids
+end
+
 function generate(warp::Function, gm::GridManager)
     # Need to get integer coordinates of cells
 
