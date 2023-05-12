@@ -43,6 +43,14 @@
 
         quadranttoglobalids = Raven.materializequadranttoglobalid(forest, ghost)
         @test quadranttoglobalids == 1:7
+
+        quadrantcommpattern = Raven.materializequadrantcommpattern(forest, ghost)
+        @test quadrantcommpattern.recvindices == 8:7
+        @test quadrantcommpattern.recvranks == []
+        @test quadrantcommpattern.recvrankindices == []
+        @test quadrantcommpattern.sendindices == 8:7
+        @test quadrantcommpattern.sendranks == []
+        @test quadrantcommpattern.sendrankindices == []
     end
 
     let
@@ -115,5 +123,13 @@
 
         quadranttoglobalids = Raven.materializequadranttoglobalid(forest, ghost)
         @test quadranttoglobalids == 1:11
+
+        quadrantcommpattern = Raven.materializequadrantcommpattern(forest, ghost)
+        @test quadrantcommpattern.recvindices == 12:11
+        @test quadrantcommpattern.recvranks == []
+        @test quadrantcommpattern.recvrankindices == []
+        @test quadrantcommpattern.sendindices == 12:11
+        @test quadrantcommpattern.sendranks == []
+        @test quadrantcommpattern.sendrankindices == []
     end
 end

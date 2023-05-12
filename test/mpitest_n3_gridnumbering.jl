@@ -59,6 +59,30 @@ let
     elseif rank == 2
         @test quadranttoglobalids == [3, 4, 5, 6, 7, 1, 2]
     end
+
+    quadrantcommpattern = Raven.materializequadrantcommpattern(forest, ghost)
+    if rank == 0
+        @test quadrantcommpattern.recvindices == 2:6
+        @test quadrantcommpattern.recvranks == [1, 2]
+        @test quadrantcommpattern.recvrankindices == [1:1, 2:5]
+        @test quadrantcommpattern.sendindices == [1, 1]
+        @test quadrantcommpattern.sendranks == [1, 2]
+        @test quadrantcommpattern.sendrankindices == [1:1, 2:2]
+    elseif rank == 1
+        @test quadrantcommpattern.recvindices == 2:6
+        @test quadrantcommpattern.recvranks == [0, 2]
+        @test quadrantcommpattern.recvrankindices == [1:1, 2:5]
+        @test quadrantcommpattern.sendindices == [1, 1]
+        @test quadrantcommpattern.sendranks == [0, 2]
+        @test quadrantcommpattern.sendrankindices == [1:1, 2:2]
+    elseif rank == 2
+        @test quadrantcommpattern.recvindices == 6:7
+        @test quadrantcommpattern.recvranks == [0, 1]
+        @test quadrantcommpattern.recvrankindices == [1:1, 2:2]
+        @test quadrantcommpattern.sendindices == [1, 2, 3, 4, 1, 2, 3, 4]
+        @test quadrantcommpattern.sendranks == [0, 1]
+        @test quadrantcommpattern.sendrankindices == [1:4, 5:8]
+    end
 end
 
 let
@@ -137,5 +161,29 @@ let
         @test quadranttoglobalids == [2, 1, 3, 4, 5, 6, 8, 9, 10]
     elseif rank == 2
         @test quadranttoglobalids == [3, 4, 5, 6, 7, 8, 9, 10, 11, 1, 2]
+    end
+
+    quadrantcommpattern = Raven.materializequadrantcommpattern(forest, ghost)
+    if rank == 0
+        @test quadrantcommpattern.recvindices == 2:9
+        @test quadrantcommpattern.recvranks == [1, 2]
+        @test quadrantcommpattern.recvrankindices == [1:1, 2:8]
+        @test quadrantcommpattern.sendindices == [1, 1]
+        @test quadrantcommpattern.sendranks == [1, 2]
+        @test quadrantcommpattern.sendrankindices == [1:1, 2:2]
+    elseif rank == 1
+        @test quadrantcommpattern.recvindices == 2:9
+        @test quadrantcommpattern.recvranks == [0, 2]
+        @test quadrantcommpattern.recvrankindices == [1:1, 2:8]
+        @test quadrantcommpattern.sendindices == [1, 1]
+        @test quadrantcommpattern.sendranks == [0, 2]
+        @test quadrantcommpattern.sendrankindices == [1:1, 2:2]
+    elseif rank == 2
+        @test quadrantcommpattern.recvindices == 10:11
+        @test quadrantcommpattern.recvranks == [0, 1]
+        @test quadrantcommpattern.recvrankindices == [1:1, 2:2]
+        @test quadrantcommpattern.sendindices == [1, 2, 3, 4, 6, 7, 8, 1, 2, 3, 4, 6, 7, 8]
+        @test quadrantcommpattern.sendranks == [0, 1]
+        @test quadrantcommpattern.sendrankindices == [1:7, 8:14]
     end
 end

@@ -120,6 +120,54 @@ end
 
 generate(gm::GridManager) = generate(identity, gm)
 
+function _offsets_to_ranges(offsets; by = identity)
+    indices = Cint[]
+    ranges = UnitRange{Int}[]
+    for r = 1:length(offsets)-1
+        if offsets[r+1] - offsets[r] > 0
+            ids = by(r - 1)
+            push!(indices, ids)
+            push!(ranges, (offsets[r]+1):offsets[r+1])
+        end
+    end
+
+    return (indices, ranges)
+end
+
+function materializequadrantcommpattern(forest, ghost)
+    ms = P4estTypes.mirrors(ghost)
+    gs = P4estTypes.ghosts(ghost)
+
+    GC.@preserve ghost begin
+        mirror_proc_mirrors = P4estTypes.unsafe_mirror_proc_mirrors(ghost)
+        mirror_proc_offsets = P4estTypes.unsafe_mirror_proc_offsets(ghost)
+
+        num_local = P4estTypes.lengthoflocalquadrants(forest)
+        T = typeof(num_local)
+        num_ghosts = T(length(gs))
+
+        sendindices = similar(mirror_proc_mirrors, T)
+        for i in eachindex(sendindices)
+            sendindices[i] = P4estTypes.unsafe_local_num(ms[mirror_proc_mirrors[i]+1])
+        end
+        (sendranks, sendrankindices) = _offsets_to_ranges(mirror_proc_offsets)
+
+        proc_offsets = P4estTypes.unsafe_proc_offsets(ghost)
+
+        recvindices = (num_local+0x1):(num_local+num_ghosts)
+        (recvranks, recvrankindices) = _offsets_to_ranges(proc_offsets)
+    end
+
+    return CommPattern{Array}(
+        recvindices,
+        recvranks,
+        recvrankindices,
+        sendindices,
+        sendranks,
+        sendrankindices,
+    )
+end
+
 function materializeforestvolumedata(forest, _, quadrant, quadid, treeid, data)
     id = quadid + P4estTypes.offset(forest[treeid])
 
