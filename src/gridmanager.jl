@@ -130,6 +130,39 @@ function materializeforestvolumedata(forest, _, quadrant, quadid, treeid, data)
     return
 end
 
+function materializequadrantdata(forest, ghost)
+    ghosts = P4estTypes.ghosts(ghost)
+
+    localnumberofquadrants = P4estTypes.lengthoflocalquadrants(forest)
+    ghostnumberofquadrants = length(ghosts)
+    totalnumberofquadrants = localnumberofquadrants + ghostnumberofquadrants
+
+    quadranttolevel = Array{Int8}(undef, totalnumberofquadrants)
+    quadranttotreeid = Array{Int32}(undef, totalnumberofquadrants)
+    quadranttocoordinate =
+        Array{Int32}(undef, totalnumberofquadrants, P4estTypes.quadrantndims(forest))
+    data = (; quadranttolevel, quadranttotreeid, quadranttocoordinate)
+
+    # Fill in information for the local quadrants
+    P4estTypes.iterateforest(
+        forest;
+        ghost,
+        userdata = data,
+        volume = materializeforestvolumedata,
+    )
+
+    # Fill in information for the ghost layer quadrants
+    for (quadid, quadrant) in enumerate(ghosts)
+        id = quadid + localnumberofquadrants
+
+        quadranttolevel[id] = P4estTypes.level(quadrant)
+        quadranttotreeid[id] = P4estTypes.unsafe_which_tree(quadrant)
+        quadranttocoordinate[id, :] .= P4estTypes.coordinates(quadrant)
+    end
+
+    return (quadranttolevel, quadranttotreeid, quadranttocoordinate)
+end
+
 function generate(warp::Function, gm::GridManager)
     # Need to get integer coordinates of cells
 
@@ -139,41 +172,13 @@ function generate(warp::Function, gm::GridManager)
     nodes = P4estTypes.lnodes(forest(gm); ghost, degree = 2)
     P4estTypes.expand!(ghost, forest(gm), nodes)
 
-    ghosts = P4estTypes.ghosts(ghost)
-
-    localnumberofquadrants = length(gm)
-    ghostnumberofquadrants = length(ghosts)
-    totalnumberofquadrants = localnumberofquadrants + ghostnumberofquadrants
-
-    quadranttolevel = Array{Int8}(undef, totalnumberofquadrants)
-    quadranttotreeid = Array{Int32}(undef, totalnumberofquadrants)
-    quadranttocoordinate =
-        Array{Int32}(undef, totalnumberofquadrants, P4estTypes.quadrantndims(forest(gm)))
-    data = (; quadranttolevel, quadranttotreeid, quadranttocoordinate)
-
-    pin.(A, values(data))
-
-    # Fill in information for the local quadrants
-    P4estTypes.iterateforest(
-        forest(gm);
-        ghost,
-        userdata = data,
-        volume = materializeforestvolumedata,
-    )
-
-    # Fill in information for the ghost layer quadrants
-    for (quadid, quadrant) in enumerate(ghosts)
-        id = quadid + length(gm)
-
-        quadranttolevel[id] = P4estTypes.level(quadrant)
-        quadranttotreeid[id] = P4estTypes.unsafe_which_tree(quadrant)
-        quadranttocoordinate[id, :] .= P4estTypes.coordinates(quadrant)
-    end
+    (quadranttolevel, quadranttotreeid, quadranttocoordinate) =
+        materializequadrantdata(forest(gm), ghost)
 
     # Send data to the device
-    quadranttolevel = A(quadranttolevel)
-    quadranttotreeid = A(quadranttotreeid)
-    quadranttocoordinate = A(quadranttocoordinate)
+    quadranttolevel = A(pin(A, quadranttolevel))
+    quadranttotreeid = A(pin(A, quadranttotreeid))
+    quadranttocoordinate = A(pin(A, quadranttocoordinate))
 
     points = materializepoints(
         referencecell(gm),
@@ -188,16 +193,14 @@ function generate(warp::Function, gm::GridManager)
 
     part = MPI.Comm_rank(comm(gm)) + 1
     nparts = MPI.Comm_size(comm(gm))
-    offset =
-        MPI.Scan(convert(Int, localnumberofquadrants), MPI.SUM, MPI.COMM_WORLD) -
-        localnumberofquadrants
+    offset = MPI.Scan(convert(Int, length(gm)), MPI.SUM, MPI.COMM_WORLD) - length(gm)
 
     return Grid(
         part,
         nparts,
         referencecell(gm),
         offset,
-        localnumberofquadrants,
+        length(gm),
         points,
         quadranttolevel,
         quadranttotreeid,
