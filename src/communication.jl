@@ -15,10 +15,10 @@ function CommPattern{AT}(
     sendrankindices::SRI,
 ) where {AT,RI,RR,RRI,SI,SR,SRI}
     return CommPattern{AT,RI,RR,RRI,SI,SR,SRI}(
-        Adapt.adapt(AT, recvindices),
+        recvindices,
         recvranks,
         recvrankindices,
-        Adapt.adapt(AT, sendindices),
+        sendindices,
         sendranks,
         sendrankindices,
     )
