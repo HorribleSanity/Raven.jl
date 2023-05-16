@@ -157,6 +157,11 @@
             end
             @test dtoc_degree_3[pid] == dtoc_degree_3[lid]
         end
+
+        GC.@preserve nodes begin
+            @test Raven.materializequadranttofacecode(nodes) ==
+                  P4estTypes.unsafe_face_code(nodes)
+        end
     end
 
     let
@@ -282,6 +287,11 @@
                 @test quadranttoglobalids[qlid] >= quadranttoglobalids[qpid]
             end
             @test dtoc_degree_3[pid] == dtoc_degree_3[lid]
+        end
+
+        GC.@preserve nodes begin
+            @test Raven.materializequadranttofacecode(nodes) ==
+                  P4estTypes.unsafe_face_code(nodes)
         end
     end
 end

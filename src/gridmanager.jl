@@ -278,6 +278,8 @@ function materializectod(dtoc)
     return sparse(1:length(dtoc), dtoc, data)
 end
 
+materializequadranttofacecode(nodes) = copy(P4estTypes.unsafe_face_code(nodes))
+
 function generate(warp::Function, gm::GridManager)
     # Need to get integer coordinates of cells
 
