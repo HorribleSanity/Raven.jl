@@ -45,6 +45,8 @@ end
 
 MPI.Initialized() || MPI.Init()
 
+include("communication.jl")
+
 Raven.Testsuite.testsuite(Array, Float64)
 Raven.Testsuite.testsuite(Array, BigFloat)
 

@@ -26,6 +26,52 @@ end
 
 arraytype(::CommPattern{AT}) where {AT} = AT
 
+function Adapt.adapt_structure(to, obj::CommPattern)
+    CommPattern{to}(
+        adapt(to, obj.recvindices),
+        obj.recvranks,
+        obj.recvrankindices,
+        adapt(to, obj.sendindices),
+        obj.sendranks,
+        obj.sendrankindices,
+    )
+end
+
+function expand(r::UnitRange, factor)
+    a = (first(r) - 0x1) * factor + 0x1
+    b = last(r) * factor
+    return a:b
+end
+
+expand(v::AbstractVector, factor) = vec((0x1:factor) .+ (v' .- 0x1) .* factor)
+
+function expand(pattern::CommPattern{AT}, factor) where {AT}
+    recvindices = expand(pattern.recvindices, factor)
+    recvranks = copy(pattern.recvranks)
+    recvrankindices = similar(pattern.recvrankindices)
+    @assert eltype(recvrankindices) <: UnitRange
+    for i in eachindex(recvrankindices)
+        recvrankindices[i] = expand(pattern.recvrankindices[i], factor)
+    end
+
+    sendindices = expand(pattern.sendindices, factor)
+    sendranks = copy(pattern.sendranks)
+    sendrankindices = similar(pattern.sendrankindices)
+    @assert eltype(sendrankindices) <: UnitRange
+    for i in eachindex(sendrankindices)
+        sendrankindices[i] = expand(pattern.sendrankindices[i], factor)
+    end
+
+    return CommPattern{AT}(
+        recvindices,
+        recvranks,
+        recvrankindices,
+        sendindices,
+        sendranks,
+        sendrankindices,
+    )
+end
+
 abstract type AbstractCommManager end
 
 struct CommManagerBuffered{CP,RBD,RB,SBD,SB} <: AbstractCommManager
