@@ -292,10 +292,42 @@ function generate(warp::Function, gm::GridManager)
     (quadranttolevel, quadranttotreeid, quadranttocoordinate) =
         materializequadrantdata(forest(gm), ghost)
 
+    quadranttoglobalid = materializequadranttoglobalid(forest(gm), ghost)
+
+    quadrantcommpattern = materializequadrantcommpattern(forest(gm), ghost)
+
+    (dtoc_degree2_local, dtoc_degree2_global) =
+        materializedtoc(forest(gm), ghost, nodes, quadrantcommpattern, comm(gm))
+
+    discontinuoustocontinuous =
+        materializedtoc(referencecell(gm), dtoc_degree2_local, dtoc_degree2_global)
+
+    continuoustodiscontinuous = materializectod(discontinuoustocontinuous)
+
+    nodecommpattern = materializenodecommpattern(
+        referencecell(gm),
+        continuoustodiscontinuous,
+        quadrantcommpattern,
+    )
+
+    parentnodes = materializeparentnodes(
+        referencecell(gm),
+        continuoustodiscontinuous,
+        quadranttoglobalid,
+        quadranttolevel,
+    )
+
+    quadranttofacecode = materializequadranttofacecode(nodes)
+
     # Send data to the device
     quadranttolevel = A(pin(A, quadranttolevel))
     quadranttotreeid = A(pin(A, quadranttotreeid))
     quadranttocoordinate = A(pin(A, quadranttocoordinate))
+    quadranttofacecode = A(pin(A, quadranttofacecode))
+    parentnodes = A(pin(A, parentnodes))
+    nodecommpattern = Adapt.adapt(A, nodecommpattern)
+    continuoustodiscontinuous = Adapt.adapt(A, continuoustodiscontinuous)
+    discontinuoustocontinuous = Adapt.adapt(A, discontinuoustocontinuous)
 
     points = materializepoints(
         referencecell(gm),
@@ -321,5 +353,10 @@ function generate(warp::Function, gm::GridManager)
         points,
         quadranttolevel,
         quadranttotreeid,
+        quadranttofacecode,
+        parentnodes,
+        nodecommpattern,
+        continuoustodiscontinuous,
+        discontinuoustocontinuous,
     )
 end

@@ -34,7 +34,7 @@ function WriteVTK.pvtk_grid(
     return vtk
 end
 
-struct Grid{C<:AbstractCell,P,L,T} <: AbstractGrid{C}
+struct Grid{C<:AbstractCell,P,L,T,F,PN,N,CTOD,DTOC} <: AbstractGrid{C}
     part::Int
     nparts::Int
     cell::C
@@ -43,6 +43,11 @@ struct Grid{C<:AbstractCell,P,L,T} <: AbstractGrid{C}
     points::P
     levels::L
     trees::T
+    facecodes::F
+    parentnodes::PN
+    nodecommpattern::N
+    continuoustodiscontinuous::CTOD
+    discontinuoustocontinuous::DTOC
 end
 
 referencecell(grid::Grid) = grid.cell
@@ -63,6 +68,13 @@ trees(grid::Grid) = trees(grid, Val(false))
 trees(grid::Grid, ::Val{false}) = view(grid.trees, Base.OneTo(grid.locallength))
 trees(grid::Grid, ::Val{true}) = grid.trees
 
+facecodes(grid::Grid) = facecodes(grid, Val(false))
+facecodes(grid::Grid, ::Val{false}) = grid.facecodes
+facecodes(::Grid, ::Val{true}) =
+    throw(error("Face codes are currently stored for local quadrants."))
+
+nodecommpattern(grid::Grid) = grid.nodecommpattern
+continuoustodiscontinuous(grid::Grid) = grid.continuoustodiscontinuous
 
 offset(grid::Grid) = grid.offset
 lengthwithghostlayer(grid::Grid) = last(size(pointswithghostlayer(grid)))
