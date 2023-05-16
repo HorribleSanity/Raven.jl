@@ -342,7 +342,10 @@ function generate(warp::Function, gm::GridManager)
 
     part = MPI.Comm_rank(comm(gm)) + 1
     nparts = MPI.Comm_size(comm(gm))
-    offset = MPI.Scan(convert(Int, length(gm)), MPI.SUM, MPI.COMM_WORLD) - length(gm)
+    GC.@preserve gm begin
+        global_first_quadrant = P4estTypes.unsafe_global_first_quadrant(forest(gm))
+        offset = global_first_quadrant[part]
+    end
 
     return Grid(
         part,
