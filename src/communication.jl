@@ -106,8 +106,8 @@ end
 
 function _get_mpi_buffers(buffer, rankindices)
     # Hack to make the element type of the buffer arrays concrete
-    @assert eltype(rankindices) == typeof(1:1)
-    T = typeof(view(buffer, 1:1))
+    @assert eltype(rankindices) == typeof(1:length(rankindices))
+    T = typeof(view(buffer, 1:length(rankindices)))
 
     bufs = Array{MPI.Buffer{T}}(undef, length(rankindices))
     for i in eachindex(rankindices)
