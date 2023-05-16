@@ -5,6 +5,7 @@ using Pkg
 using Raven
 import Raven.P4estTypes
 using Raven.StaticArrays
+using Raven.SparseArrays
 using Test
 
 function runmpitests()

@@ -271,6 +271,13 @@ function materializedtoc(forest, ghost, nodes, quadrantcommpattern, comm)
     return (dtoc_local, dtoc_global)
 end
 
+function materializectod(dtoc)
+    dtoc = vec(dtoc)
+    data = similar(dtoc, Bool)
+    fill!(data, true)
+    return sparse(1:length(dtoc), dtoc, data)
+end
+
 function generate(warp::Function, gm::GridManager)
     # Need to get integer coordinates of cells
 

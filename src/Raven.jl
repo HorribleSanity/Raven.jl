@@ -10,6 +10,7 @@ import P4estTypes
 using RecipesBase
 using StaticArrays
 using StaticArrays: tuple_prod, tuple_length, size_to_tuple
+using SparseArrays
 using WriteVTK
 
 export LobattoCell

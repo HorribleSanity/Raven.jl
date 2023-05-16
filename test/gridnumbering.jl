@@ -26,6 +26,25 @@
         return true
     end
 
+    function istranspose(ctod, dtoc)
+        rows = rowvals(ctod)
+        vals = nonzeros(ctod)
+        _, n = size(ctod)
+        for j = 1:n
+            for k in nzrange(ctod, j)
+                if vals[k] == false
+                    return false
+                end
+                i = rows[k]
+                if j != dtoc[i]
+                    return false
+                end
+            end
+        end
+
+        return true
+    end
+
     let
         # Coarse Grid
         #   y
@@ -111,6 +130,10 @@
             dtoc_degree_3_p4est = P4estTypes.unsafe_element_nodes(nodes_degree_3) .+ 0x1
             @test isisomorphic(dtoc_degree_3, dtoc_degree_3_p4est)
         end
+
+        ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
+        @test ctod_degree_3 isa AbstractSparseMatrix
+        @test istranspose(ctod_degree_3, dtoc_degree_3)
     end
 
     let
@@ -210,5 +233,9 @@
             dtoc_degree_3_p4est = P4estTypes.unsafe_element_nodes(nodes_degree_3) .+ 0x1
             @test isisomorphic(dtoc_degree_3, dtoc_degree_3_p4est)
         end
+
+        ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
+        @test ctod_degree_3 isa AbstractSparseMatrix
+        @test istranspose(ctod_degree_3, dtoc_degree_3)
     end
 end
