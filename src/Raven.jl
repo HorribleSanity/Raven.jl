@@ -19,7 +19,7 @@ export derivatives, facemass, mass, points, toequallyspaced
 export derivatives_1d, points_1d, weights_1d
 export referencecell, levels, trees, offset
 
-export brick
+export brick, coarsegrid
 
 export GridManager, generate
 
