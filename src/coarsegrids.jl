@@ -93,7 +93,7 @@ end
 
 brick(l::Integer, m::Integer, p::Bool = false, q::Bool = false; kwargs...) =
     brick(Float64, (l, m), (p, q); kwargs...)
-brick(T::Type, l::Integer, m::Integer, p::Bool = false, q::Bool = false; kwargs) =
+brick(T::Type, l::Integer, m::Integer, p::Bool = false, q::Bool = false; kwargs...) =
     brick(T, (l, m), (p, q); kwargs...)
 
 function brick(
