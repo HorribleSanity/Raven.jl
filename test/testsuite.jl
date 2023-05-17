@@ -1,10 +1,10 @@
 module Testsuite
 
-using ..Raven
-using ..Raven.Adapt
-using ..Raven.LinearAlgebra
-using ..Raven.OneDimensionalNodes
-using ..Raven.StaticArrays
+using Raven
+using Raven.Adapt
+using Raven.LinearAlgebra
+using Raven.OneDimensionalNodes
+using Raven.StaticArrays
 
 using StableRNGs
 using Test

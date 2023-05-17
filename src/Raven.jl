@@ -8,7 +8,6 @@ using MPI
 using OneDimensionalNodes
 import P4estTypes
 using RecipesBase
-using PrecompileTools
 using StaticArrays
 using StaticArrays: tuple_prod, tuple_length, size_to_tuple
 using WriteVTK
@@ -42,16 +41,6 @@ end
 @static if !isdefined(Base, :get_extension)
     function __init__()
         @require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" include("../ext/CUDAExt.jl")
-    end
-end
-
-@setup_workload begin
-    @compile_workload begin
-        include("../test/testsuite.jl")
-        for T in (Float64, Float32, BigFloat)
-            Testsuite.cells_testsuite(Array, T)
-            Testsuite.kron_testsuite(Array, T)
-        end
     end
 end
 

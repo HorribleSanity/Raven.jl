@@ -1,4 +1,4 @@
-using StaticArrays: size_to_tuple
+using Raven.StaticArrays: size_to_tuple
 
 function cells_testsuite(AT, FT)
     cell = LobattoCell{Tuple{3,3},FT,AT}()

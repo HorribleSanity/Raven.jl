@@ -47,14 +47,16 @@ MPI.Initialized() || MPI.Init()
 
 include("communication.jl")
 
-Raven.Testsuite.testsuite(Array, Float64)
-Raven.Testsuite.testsuite(Array, BigFloat)
+include("testsuite.jl")
+
+Testsuite.testsuite(Array, Float64)
+Testsuite.testsuite(Array, BigFloat)
 
 if CUDA.functional()
     @info "Running test suite with CUDA"
     CUDA.versioninfo()
     CUDA.allowscalar(false)
-    Raven.Testsuite.testsuite(CuArray, Float32)
+    Testsuite.testsuite(CuArray, Float32)
 end
 
 runmpitests()
