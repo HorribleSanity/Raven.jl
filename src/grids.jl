@@ -74,7 +74,7 @@ function points_vtk(grid::Grid)
     P = toequallyspaced(referencecell(grid))
     x = P * reshape(points(grid), size(P, 2), :)
 
-    return reinterpret(reshape, floattype(grid), vec(adapt(Array, x)))
+    return reinterpret(reshape, eltype(eltype(x)), vec(adapt(Array, x)))
 end
 
 function cells_vtk(grid::Grid)
