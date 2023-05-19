@@ -213,6 +213,14 @@ function start!(A, cm::CommManagerTripleBuffered)
     # <https://developer.nvidia.com/blog/introduction-cuda-aware-mpi/> for more
     # details.
 
+    # There is an issue with the non blocking synchronization in CUDA.jl that
+    # can cause long pauses:
+    #
+    #   https://github.com/JuliaGPU/CUDA.jl/issues/1910
+    #
+    # so we will want to profiling (as done in the issue) to make sure our code
+    # is performing as expected.
+
     # Wait for kernels on the main thread/stream to finish before launching
     # kernels on on different threads which each have their own streams.
     KernelAbstractions.synchronize(backend)
