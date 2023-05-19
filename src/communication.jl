@@ -213,6 +213,10 @@ function start!(A, cm::CommManagerTripleBuffered)
     # <https://developer.nvidia.com/blog/introduction-cuda-aware-mpi/> for more
     # details.
 
+    # Wait for kernels on the main thread/stream to finish before launching
+    # kernels on on different threads which each have their own streams.
+    KernelAbstractions.synchronize(backend)
+
     MPI.Startall(cm.recvrequests)
     cm.recvtask[] = Base.Threads.@spawn begin
         KernelAbstractions.priority!(backend, :high)
