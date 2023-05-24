@@ -1,0 +1,6 @@
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Raven = "cfd3f2ab-0fb0-4d51-9553-03e53d33f144"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
