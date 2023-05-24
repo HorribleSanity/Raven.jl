@@ -694,6 +694,119 @@ function materializedtoc(cell::LobattoCell, dtoc_degree2_local, dtoc_degree2_glo
     return dtoc
 end
 
+function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern)
+    ghostranktompirank = quadrantcommpattern.recvranks
+    ghostranktoindices =
+        expand.(
+            [
+                quadrantcommpattern.recvindices[ids] for
+                ids in quadrantcommpattern.recvrankindices
+            ],
+            length(cell),
+        )
+
+    ranktype = eltype(ghostranktompirank)
+    indicestype = eltype(eltype(ghostranktoindices))
+
+    if length(ghostranktompirank) == 0
+        return CommPattern{Array}(
+            indicestype[],
+            ranktype[],
+            UnitRange{indicestype}[],
+            indicestype[],
+            ranktype[],
+            UnitRange{indicestype}[],
+        )
+
+    end
+
+    dofstarts = zeros(indicestype, length(ghostranktoindices) + 1)
+    for (i, ids) in enumerate(ghostranktoindices)
+        dofstarts[i] = first(ids)
+    end
+    dofstarts[end] = last(last(ghostranktoindices)) + 0x1
+
+    senddofs = Dict{ranktype,Set{indicestype}}()
+    recvdofs = Dict{ranktype,Set{indicestype}}()
+
+    rows = rowvals(ctod)
+    n = size(ctod, 2)
+    remoteranks = Set{ranktype}()
+    for j = 1:n
+        containslocal = false
+        for k in nzrange(ctod, j)
+            i = rows[k]
+            s = searchsorted(dofstarts, i)
+            if last(s) > 0
+                push!(remoteranks, ghostranktompirank[last(s)])
+            end
+            if last(s) == 0
+                containslocal = true
+            end
+        end
+
+        if !isempty(remoteranks)
+            for k in nzrange(ctod, j)
+                i = rows[k]
+                s = searchsorted(dofstarts, i)
+                if last(s) == 0
+                    for rank in remoteranks
+                        # local node we need to send
+                        sendset = get!(senddofs, rank) do
+                            Set{indicestype}()
+                        end
+                        push!(sendset, i)
+                    end
+                elseif containslocal
+                    # remote node we need to recv
+                    rank = ghostranktompirank[last(s)]
+                    recvset = get!(recvdofs, rank) do
+                        Set{indicestype}()
+                    end
+                    push!(recvset, i)
+                end
+            end
+        end
+
+        empty!(remoteranks)
+    end
+
+    numsendindices = 0
+    for dofs in keys(senddofs)
+        numsendindices += length(dofs)
+    end
+
+    sendindices = Int[]
+    sendrankindices = UnitRange{Int}[]
+    sendoffset = 0
+    for r in ghostranktompirank
+        dofs = senddofs[r]
+        append!(sendindices, sort(collect(dofs)))
+        push!(sendrankindices, (1:length(dofs)) .+ sendoffset)
+
+        sendoffset += length(dofs)
+    end
+
+    recvindices = Int[]
+    recvrankindices = UnitRange{Int}[]
+    recvoffset = 0
+    for r in ghostranktompirank
+        dofs = recvdofs[r]
+        append!(recvindices, sort(collect(dofs)))
+        push!(recvrankindices, (1:length(dofs)) .+ recvoffset)
+
+        recvoffset += length(dofs)
+    end
+
+    return CommPattern{Array}(
+        recvindices,
+        ghostranktompirank,
+        recvrankindices,
+        sendindices,
+        ghostranktompirank,
+        sendrankindices,
+    )
+end
 #function materializepoints(referencecell::LobattoLine, vertices, connectivity)
 #    T = floattype(referencecell)
 #    A = arraytype(referencecell)

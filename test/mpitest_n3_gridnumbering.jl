@@ -171,6 +171,38 @@ let
         @test isisomorphic(dtoc[:, :, 1:5], dtoc_degree_2_global_self[:, :, 3:7])
         @test isisomorphic(dtoc[:, :, 6:7], dtoc_degree_2_global_self[:, :, [1, 2]])
     end
+
+    cell_degree_3 = LobattoCell{Tuple{4,4},Float64,Array}()
+    dtoc_degree_3 =
+        Raven.materializedtoc(cell_degree_3, dtoc_degree_2_local, dtoc_degree_2_global)
+    ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
+    nodecommpattern_degree_3 =
+        Raven.materializenodecommpattern(cell_degree_3, ctod_degree_3, quadrantcommpattern)
+    if rank == 0
+        @test nodecommpattern_degree_3.recvindices ==
+              [20, 24, 28, 32, 33, 34, 35, 36, 49, 65, 81]
+        @test nodecommpattern_degree_3.recvranks == Int32[1, 2]
+        @test nodecommpattern_degree_3.recvrankindices == UnitRange{Int64}[1:4, 5:11]
+        @test nodecommpattern_degree_3.sendindices == [4, 8, 12, 16, 13, 14, 15, 16]
+        @test nodecommpattern_degree_3.sendranks == Int32[1, 2]
+        @test nodecommpattern_degree_3.sendrankindices == UnitRange{Int64}[1:4, 5:8]
+    elseif rank == 1
+        @test nodecommpattern_degree_3.recvindices ==
+              [20, 24, 28, 32, 36, 49, 50, 51, 52, 65, 66, 67, 68, 81]
+        @test nodecommpattern_degree_3.recvranks == Int32[0, 2]
+        @test nodecommpattern_degree_3.recvrankindices == UnitRange{Int64}[1:4, 5:14]
+        @test nodecommpattern_degree_3.sendindices == [4, 8, 12, 16, 1, 2, 3, 4]
+        @test nodecommpattern_degree_3.sendranks == Int32[0, 2]
+        @test nodecommpattern_degree_3.sendrankindices == UnitRange{Int64}[1:4, 5:8]
+    elseif rank == 2
+        @test nodecommpattern_degree_3.recvindices == [93, 94, 95, 96, 97, 98, 99, 100]
+        @test nodecommpattern_degree_3.recvranks == Int32[0, 1]
+        @test nodecommpattern_degree_3.recvrankindices == UnitRange{Int64}[1:4, 5:8]
+        @test nodecommpattern_degree_3.sendindices ==
+              [1, 2, 3, 4, 17, 33, 49, 4, 17, 18, 19, 20, 33, 34, 35, 36, 49]
+        @test nodecommpattern_degree_3.sendranks == Int32[0, 1]
+        @test nodecommpattern_degree_3.sendrankindices == UnitRange{Int64}[1:7, 8:17]
+    end
 end
 
 let
@@ -343,4 +375,72 @@ let
         @test isisomorphic(dtoc[:, :, :, 1:9], dtoc_degree_2_global_self[:, :, :, 3:11])
         @test isisomorphic(dtoc[:, :, :, 10:11], dtoc_degree_2_global_self[:, :, :, [1, 2]])
     end
+
+    cell_degree_3 = LobattoCell{Tuple{4,4,4},Float64,Array}()
+    dtoc_degree_3 =
+        Raven.materializedtoc(cell_degree_3, dtoc_degree_2_local, dtoc_degree_2_global)
+    ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
+    nodecommpattern_degree_3 =
+        Raven.materializenodecommpattern(cell_degree_3, ctod_degree_3, quadrantcommpattern)
+
+    dnodes = LinearIndices(dtoc_degree_3)
+    if rank == 0
+        recv_1 = vec(dnodes[end, :, :, 2])
+        recv_2 = vcat(
+            vec(dnodes[:, 1, :, 3]),
+            dnodes[1, 1, :, 4],
+            dnodes[1, 1, :, 5],
+            dnodes[1, 1, :, 6],
+            dnodes[1, 1, :, 7],
+            dnodes[1, 1, :, 8],
+            dnodes[1, 1, :, 9],
+        )
+        send_1 = vec(dnodes[end, :, :, 1])
+        send_2 = vec(dnodes[:, end, :, 1])
+        sendrecv_ranks = Int32[1, 2]
+    elseif rank == 1
+        recv_1 = vec(dnodes[end, :, :, 2])
+        recv_2 = vcat(
+            dnodes[end, 1, :, 3],
+            vec(dnodes[:, 1, :, 4]),
+            vec(dnodes[:, 1, :, 5]),
+            dnodes[1, 1, :, 6],
+            vec(dnodes[:, 1, :, 7]),
+            vec(dnodes[:, 1, :, 8]),
+            dnodes[1, 1, :, 9],
+        )
+        send_1 = vec(dnodes[end, :, :, 1])
+        send_2 = vec(dnodes[:, 1, :, 1])
+        sendrecv_ranks = Int32[0, 2]
+    elseif rank == 2
+        recv_1 = vec(dnodes[:, end, :, 10])
+        recv_2 = vec(dnodes[:, 1, :, 11])
+        send_1 = vcat(
+            vec(dnodes[:, 1, :, 1]),
+            dnodes[1, 1, :, 2],
+            dnodes[1, 1, :, 3],
+            dnodes[1, 1, :, 4],
+            dnodes[1, 1, :, 6],
+            dnodes[1, 1, :, 7],
+            dnodes[1, 1, :, 8],
+        )
+        send_2 = vcat(
+            dnodes[end, 1, :, 1],
+            vec(dnodes[:, 1, :, 2]),
+            vec(dnodes[:, 1, :, 3]),
+            dnodes[1, 1, :, 4],
+            vec(dnodes[:, 1, :, 6]),
+            vec(dnodes[:, 1, :, 7]),
+            dnodes[1, 1, :, 8],
+        )
+        sendrecv_ranks = Int32[0, 1]
+    end
+    @test nodecommpattern_degree_3.recvindices == vcat(recv_1, recv_2)
+    @test nodecommpattern_degree_3.recvranks == sendrecv_ranks
+    @test nodecommpattern_degree_3.recvrankindices ==
+          UnitRange{Int64}[1:length(recv_1), (1:length(recv_2)).+length(recv_1)]
+    @test nodecommpattern_degree_3.sendindices == vcat(send_1, send_2)
+    @test nodecommpattern_degree_3.sendranks == sendrecv_ranks
+    @test nodecommpattern_degree_3.sendrankindices ==
+          UnitRange{Int64}[1:length(send_1), (1:length(send_2)).+length(send_1)]
 end
