@@ -16,20 +16,21 @@ function WriteVTK.pvtk_grid(
     filename::AbstractString,
     grid::AbstractGrid,
     args...;
+    withghostlayer = Val(false),
     kwargs...,
 )
     part = partitionnumber(grid)
     nparts = numberofpartitions(grid)
     vtk = pvtk_grid(
         filename,
-        points_vtk(grid),
-        cells_vtk(grid),
+        points_vtk(grid, withghostlayer),
+        cells_vtk(grid, withghostlayer),
         args...;
         part,
         nparts,
         kwargs...,
     )
-    data_vtk!(vtk, grid)
+    data_vtk!(vtk, grid, withghostlayer)
 
     return vtk
 end
@@ -77,40 +78,45 @@ nodecommpattern(grid::Grid) = grid.nodecommpattern
 continuoustodiscontinuous(grid::Grid) = grid.continuoustodiscontinuous
 
 offset(grid::Grid) = grid.offset
-lengthwithghostlayer(grid::Grid) = last(size(pointswithghostlayer(grid)))
-Base.length(grid::Grid) = last(size(points(grid)))
+numcells(grid::Grid) = numcells(grid, Val(false))
+numcells(grid::Grid, ::Val{false}) = grid.locallength
+numcells(grid::Grid, ::Val{true}) = length(grid.levels)
+
+Base.length(grid::Grid) = grid.locallength
 partitionnumber(grid::Grid) = grid.part
 numberofpartitions(grid::Grid) = grid.nparts
 
-function points_vtk(grid::Grid)
+function points_vtk(grid::Grid, withghostlayer = Val(false))
     P = toequallyspaced(referencecell(grid))
-    x = P * reshape(points(grid), size(P, 2), :)
+    x = P * reshape(points(grid, withghostlayer), size(P, 2), :)
 
     return reinterpret(reshape, eltype(eltype(x)), vec(adapt(Array, x)))
 end
 
-function cells_vtk(grid::Grid)
+function cells_vtk(grid::Grid, withghostlayer = Val(false))
     type = celltype_vtk(referencecell(grid))
     connectivity = connectivity_vtk(referencecell(grid))
 
     cells = [
-        MeshCell(type, e * length(connectivity) .+ connectivity) for e = 0:(length(grid)-1)
+        MeshCell(type, e * length(connectivity) .+ connectivity) for
+        e = 0:(numcells(grid, withghostlayer)-1)
     ]
 
     return cells
 end
 
-function data_vtk!(vtk, grid::Grid)
-    higherorderdegrees = zeros(Int, 3, length(grid))
+function data_vtk!(vtk, grid::Grid, withghostlayer = Val(false))
+    higherorderdegrees = zeros(Int, 3, numcells(grid, withghostlayer))
     ds = [degrees(referencecell(grid))...]
-    higherorderdegrees[1:length(ds), :] .= repeat(ds, 1, length(grid))
+    higherorderdegrees[1:length(ds), :] .= repeat(ds, 1, numcells(grid, withghostlayer))
 
     vtk["HigherOrderDegrees", VTKCellData()] = higherorderdegrees
     vtk[VTKCellData()] = Dict("HigherOrderDegrees" => "HigherOrderDegrees")
 
-    vtk["PartitionNumber", VTKCellData()] = fill(partitionnumber(grid), length(grid))
-    vtk["Level", VTKCellData()] = collect(levels(grid))
-    vtk["Tree", VTKCellData()] = collect(trees(grid))
+    vtk["PartitionNumber", VTKCellData()] =
+        fill(partitionnumber(grid), numcells(grid, withghostlayer))
+    vtk["Level", VTKCellData()] = collect(levels(grid, withghostlayer))
+    vtk["Tree", VTKCellData()] = collect(trees(grid, withghostlayer))
 
     return
 end
