@@ -27,21 +27,21 @@ function lobattooperators_1d(::Type{T}, M) where {T}
     derivative = spectralderivative(points)
     equallyspacedpoints = range(-one(BigFloat), stop = one(BigFloat), length = M)
     toequallyspaced = spectralinterpolation(points, equallyspacedpoints)
+    tolowerhalf = spectralinterpolation(points, (points .- 1) ./ 2)
+    toupperhalf = spectralinterpolation(points, (points .+ 1) ./ 2)
 
     setprecision(oldprecision)
 
-    return map(
-        Array{T},
-        (
-            points = points,
-            weights = weights,
-            derivative = derivative,
-            toequallyspaced = toequallyspaced,
-        ),
-    )
+    points = Array{T}(points)
+    weights = Array{T}(weights)
+    derivative = Array{T}(derivative)
+    toequallyspaced = Array{T}(toequallyspaced)
+    tohalves = (Array{T}(tolowerhalf), Array{T}(toupperhalf))
+
+    return (; points, weights, derivative, toequallyspaced, tohalves)
 end
 
-struct LobattoCell{S,T,A,N,O,P,D,M,FM,E,C} <: AbstractCell{S,T,A,N}
+struct LobattoCell{S,T,A,N,O,P,D,M,FM,E,H,C} <: AbstractCell{S,T,A,N}
     points_1d::O
     weights_1d::O
     points::P
@@ -49,6 +49,7 @@ struct LobattoCell{S,T,A,N,O,P,D,M,FM,E,C} <: AbstractCell{S,T,A,N}
     mass::M
     facemass::FM
     toequallyspaced::E
+    tohalves_1d::H
     connectivity::C
 end
 
@@ -72,6 +73,7 @@ function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
     mass = Diagonal(vec(.*(weights_1d...)))
     facemass = adapt(A, Diagonal([T(1), T(1)]))
     toequallyspaced = Kron((o.toequallyspaced,))
+    tohalves_1d = ((o.tohalves[1], o.tohalves[2]),)
     connectivity = materializeconnectivity(LobattoCell{Tuple{S1},T,A})
 
     args = (
@@ -82,6 +84,7 @@ function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
         mass,
         facemass,
         toequallyspaced,
+        tohalves_1d,
         connectivity,
     )
     LobattoCell{Tuple{S1},T,A,1,typeof.(args[2:end])...}(args...)
@@ -99,6 +102,8 @@ function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
     ω1, ω2 = weights_1d
     facemass = Diagonal(vcat(repeat(vec(ω2), 2), repeat(vec(ω1), 2)))
     toequallyspaced = Kron((o[2].toequallyspaced, o[1].toequallyspaced))
+    tohalves_1d =
+        ((o[1].tohalves[1], o[1].tohalves[2]), (o[2].tohalves[1], o[2].tohalves[2]))
     connectivity = materializeconnectivity(LobattoCell{Tuple{S1,S2},T,A})
 
     args = (
@@ -109,6 +114,7 @@ function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
         mass,
         facemass,
         toequallyspaced,
+        tohalves_1d,
         connectivity,
     )
     LobattoCell{Tuple{S1,S2},T,A,2,typeof.(args[2:end])...}(args...)
@@ -147,6 +153,11 @@ function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
     )
     toequallyspaced =
         Kron((o[3].toequallyspaced, o[2].toequallyspaced, o[1].toequallyspaced))
+    tohalves_1d = (
+        (o[1].tohalves[1], o[1].tohalves[2]),
+        (o[2].tohalves[1], o[2].tohalves[2]),
+        (o[3].tohalves[1], o[3].tohalves[2]),
+    )
     connectivity = materializeconnectivity(LobattoCell{Tuple{S1,S2,S3},T,A})
 
     args = (
@@ -157,6 +168,7 @@ function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
         mass,
         facemass,
         toequallyspaced,
+        tohalves_1d,
         connectivity,
     )
     LobattoCell{Tuple{S1,S2,S3},T,A,3,typeof.(args[2:end])...}(args...)
@@ -188,6 +200,7 @@ end
 mass(cell::LobattoCell) = cell.mass
 facemass(cell::LobattoCell) = cell.facemass
 toequallyspaced(cell::LobattoCell) = cell.toequallyspaced
+tohalves_1d(cell::LobattoCell) = cell.tohalves_1d
 connectivity(cell::LobattoCell) = cell.connectivity
 degrees(cell::LobattoCell) = size(cell) .- 1
 

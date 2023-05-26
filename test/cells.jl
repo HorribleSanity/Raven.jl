@@ -29,6 +29,18 @@ function cells_testsuite(AT, FT)
             }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
         end,
     )
+    h1d = tohalves_1d(cell)
+    @test length(h1d) == ndims(cell)
+    @test all(length.(h1d) .== 2)
+    setprecision(BigFloat, 2^(max(8, ceil(Int, log2(precision(FT))) + 2))) do
+        p, _ = legendregausslobatto(BigFloat, 3)
+        I1 = Matrix{FT}(spectralinterpolation(p, (p .- 1) / 2))
+        I2 = Matrix{FT}(spectralinterpolation(p, (p .+ 1) / 2))
+        @test Array(h1d[1][1]) == I1
+        @test Array(h1d[1][2]) == I2
+        @test Array(h1d[2][1]) == I1
+        @test Array(h1d[2][2]) == I2
+    end
     @test (1, 4, 4) == size.(Raven.materializefaces(cell), 2)
     @test Raven.connectivity(cell) == adapt(
         AT,
@@ -71,6 +83,16 @@ function cells_testsuite(AT, FT)
             }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
         end,
     )
+    h1d = tohalves_1d(cell)
+    @test length(h1d) == ndims(cell)
+    @test all(length.(h1d) .== 2)
+    setprecision(BigFloat, 2^(max(8, ceil(Int, log2(precision(FT))) + 2))) do
+        for (n, N) in enumerate(size(cell))
+            p, _ = legendregausslobatto(BigFloat, N)
+            @test Array(h1d[n][1]) == Matrix{FT}(spectralinterpolation(p, (p .- 1) ./ 2))
+            @test Array(h1d[n][2]) == Matrix{FT}(spectralinterpolation(p, (p .+ 1) ./ 2))
+        end
+    end
     @test (1, 6, 12, 8) == size.(Raven.materializefaces(cell), 2)
     @test Raven.connectivity(cell)[1] == (adapt(AT, reshape(collect(1:24), 3, 4, 2)),)
     @test Raven.connectivity(cell)[2:end] == adapt(
@@ -129,6 +151,14 @@ function cells_testsuite(AT, FT)
             }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
         end,
     )
+    h1d = tohalves_1d(cell)
+    @test length(h1d) == ndims(cell)
+    @test all(length.(h1d) .== 2)
+    setprecision(BigFloat, 2^(max(8, ceil(Int, log2(precision(FT))) + 2))) do
+        p, _ = legendregausslobatto(BigFloat, size(cell)[1])
+        @test Array(h1d[1][1]) == Matrix{FT}(spectralinterpolation(p, (p .- 1) ./ 2))
+        @test Array(h1d[1][2]) == Matrix{FT}(spectralinterpolation(p, (p .+ 1) ./ 2))
+    end
     @test (1, 2) == size.(Raven.materializefaces(cell), 2)
     @test Raven.connectivity(cell) == adapt(AT, (([1, 2, 3, 4, 5],), (1, 5)))
     @test Raven.connectivityoffsets(cell, Val(1)) == (0, 5)
