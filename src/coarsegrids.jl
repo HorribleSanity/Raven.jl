@@ -11,46 +11,7 @@ vertices(g::CoarseGrid) = g.vertices
 cells(g::CoarseGrid) = g.cells
 
 function coarsegrid(vertices, cells::AbstractVector{NTuple{X,T}}) where {X,T}
-    # TODO Move Connectivity constructor to P4estTypes
-
-    if X == 4
-        conn = P4estTypes.Connectivity{X}(
-            P4estTypes.P4est.p4est_connectivity_new(length(vertices), length(cells), 0, 0),
-        )
-    elseif X == 8
-        conn = P4estTypes.Connectivity{X}(
-            P4estTypes.P4est.p8est_connectivity_new(
-                length(vertices),
-                length(cells),
-                0,
-                0,
-                0,
-                0,
-            ),
-        )
-    else
-        throw(error("Unsupported cells."))
-    end
-    trees = P4estTypes.unsafe_trees(conn)
-    cvertices = P4estTypes.unsafe_vertices(conn)
-    tree_to_tree = P4estTypes.unsafe_tree_to_tree(conn)
-    tree_to_face = P4estTypes.unsafe_tree_to_face(conn)
-
-    NUM_FACES = (X == 4) ? 4 : 6
-
-    for i in eachindex(cells, trees, tree_to_tree, tree_to_face)
-        trees[i] = cells[i] .- 1
-        tree_to_tree[i] = ntuple(_ -> (i - 1), NUM_FACES)
-        tree_to_face[i] = ntuple(j -> (j - 1), NUM_FACES)
-    end
-
-    for i in eachindex(cvertices, vertices)
-        cvertices[i] =
-            ntuple(j -> (j ≤ length(vertices[i]) ? Float64(vertices[i][j]) : 0.0), Val(3))
-    end
-
-    P4estTypes.complete!(conn)
-
+    conn = P4estTypes.Connectivity{X}(vertices, cells)
     return CoarseGrid{typeof(conn),typeof(vertices),typeof(cells)}(conn, vertices, cells)
 end
 
