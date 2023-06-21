@@ -25,7 +25,7 @@ using Raven
 using WriteVTK
 using StaticArrays
 
-# here the level is a tuple to
+# here the level is a tuple to 
 # coarsegrid = extrude(cubesphere(2, 2), 1)
 # gm = GridManager(cell, coarsegrid; level = (2, 3))
 
