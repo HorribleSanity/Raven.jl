@@ -29,6 +29,7 @@ export GridManager, generate
 export adapt!
 
 include("arrays.jl")
+include("sparsearrays.jl")
 include("eye.jl")
 include("flatten.jl")
 include("kron.jl")
