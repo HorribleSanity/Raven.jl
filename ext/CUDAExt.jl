@@ -29,4 +29,8 @@ function Raven.LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A<:CuArray}
     return Adapt.adapt(A, cell)
 end
 
+function Raven.adaptsparse(::Type{T}, S) where {T<:CuArray}
+    return Adapt.adapt(T, Raven.GeneralSparseMatrixCSC(S))
+end
+
 end # module CUDAExt

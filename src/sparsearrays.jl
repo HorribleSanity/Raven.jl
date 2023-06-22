@@ -59,3 +59,5 @@ function Adapt.adapt_structure(to, S::GeneralSparseMatrixCSC)
 
     return GeneralSparseMatrixCSC(m, n, colptr, rowval, nzval)
 end
+
+adaptsparse(_, S) = S

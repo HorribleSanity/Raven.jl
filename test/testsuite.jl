@@ -6,6 +6,7 @@ using Raven.KernelAbstractions
 using Raven.LinearAlgebra
 using Raven.OneDimensionalNodes
 import Raven.P4estTypes
+using Raven.SparseArrays
 using Raven.StaticArrays
 using Raven.WriteVTK
 

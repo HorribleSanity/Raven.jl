@@ -23,6 +23,7 @@ function grids_testsuite(AT, FT)
         grid = generate(warp, gm)
 
         @test grid isa Raven.Grid
+        @test issparse(grid.continuoustodiscontinuous)
 
         @test_nowarn mktempdir() do tmpdir
             vtk_grid("$tmpdir/grid", grid) do vtk
@@ -54,6 +55,7 @@ function grids_testsuite(AT, FT)
         grid = generate(warp, gm)
 
         @test grid isa Raven.Grid
+        @test issparse(grid.continuoustodiscontinuous)
 
         @test_nowarn mktempdir() do tmpdir
             vtk_grid("$tmpdir/grid", grid) do vtk
@@ -84,6 +86,7 @@ function grids_testsuite(AT, FT)
         grid = generate(gm)
 
         @test grid isa Raven.Grid
+        @test issparse(grid.continuoustodiscontinuous)
 
         @test_nowarn mktempdir() do tmpdir
             vtk_grid("$tmpdir/grid", grid) do vtk
@@ -119,6 +122,7 @@ function grids_testsuite(AT, FT)
         grid = generate(gm)
 
         @test grid isa Raven.Grid
+        @test issparse(grid.continuoustodiscontinuous)
 
         @test_nowarn mktempdir() do tmpdir
             vtk_grid("$tmpdir/grid", grid) do vtk

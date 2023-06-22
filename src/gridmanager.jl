@@ -326,7 +326,7 @@ function generate(warp::Function, gm::GridManager)
     quadranttofacecode = A(pin(A, quadranttofacecode))
     parentnodes = A(pin(A, parentnodes))
     nodecommpattern = Adapt.adapt(A, nodecommpattern)
-    continuoustodiscontinuous = Adapt.adapt(A, continuoustodiscontinuous)
+    continuoustodiscontinuous = adaptsparse(A, continuoustodiscontinuous)
     discontinuoustocontinuous = Adapt.adapt(A, discontinuoustocontinuous)
 
     points = materializepoints(
