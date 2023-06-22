@@ -2,6 +2,7 @@ module Testsuite
 
 using Raven
 using Raven.Adapt
+using Raven.KernelAbstractions
 using Raven.LinearAlgebra
 using Raven.OneDimensionalNodes
 import Raven.P4estTypes
@@ -12,12 +13,17 @@ using StableRNGs
 using Test
 
 include("cells.jl")
+include("flatten.jl")
 include("grids.jl")
 include("kron.jl")
 
 function testsuite(AT, FT)
     @testset "Cells ($AT, $FT)" begin
         cells_testsuite(AT, FT)
+    end
+
+    @testset "Flatten ($AT, $FT)" begin
+        flatten_testsuite(AT, FT)
     end
 
     # Unfortunately, our KernelAbstractions kernels do not work
