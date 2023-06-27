@@ -33,4 +33,6 @@ function Raven.adaptsparse(::Type{T}, S) where {T<:CuArray}
     return Adapt.adapt(T, Raven.GeneralSparseMatrixCSC(S))
 end
 
+Adapt.adapt_storage(::CUDA.Adaptor, ::MPI.Comm) = nothing
+
 end # module RavenCUDAExt
