@@ -49,7 +49,7 @@ argument.
 """
 get_backend(A) = get_backend(typeof(A))
 get_backend(::Type) = nothing
-get_backend(::Type{T}) where {T<:Array} = CPU()
+get_backend(::Type{T}) where {T<:Array} = CPU(; static = true)
 get_backend(::Type{T}) where {T<:AbstractArray} = get_backend(parenttype(T))
 
 arraytype(A) = arraytype(typeof(A))
