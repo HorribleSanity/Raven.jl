@@ -1,4 +1,4 @@
-module CUDAExt
+module RavenCUDAExt
 
 import Raven
 import Adapt
@@ -33,4 +33,4 @@ function Raven.adaptsparse(::Type{T}, S) where {T<:CuArray}
     return Adapt.adapt(T, Raven.GeneralSparseMatrixCSC(S))
 end
 
-end # module CUDAExt
+end # module RavenCUDAExt
