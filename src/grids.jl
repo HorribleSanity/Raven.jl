@@ -9,6 +9,7 @@ arraytype(grid::AbstractGrid) = arraytype(typeof(grid))
 celltype(grid::AbstractGrid) = celltype(typeof(grid))
 
 struct Grid{C<:AbstractCell,P,L,T,F,PN,N,CTOD,DTOC} <: AbstractGrid{C}
+    comm::MPI.Comm
     part::Int
     nparts::Int
     cell::C
@@ -23,6 +24,8 @@ struct Grid{C<:AbstractCell,P,L,T,F,PN,N,CTOD,DTOC} <: AbstractGrid{C}
     continuoustodiscontinuous::CTOD
     discontinuoustocontinuous::DTOC
 end
+
+comm(grid::Grid) = grid.comm
 
 referencecell(grid::Grid) = grid.cell
 

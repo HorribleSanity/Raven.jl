@@ -348,6 +348,7 @@ function generate(warp::Function, gm::GridManager)
     end
 
     return Grid(
+        comm(gm),
         part,
         nparts,
         referencecell(gm),
