@@ -61,7 +61,7 @@ end
 function flatten_builder(name, ::Type{T}, ::Type{U}, fname) where {T,U}
     newname = :(getfield($name, $(QuoteNode(fname))))
     if fieldtype(T, fname) <: U
-        return newname
+        return Expr(:tuple, newname)
     else
         return nested(newname, fieldtype(T, fname), U, flatten_builder, flatten_combiner)
     end
