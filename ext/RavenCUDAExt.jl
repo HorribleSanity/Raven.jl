@@ -9,6 +9,7 @@ isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAK
 
 Raven.get_backend(::Type{T}) where {T<:CuArray} = CUDABackend(; always_inline = true)
 Raven.arraytype(::Type{T}) where {T<:CuArray} = CuArray
+Raven.arraytype(::Type{T}) where {T<:CuDeviceArray} = CuArray
 
 Raven.pin(::Type{T}, A::Array) where {T<:CuArray} = CUDA.Mem.pin(A)
 
