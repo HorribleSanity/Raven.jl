@@ -1,6 +1,7 @@
 module Raven
 
 using Adapt
+using Compat
 using GPUArraysCore
 using KernelAbstractions
 using KernelAbstractions.Extras: @unroll
@@ -25,6 +26,7 @@ export flatten, unflatten
 export brick, coarsegrid
 
 export GridManager, generate
+export GridArray, components, sizewithghosts, viewwithghosts, parentwithghosts
 
 export adapt!
 
@@ -38,6 +40,7 @@ include("coarsegrids.jl")
 include("communication.jl")
 include("grids.jl")
 include("gridmanager.jl")
+include("gridarrays.jl")
 
 if !isdefined(Base, :get_extension)
     using Requires
