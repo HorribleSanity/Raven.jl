@@ -4,6 +4,7 @@ using MPI
 using Test
 using Raven
 using Raven.StaticArrays
+using LinearAlgebra
 
 MPI.Init()
 
@@ -16,8 +17,9 @@ end
 
 function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
     @testset "GridArray ($N, $AT, $FT)" begin
+        minlvl = 1
         cell = LobattoCell{Tuple{N...},Float64,AT}()
-        gm = GridManager(cell, Raven.brick(K...); min_level = 1)
+        gm = GridManager(cell, Raven.brick(K...); min_level = minlvl)
         grid = generate(gm)
 
         val = (E = SVector{3,Complex{FT}}(1, 3, 5), B = SVector{3,Complex{FT}}(7, 9, 11))
@@ -85,6 +87,16 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
         F = components(E[1])
         @test length(F) == 1
         @test F[1] isa GridArray{FT}
+
+        val3 = (
+            E = SVector{3,Complex{FT}}(1 + 1im, 1 + 1im, 1 + 1im),
+            B = SVector{3,Complex{FT}}(1 + 1im, 1 + 1im, 1 + 1im),
+        )
+        L = length(flatten(val))
+        B = Raven.viewwithghosts(A)
+        B .= Ref(val3)
+        normA = sqrt(FT(L * prod(N) * prod(K) * (2^(length(K) * minlvl))))
+        @test isapprox(norm(A), normA)
 
         A = GridArray{Stiffness}(undef, grid)
         @test eltype(A) == Stiffness
