@@ -204,67 +204,6 @@ tohalves_1d(cell::LobattoCell) = cell.tohalves_1d
 connectivity(cell::LobattoCell) = cell.connectivity
 degrees(cell::LobattoCell) = size(cell) .- 1
 
-celltype_vtk(::LobattoLine) = VTKCellTypes.VTK_LAGRANGE_CURVE
-celltype_vtk(::LobattoQuad) = VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL
-celltype_vtk(::LobattoHex) = VTKCellTypes.VTK_LAGRANGE_HEXAHEDRON
-
-function connectivity_vtk(cell::LobattoLine)
-    L = LinearIndices(size(cell))
-    return [
-        L[1],      # corners
-        L[end],
-        L[2:(end-1)]..., # interior
-    ]
-end
-
-function connectivity_vtk(cell::LobattoQuad)
-    L = LinearIndices(size(cell))
-    return [
-        L[1, 1], # corners
-        L[end, 1],
-        L[end, end],
-        L[1, end],
-        L[2:(end-1), 1]..., # edges
-        L[end, 2:(end-1)]...,
-        L[2:(end-1), end]...,
-        L[1, 2:(end-1)]...,
-        L[2:(end-1), 2:(end-1)]..., # interior
-    ]
-end
-
-function connectivity_vtk(cell::LobattoHex)
-    L = LinearIndices(size(cell))
-    return [
-        L[1, 1, 1], # corners
-        L[end, 1, 1],
-        L[end, end, 1],
-        L[1, end, 1],
-        L[1, 1, end],
-        L[end, 1, end],
-        L[end, end, end],
-        L[1, end, end],
-        L[2:(end-1), 1, 1]..., # edges
-        L[end, 2:(end-1), 1]...,
-        L[2:(end-1), end, 1]...,
-        L[1, 2:(end-1), 1]...,
-        L[2:(end-1), 1, end]...,
-        L[end, 2:(end-1), end]...,
-        L[2:(end-1), end, end]...,
-        L[1, 2:(end-1), end]...,
-        L[1, 1, 2:(end-1)]...,
-        L[end, 1, 2:(end-1)]...,
-        L[1, end, 2:(end-1)]...,
-        L[end, end, 2:(end-1)]...,
-        L[1, 2:(end-1), 2:(end-1)]..., # faces
-        L[end, 2:(end-1), 2:(end-1)]...,
-        L[2:(end-1), 1, 2:(end-1)]...,
-        L[2:(end-1), end, 2:(end-1)]...,
-        L[2:(end-1), 2:(end-1), 1]...,
-        L[2:(end-1), 2:(end-1), end]...,
-        L[2:(end-1), 2:(end-1), 2:(end-1)]..., # interior
-    ]
-end
-
 function materializeconnectivity(::Type{LobattoCell{Tuple{L},T,A}}) where {L,T,A}
     indices = collect(LinearIndices((L,)))
 

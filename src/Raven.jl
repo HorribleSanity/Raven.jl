@@ -11,7 +11,6 @@ using RecipesBase
 using StaticArrays
 using StaticArrays: tuple_prod, tuple_length, size_to_tuple
 using SparseArrays
-using WriteVTK
 
 export LobattoCell
 
@@ -47,6 +46,9 @@ end
     function __init__()
         @require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" include(
             "../ext/RavenCUDAExt.jl",
+        )
+        @require WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192" include(
+            "../ext/RavenWriteVTKExt.jl",
         )
     end
 end

@@ -14,13 +14,14 @@ RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [extensions]
 RavenCUDAExt = "CUDA"
+RavenWriteVTKExt = "WriteVTK"
 
 [compat]
 Adapt = "3"
@@ -37,3 +38,4 @@ julia = "1.6"
 
 [extras]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"

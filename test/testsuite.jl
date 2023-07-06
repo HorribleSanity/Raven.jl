@@ -8,10 +8,10 @@ using Raven.OneDimensionalNodes
 import Raven.P4estTypes
 using Raven.SparseArrays
 using Raven.StaticArrays
-using Raven.WriteVTK
 
 using StableRNGs
 using Test
+using WriteVTK
 
 include("cells.jl")
 include("flatten.jl")
