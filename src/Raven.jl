@@ -1,6 +1,7 @@
 module Raven
 
 using Adapt
+using GPUArraysCore
 using KernelAbstractions
 using KernelAbstractions.Extras: @unroll
 using LinearAlgebra

@@ -22,6 +22,14 @@ struct GeneralSparseMatrixCSC{
     end
 end
 
+const AnyGPUGeneralSparseMatrix =
+    GeneralSparseMatrixCSC{<:Any,<:Any,<:AnyGPUArray,<:AnyGPUArray}
+const AnyGPUGeneralSparseMatrixCSCInclAdjointAndTranspose = Union{
+    AnyGPUGeneralSparseMatrix,
+    Adjoint{<:Any,<:AnyGPUGeneralSparseMatrix},
+    Transpose{<:Any,<:AnyGPUGeneralSparseMatrix},
+}
+
 function GeneralSparseMatrixCSC(
     m::Integer,
     n::Integer,
@@ -40,6 +48,9 @@ end
 SparseArrays.getcolptr(S::GeneralSparseMatrixCSC) = getfield(S, :colptr)
 SparseArrays.rowvals(S::GeneralSparseMatrixCSC) = getfield(S, :rowval)
 SparseArrays.nonzeros(S::GeneralSparseMatrixCSC) = getfield(S, :nzval)
+function SparseArrays.nnz(S::AnyGPUGeneralSparseMatrix)
+    GPUArraysCore.@allowscalar Int(SparseArrays.getcolptr(S)[size(S, 2)+1]) - 1
+end
 Base.size(S::GeneralSparseMatrixCSC) = (S.m, S.n)
 
 function GeneralSparseMatrixCSC(S::SparseArrays.AbstractSparseMatrixCSC)
@@ -61,3 +72,26 @@ function Adapt.adapt_structure(to, S::GeneralSparseMatrixCSC)
 end
 
 adaptsparse(_, S) = S
+
+@static if VERSION >= v"1.7"
+    function Base.print_array(
+        io::IO,
+        S::AnyGPUGeneralSparseMatrixCSCInclAdjointAndTranspose,
+    )
+        Base.print_array(io, adapt(Array, S))
+    end
+
+    function Base.show(io::IO, S::AnyGPUGeneralSparseMatrixCSCInclAdjointAndTranspose)
+        Base.show(io, adapt(Array, S))
+    end
+
+    function SparseArrays._goodbuffers(S::AnyGPUGeneralSparseMatrix)
+        (_, n) = size(S)
+        colptr = SparseArrays.getcolptr(S)
+        rowval = rowvals(S)
+        nzval = nonzeros(S)
+        GPUArraysCore.@allowscalar (
+            length(colptr) == n + 1 && colptr[end] - 1 == length(rowval) == length(nzval)
+        )
+    end
+end
