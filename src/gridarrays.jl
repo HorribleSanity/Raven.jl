@@ -326,8 +326,8 @@ end
 
 @kernel function broadcast_kernel!(dest, bc)
     i = @index(Global)
-    I = CartesianIndices(dest)[i]
-    dest[I] = bc[I]
+    @inbounds I = CartesianIndices(dest)[i]
+    @inbounds dest[I] = bc[I]
 end
 
 @inline function Base.copyto!(dest::GridArray, bc::Broadcast.Broadcasted{Nothing})
