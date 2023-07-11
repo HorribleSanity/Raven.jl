@@ -5,6 +5,7 @@ using Test
 using Raven
 using Raven.StaticArrays
 using LinearAlgebra
+using Raven.Adapt
 
 MPI.Init()
 
@@ -101,6 +102,11 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
         A = GridArray{Stiffness}(undef, grid)
         @test eltype(A) == Stiffness
         @test components(A) isa NamedTuple{(:xx, :yx, :xy, :yy)}
+
+        A = GridArray{FT}(undef, grid)
+        A .= FT(2)
+        B = 1 ./ A
+        @test all(adapt(Array, (B .== FT(0.5))))
     end
 end
 

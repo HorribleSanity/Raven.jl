@@ -306,7 +306,7 @@ function Base.similar(
     A = arraytype(a)
     G = showingghosts(a)
     F = fieldindex(a)
-    elemdims = sizewithghosts(a)[M+1:end]
+    elemdims = sizewithghosts(a)[F:end]
 
     for b in gridarrays
         if A != arraytype(b) ||
@@ -318,12 +318,13 @@ function Base.similar(
         end
     end
 
-    return GridArray{T}(A, dims, (dims[1:F-1]..., elemdims...), comm(a), G, F)
+    return GridArray{T}(undef, A, dims, (dims[1:F-1]..., elemdims...), comm(a), G, F)
 end
 
 @kernel function broadcast_kernel!(dest, bc)
-    I = @index(Global)
-    @inbounds dest[I] = bc[I]
+    i = @index(Global)
+    I = CartesianIndices(dest)[i]
+    dest[I] = bc[I]
 end
 
 @inline function Base.copyto!(dest::GridArray, bc::Broadcast.Broadcasted{Nothing})
