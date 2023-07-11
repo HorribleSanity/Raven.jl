@@ -266,8 +266,8 @@ LinearAlgebra.norm(a::GridArray) = sqrt(MPI.Allreduce(norm(parent(a))^2, +, comm
     @inbounds a[I] = x
 end
 
-function Base.fill!(a::GridArray, x)
-    fill_kernel!(get_backend(a), 256)(a, x, ndrange = length(a))
+function Base.fill!(a::GridArray{T}, x) where {T}
+    fill_kernel!(get_backend(a), 256)(a, convert(T, x)::T, ndrange = length(a))
 end
 
 function Adapt.adapt_structure(to, a::GridArray{T,N,A,G,F,L}) where {T,N,A,G,F,L}

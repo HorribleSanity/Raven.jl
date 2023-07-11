@@ -44,6 +44,10 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
             @test all(Adata[colons..., i, :] .== 0)
         end
 
+        val = (E = SA[2, 1, 3], B = SA[0, 2, 1])
+        fill!(A, val)
+        @test CUDA.@allowscalar A[1] == val
+
         val2 =
             (E = SVector{3,Complex{FT}}(2, 6, 10), B = SVector{3,Complex{FT}}(14, 18, 22))
         B = Raven.viewwithghosts(A)
