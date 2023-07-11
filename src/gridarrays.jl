@@ -47,7 +47,8 @@ function GridArray{T}(
     fieldindex::Integer,
 ) where {T,A,N}
     if !(all(dims[1:end-1] .== dimswithghosts[1:end-1]) && dims[end] <= dimswithghosts[end])
-        throw(DimensionMismatch(
+        throw(
+            DimensionMismatch(
                 "dims ($dims) must equal to dimswithghosts ($dimswithghosts) in all but the last dimension where it should be less than",
             ),
         )
@@ -66,7 +67,7 @@ function GridArray{T}(
     end
 
     datawithghosts = A{E}(undef, insert(dimswithghosts, Val(fieldindex), L))
-    data = view(datawithghosts, (ntuple(_->Colon(), Val(N))..., Base.OneTo(dims[end]))...)
+    data = view(datawithghosts, (ntuple(_ -> Colon(), Val(N))..., Base.OneTo(dims[end]))...)
 
     C = typeof(comm)
     D = typeof(data)
