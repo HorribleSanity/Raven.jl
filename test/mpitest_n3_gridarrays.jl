@@ -27,11 +27,11 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
         @test A isa GridArray{Float64}
         @test arraytype(A) <: AT
 
-        val = (E = SVector{3,Complex{FT}}(1, 3, 5), B = SVector{3,Complex{FT}}(7, 9, 11))
-        T = typeof(val)
+        T = NamedTuple{(:E, :B),Tuple{SVector{3,Complex{FT}},SVector{3,Complex{FT}}}}
         A = GridArray{T}(undef, grid)
         @test eltype(A) == T
 
+        val = (E = SA[1, 3, 5], B = SA[7, 9, 11])
         A .= Ref(val)
         @test CUDA.@allowscalar A[1] == val
 
@@ -59,7 +59,8 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
             @test all(Adatadata[colons..., i, :] .== 0)
         end
 
-        L = length(flatten(val))
+        cval = convert(T, val)
+        L = length(flatten(cval))
 
         @test arraytype(A) <: AT
         @test Raven.showingghosts(A) == false
@@ -75,8 +76,8 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
         @test length(C) == 2
         @test C isa NamedTuple{(:E, :B)}
 
-        @test C[1] isa GridArray{typeof(val[1])}
-        @test C[2] isa GridArray{typeof(val[2])}
+        @test C[1] isa GridArray{typeof(cval[1])}
+        @test C[2] isa GridArray{typeof(cval[2])}
 
         D = components(C[1])
         @test length(D) == 3
@@ -97,7 +98,7 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
             E = SVector{3,Complex{FT}}(1 + 1im, 1 + 1im, 1 + 1im),
             B = SVector{3,Complex{FT}}(1 + 1im, 1 + 1im, 1 + 1im),
         )
-        L = length(flatten(val))
+        L = length(flatten(cval))
         B = Raven.viewwithghosts(A)
         B .= Ref(val3)
         normA = sqrt(FT(L * prod(N) * prod(K) * (2^(length(K) * minlvl))))

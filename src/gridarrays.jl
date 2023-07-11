@@ -248,12 +248,12 @@ end
 
 @inline function Base.setindex!(
     a::GridArray{T,N,A,G,F,L},
-    v::T,
+    v,
     I::Vararg{Int,N},
 ) where {T,N,A,G,F,L}
     @boundscheck Base.checkbounds_indices(Bool, axes(a), I) || Base.throw_boundserror(a, I)
     data = parent(a)
-    vt = flatten(v)
+    vt = flatten(convert(T, v)::T)
     @unroll for i = 1:L
         @inbounds setindex!(data, vt[i], insert(I, Val(F), i)...)
     end
