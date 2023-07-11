@@ -146,6 +146,8 @@ function GridArray{T}(::UndefInitializer, grid::Grid) where {T}
     return GridArray{T}(undef, A, dims, dimswithghosts, comm(grid), false, F)
 end
 
+GridArray(::UndefInitializer, grid::Grid) = GridArray{Float64}(undef, grid)
+
 function Base.showarg(io::IO, a::GridArray{T,N,A,G,F}, toplevel) where {T,N,A,G,F}
     !toplevel && print(io, "::")
     print(io, "GridArray{", T, ",", N, ",", A, ",", G, ",", F, "}")

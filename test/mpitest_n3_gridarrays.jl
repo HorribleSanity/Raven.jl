@@ -23,6 +23,10 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
         gm = GridManager(cell, Raven.brick(K...); min_level = minlvl)
         grid = generate(gm)
 
+        A = GridArray(undef, grid)
+        @test A isa GridArray{Float64}
+        @test arraytype(A) <: AT
+
         val = (E = SVector{3,Complex{FT}}(1, 3, 5), B = SVector{3,Complex{FT}}(7, 9, 11))
         T = typeof(val)
         A = GridArray{T}(undef, grid)
