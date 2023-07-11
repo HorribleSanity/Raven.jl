@@ -116,6 +116,9 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
         A .= FT(2)
         B = 1 ./ A
         @test all(adapt(Array, (B .== FT(0.5))))
+
+        B = copy(A)
+        @test all(adapt(Array, (B .== A)))
     end
 end
 

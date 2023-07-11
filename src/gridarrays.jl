@@ -346,6 +346,11 @@ end
     return dest
 end
 
+function Base.copy(a::GridArray)
+    b = similar(a)
+    copyto!(b, a)
+end
+
 # We follow GPUArrays approach of coping the whole array to the host when
 # outputting a GridArray backed by GPU arrays.
 convert_to_cpu(xs) = Adapt.adapt_structure(Array, xs)
