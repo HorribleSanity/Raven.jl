@@ -41,6 +41,59 @@ function grids_testsuite(AT, FT)
     end
 
     let
+        N = (3, 3)
+        R = 1
+        nedge = 3
+
+        coarse_grid = Raven.cubeshellgrid(R, nedge)
+
+        gm = GridManager(
+            LobattoCell{Tuple{N...},Float64,Array}(),
+            coarse_grid,
+            min_level = 2,
+        )
+
+        indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
+        adapt!(gm, indicator)
+
+        function cubespherewarp(point::SVector{3})
+            p = sortperm(abs.(point))
+            point = point[p]
+
+            ξ = π * point[2] / 4point[3]
+            η = π * point[1] / 4point[3]
+
+            y_x = tan(ξ)
+            z_x = tan(η)
+
+            x = point[3] / hypot(1, y_x, z_x)
+            y = x * y_x
+            z = x * z_x
+
+            point = SVector(z, y, x)[sortperm(p)]
+
+            return point
+        end
+
+        grid = generate(cubespherewarp, gm)
+
+        @test grid isa Raven.Grid
+        @test issparse(grid.continuoustodiscontinuous)
+
+        mktempdir() do tmpdir
+            vtk_grid("$tmpdir/grid", grid) do vtk
+                vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
+                P = toequallyspaced(referencecell(grid))
+                x = P * reshape(points(grid), size(P, 2), :)
+                vtk["x"] = collect(x)
+            end
+            @test isfile("$tmpdir/grid.pvtu")
+            @test isdir("$tmpdir/grid")
+            @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
+        end
+    end
+
+    let
         N = (3, 2, 4)
         K = (2, 3, 1)
         coordinates =
