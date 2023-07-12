@@ -268,6 +268,7 @@ end
 
 function Base.fill!(a::GridArray{T}, x) where {T}
     fill_kernel!(get_backend(a), 256)(a, convert(T, x)::T, ndrange = length(a))
+    return a
 end
 
 function Adapt.adapt_structure(to, a::GridArray{T,N,A,G,F,L}) where {T,N,A,G,F,L}
