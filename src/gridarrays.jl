@@ -342,7 +342,8 @@ end
 end
 
 @inline function Base.copyto!(dest::GridArray, src::GridArray)
-    return copyto!(dest.datawithghosts, src.datawithghosts)
+    copyto!(dest.datawithghosts, src.datawithghosts)
+    return dest
 end
 
 # We follow GPUArrays approach of coping the whole array to the host when
