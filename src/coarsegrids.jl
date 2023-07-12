@@ -15,6 +15,42 @@ function coarsegrid(vertices, cells::AbstractVector{NTuple{X,T}}) where {X,T}
     return CoarseGrid{typeof(conn),typeof(vertices),typeof(cells)}(conn, vertices, cells)
 end
 
+"""
+    function cubeshellgrid(R::Real, nedge::Int)
+
+    This function will construct the CoarseGrid of a cube shell of radius R with nedge^2 cells/trees
+    along each face. A cube shell is a 2D connectivity.
+"""
+function cubeshellgrid(R::Real, nedge::Int)
+    vert_temp = zeros(SVector{3,Float64}, 8)
+
+    vert_temp[1] = SVector(+R, +R, -R)
+    vert_temp[2] = SVector(+R, -R, -R)
+    vert_temp[3] = SVector(+R, +R, +R)
+    vert_temp[4] = SVector(+R, -R, +R)
+
+    vert_temp[5] = SVector(-R, +R, -R)
+    vert_temp[6] = SVector(-R, -R, -R)
+    vert_temp[7] = SVector(-R, +R, +R)
+    vert_temp[8] = SVector(-R, -R, +R)
+
+    cells_temp =
+        [(1, 2, 3, 4), (4, 8, 2, 6), (6, 2, 5, 1), (1, 5, 3, 7), (7, 3, 8, 4), (5, 6, 7, 8)]
+
+    # construct connectivity for cube composed of the 6 cells above
+    conn_temp = P4estTypes.Connectivity{4}(vert_temp, cells_temp)
+
+    # refine the 6 cell cube into a 6*nedge^2 cell cube
+    conn = P4estTypes.refine(conn_temp, nedge)
+
+    # collect cell of vertex data of the refinement
+    verts = GC.@preserve conn collect(P4estTypes.unsafe_vertices(conn))
+    vertices = [SVector(verts[i][1], verts[i][2], verts[i][3]) for i = 1:length(verts)]
+    cells = GC.@preserve conn map.(x -> x + 1, P4estTypes.unsafe_trees(conn))
+
+    return CoarseGrid{typeof(conn),typeof(vertices),typeof(cells)}(conn, vertices, cells)
+end
+
 struct BrickGrid{T,C,D,M} <: AbstractCoarseGrid
     connectivity::C
     coordinates::D
