@@ -257,6 +257,7 @@ end
     @unroll for i = 1:L
         @inbounds setindex!(data, vt[i], insert(I, Val(F), i)...)
     end
+    return a
 end
 
 LinearAlgebra.norm(a::GridArray) = sqrt(MPI.Allreduce(norm(parent(a))^2, +, comm(a)))
