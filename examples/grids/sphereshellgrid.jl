@@ -14,40 +14,19 @@ using StaticArrays
 
 N = (3, 3)
 R = 1
-nedge = 3
 
-coarse_grid = Raven.cubeshellgrid(R, nedge)
+coarse_grid = Raven.cubeshellgrid(R)
 
 gm = GridManager(LobattoCell{Tuple{N...},Float64,Array}(), coarse_grid, min_level = 2)
 
 indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
 adapt!(gm, indicator)
 
-function cubespherewarp(point::SVector{3})
-    # Put the points in reverse magnitude order
-    p = sortperm(abs.(point))
-    point = point[p]
-
-    # Convert to angles
-    ξ = π * point[2] / 4point[3]
-    η = π * point[1] / 4point[3]
-
-    # Compute the ratios
-    y_x = tan(ξ)
-    z_x = tan(η)
-
-    # Compute the new points
-    x = point[3] / hypot(1, y_x, z_x)
-    y = x * y_x
-    z = x * z_x
-
-    # Compute the new points and unpermute
-    point = SVector(z, y, x)[sortperm(p)]
-
-    return point
+function stretch(point)
+    return SVector(point[1], 3 * point[2], point[3])
 end
 
-grid = generate(cubespherewarp, gm)
+grid = generate(stretch, gm)     #Example of user warp
 
 vtk_grid("grid", grid) do vtk
     vtk["CellNumber"] = (1:length(grid)) .+ Raven.offset(grid)

@@ -1,54 +1,94 @@
 abstract type AbstractCoarseGrid end
 
-struct CoarseGrid{C,V,L} <: AbstractCoarseGrid
+struct CoarseGrid{C,V,L,W,U} <: AbstractCoarseGrid
     connectivity::C
     vertices::V
     cells::L
+    warp::W
+    unwarp::U
 end
 
 connectivity(g::CoarseGrid) = g.connectivity
 vertices(g::CoarseGrid) = g.vertices
 cells(g::CoarseGrid) = g.cells
+getwarp(g::CoarseGrid) = g.warp
+getunwarp(g::CoarseGrid) = g.unwarp
 
-function coarsegrid(vertices, cells::AbstractVector{NTuple{X,T}}) where {X,T}
+function coarsegrid(
+    vertices,
+    cells::AbstractVector{NTuple{X,T}},
+    warp = identity,
+    unwarp = identity,
+) where {X,T}
+
     conn = P4estTypes.Connectivity{X}(vertices, cells)
-    return CoarseGrid{typeof(conn),typeof(vertices),typeof(cells)}(conn, vertices, cells)
+    C, V, L, W, U = typeof.([conn, vertices, cells, warp, unwarp])
+    return CoarseGrid{C,V,L,W,U}(conn, vertices, cells, warp, unwarp)
 end
 
 """
-    function cubeshellgrid(R::Real, nedge::Int)
+    function cubeshellgrid(R::Real)
 
-    This function will construct the CoarseGrid of a cube shell of radius R with nedge^2 cells/trees
-    along each face. A cube shell is a 2D connectivity.
+    This function will construct the CoarseGrid of a cube shell of radius R. 
+    A cube shell is a 2D connectivity.
 """
-function cubeshellgrid(R::Real, nedge::Int)
-    vert_temp = zeros(SVector{3,Float64}, 8)
+function cubeshellgrid(R::Real)
+    vertices = zeros(SVector{3,Float64}, 8)
 
-    vert_temp[1] = SVector(+R, +R, -R)
-    vert_temp[2] = SVector(+R, -R, -R)
-    vert_temp[3] = SVector(+R, +R, +R)
-    vert_temp[4] = SVector(+R, -R, +R)
+    vertices[1] = SVector(+R, +R, -R)
+    vertices[2] = SVector(+R, -R, -R)
+    vertices[3] = SVector(+R, +R, +R)
+    vertices[4] = SVector(+R, -R, +R)
+    vertices[5] = SVector(-R, +R, -R)
+    vertices[6] = SVector(-R, -R, -R)
+    vertices[7] = SVector(-R, +R, +R)
+    vertices[8] = SVector(-R, -R, +R)
 
-    vert_temp[5] = SVector(-R, +R, -R)
-    vert_temp[6] = SVector(-R, -R, -R)
-    vert_temp[7] = SVector(-R, +R, +R)
-    vert_temp[8] = SVector(-R, -R, +R)
-
-    cells_temp =
+    cells =
         [(1, 2, 3, 4), (4, 8, 2, 6), (6, 2, 5, 1), (1, 5, 3, 7), (7, 3, 8, 4), (5, 6, 7, 8)]
 
-    # construct connectivity for cube composed of the 6 cells above
-    conn_temp = P4estTypes.Connectivity{4}(vert_temp, cells_temp)
+    function cubespherewarp(point)
+        # Put the points in reverse magnitude order
+        p = sortperm(abs.(point))
+        point = point[p]
 
-    # refine the 6 cell cube into a 6*nedge^2 cell cube
-    conn = P4estTypes.refine(conn_temp, nedge)
+        # Convert to angles
+        ξ = π * point[2] / 4point[3]
+        η = π * point[1] / 4point[3]
 
-    # collect cell of vertex data of the refinement
-    verts = GC.@preserve conn collect(P4estTypes.unsafe_vertices(conn))
-    vertices = [SVector(verts[i][1], verts[i][2], verts[i][3]) for i = 1:length(verts)]
-    cells = GC.@preserve conn map.(x -> x + 1, P4estTypes.unsafe_trees(conn))
+        # Compute the ratios
+        y_x = tan(ξ)
+        z_x = tan(η)
 
-    return CoarseGrid{typeof(conn),typeof(vertices),typeof(cells)}(conn, vertices, cells)
+        # Compute the new points
+        x = point[3] / hypot(1, y_x, z_x)
+        y = x * y_x
+        z = x * z_x
+
+        # Compute the new points and unpermute
+        point = SVector(z, y, x)[sortperm(p)]
+        return point
+    end
+
+    function cubesphereunwarp(point)
+        # Put the points in reverse magnitude order
+        p = sortperm(abs.(point))
+        point = point[p]
+
+        # Convert to angles
+        ξ = 4atan(point[2] / point[3]) / π
+        η = 4atan(point[1] / point[3]) / π
+        R = sign(point[3]) * hypot(point...)
+
+        x = R
+        y = R * ξ
+        z = R * η
+        # Compute the new points and unpermute
+        point = SVector(z, y, x)[sortperm(p)]
+        return point
+    end
+
+    return coarsegrid(vertices, cells, cubespherewarp, cubesphereunwarp)
 end
 
 struct BrickGrid{T,C,D,M} <: AbstractCoarseGrid

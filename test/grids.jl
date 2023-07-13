@@ -45,7 +45,7 @@ function grids_testsuite(AT, FT)
         R = 1
         nedge = 3
 
-        coarse_grid = Raven.cubeshellgrid(R, nedge)
+        coarse_grid = Raven.cubeshellgrid(R)
 
         gm = GridManager(
             LobattoCell{Tuple{N...},Float64,Array}(),
@@ -56,26 +56,7 @@ function grids_testsuite(AT, FT)
         indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
         adapt!(gm, indicator)
 
-        function cubespherewarp(point::SVector{3})
-            p = sortperm(abs.(point))
-            point = point[p]
-
-            ξ = π * point[2] / 4point[3]
-            η = π * point[1] / 4point[3]
-
-            y_x = tan(ξ)
-            z_x = tan(η)
-
-            x = point[3] / hypot(1, y_x, z_x)
-            y = x * y_x
-            z = x * z_x
-
-            point = SVector(z, y, x)[sortperm(p)]
-
-            return point
-        end
-
-        grid = generate(cubespherewarp, gm)
+        grid = generate(gm)
 
         @test grid isa Raven.Grid
         @test issparse(grid.continuoustodiscontinuous)
