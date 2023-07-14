@@ -9,6 +9,8 @@
 JFDIR=$HOME/.local/share/nvim/site/pack/packer/start/JuliaFormatter.vim
 JLFILES=$(git diff --name-only --diff-filter=AM HEAD | grep '.*\.jl$')
 
+export GIT_DIR="${GIT_DIR-$(git rev-parse --git-common-dir)}"
+
 for JLFILE in $JLFILES;
 do
   MKTEMPLATE=$(basename "$JLFILE").XXXXXXXX.jl
