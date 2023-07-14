@@ -156,6 +156,21 @@ function Base.showarg(io::IO, a::GridArray{T,N,A,G,F}, toplevel) where {T,N,A,G,
 end
 
 """
+    viewwithoutghosts(A::GridArray)
+
+Return a `GridArray` with the same data as `A` but with the ghost cells inaccessible.
+"""
+@inline function viewwithoutghosts(a::GridArray{T,N,A,true,F,L,C,D,W}) where {T,N,A,F,L,C,D,W}
+    GridArray{T,N,A,false,F,L,C,D,W}(
+        a.comm,
+        a.data,
+        a.datawithghosts,
+        a.dims,
+        a.dimswithghosts,
+    )
+end
+
+"""
     viewwithghosts(A::GridArray)
 
 Return a `GridArray` with the same data as `A` but with the ghost cells accessible.

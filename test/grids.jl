@@ -29,8 +29,8 @@ function grids_testsuite(AT, FT)
             vtk_grid("$tmpdir/grid", grid) do vtk
                 vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
                 P = toequallyspaced(referencecell(grid))
-                x = P * reshape(points(grid), size(P, 2), :)
-                vtk["x"] = collect(x)
+                x = P * points(grid)
+                vtk["x"] = Adapt.adapt(Array, x)
             end
         end
     end
@@ -61,8 +61,8 @@ function grids_testsuite(AT, FT)
             vtk_grid("$tmpdir/grid", grid) do vtk
                 vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
                 P = toequallyspaced(referencecell(grid))
-                x = P * reshape(points(grid), size(P, 2), :)
-                vtk["x"] = collect(x)
+                x = P * points(grid)
+                vtk["x"] = Adapt.adapt(Array, x)
             end
         end
     end
@@ -92,8 +92,8 @@ function grids_testsuite(AT, FT)
             vtk_grid("$tmpdir/grid", grid) do vtk
                 vtk["CellNumber"] = (1:length(grid)) .+ Raven.offset(grid)
                 P = toequallyspaced(referencecell(grid))
-                x = P * reshape(points(grid), size(P, 2), :)
-                vtk["x"] = collect(x)
+                x = P * points(grid)
+                vtk["x"] = Adapt.adapt(Array, x)
             end
         end
     end
@@ -128,8 +128,8 @@ function grids_testsuite(AT, FT)
             vtk_grid("$tmpdir/grid", grid) do vtk
                 vtk["CellNumber"] = (1:length(grid)) .+ Raven.offset(grid)
                 P = toequallyspaced(referencecell(grid))
-                x = P * reshape(points(grid), size(P, 2), :)
-                vtk["x"] = collect(x)
+                x = P * points(grid)
+                vtk["x"] = Adapt.adapt(Array, x)
             end
         end
     end

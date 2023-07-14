@@ -30,12 +30,8 @@ comm(grid::Grid) = grid.comm
 referencecell(grid::Grid) = grid.cell
 
 points(grid::Grid) = points(grid, Val(false))
-function points(grid::Grid, withghostlayer::Val{false})
-    colons = ntuple(_ -> Colon(), ndims(grid.points) - 1)
-    return view(grid.points, colons..., Base.OneTo(grid.locallength))
-end
+points(grid::Grid, withghostlayer::Val{false}) = viewwithoutghosts(grid.points)
 points(grid::Grid, withghostlayer::Val{true}) = grid.points
-
 
 levels(grid::Grid) = levels(grid, Val(false))
 levels(grid::Grid, ::Val{false}) = view(grid.levels, Base.OneTo(grid.locallength))

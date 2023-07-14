@@ -435,14 +435,23 @@ function materializepoints(
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
+    forest,
+    comm
 )
-
-    A = arraytype(referencecell)
     r = vec.(points_1d(referencecell))
     Q = max(512 ÷ prod(length.(r)), 1)
 
-    # FIXME use cell array here; think about storage order
-    points = A{eltype(coarsegridvertices)}(undef, length.(r)..., length(quadranttolevel))
+    IntType = typeof(length(r))
+    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    points = GridArray{eltype(coarsegridvertices)}(
+        undef,
+        arraytype(referencecell),
+        (length.(r)..., num_local),
+        (length.(r)..., length(quadranttolevel)),
+        comm,
+        true,
+        length(r) + 1
+    )
 
     backend = get_backend(points)
 
@@ -564,13 +573,22 @@ function materializepoints(
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
+    forest,
+    comm
 )
-
-    A = arraytype(referencecell)
     r = vec.(points_1d(referencecell))
 
-    # FIXME use cell array here; think about storage order
-    points = A{eltype(coarsegridvertices)}(undef, length.(r)..., length(quadranttolevel))
+    IntType = typeof(length(r))
+    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    points = GridArray{eltype(coarsegridvertices)}(
+        undef,
+        arraytype(referencecell),
+        (length.(r)..., num_local),
+        (length.(r)..., length(quadranttolevel)),
+        comm,
+        true,
+        length(r) + 1
+    )
 
     backend = get_backend(points)
     kernel! = hexpoints!(backend, length.(r))
