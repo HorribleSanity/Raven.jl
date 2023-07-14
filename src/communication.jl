@@ -215,6 +215,34 @@ end
 
 get_backend(cm::AbstractCommManager) = get_backend(arraytype(cm.pattern))
 
+@kernel function setbuffer_kernel!(buffer, src, Is)
+    i = @index(Global)
+    @inbounds buffer[i] = src[Is[i]]
+end
+
+function setbuffer!(buffer, src, Is)
+    axes(buffer) == axes(Is) || Broadcast.throwdm(axes(buffer), axes(Is))
+    isempty(buffer) && return
+
+    setbuffer_kernel!(get_backend(buffer), 256)(buffer, src, Is, ndrange = length(buffer))
+
+    return
+end
+
+@kernel function getbuffer_kernel!(dest, buffer, Is)
+    i = @index(Global)
+    @inbounds dest[Is[i]] = buffer[i]
+end
+
+function getbuffer!(dest, buffer, Is)
+    axes(buffer) == axes(Is) || Broadcast.throwdm(axes(buffer), axes(Is))
+    isempty(buffer) && return
+
+    getbuffer_kernel!(get_backend(buffer), 256)(dest, buffer, Is, ndrange = length(buffer))
+
+    return
+end
+
 function progress(::AbstractCommManager)
     MPI.Iprobe(MPI.ANY_SOURCE, MPI.ANY_TAG, MPI.COMM_WORLD)
 
@@ -222,7 +250,7 @@ function progress(::AbstractCommManager)
 end
 
 function start!(A, cm::CommManagerBuffered)
-    cm.sendbufferdevice .= A[cm.pattern.sendindices]
+    setbuffer!(cm.sendbufferdevice, A, cm.pattern.sendindices)
     KernelAbstractions.synchronize(get_backend(cm))
 
     MPI.Startall(cm.recvrequests)
@@ -236,7 +264,7 @@ function finish!(A, cm::CommManagerBuffered)
     MPI.Waitall(cm.sendrequests)
 
     A = viewwithghosts(A)
-    A[cm.pattern.recvindices] .= cm.recvbufferdevice
+    getbuffer!(A, cm.recvbufferdevice, cm.pattern.recvindices)
 
     return
 end
@@ -285,12 +313,12 @@ function start!(A, cm::CommManagerTripleBuffered)
         copyto!(cm.recvbufferhost, cm.recvbuffercomm)
         KernelAbstractions.copyto!(backend, cm.recvbufferdevice, cm.recvbufferhost)
         A = viewwithghosts(A)
-        A[cm.pattern.recvindices] .= cm.recvbufferdevice
+        getbuffer!(A, cm.recvbufferdevice, cm.pattern.recvindices)
         KernelAbstractions.synchronize(backend)
     end
 
     cm.sendtask[] = Base.Threads.@spawn begin
-        cm.sendbufferdevice .= A[cm.pattern.sendindices]
+        setbuffer!(cm.sendbufferdevice, A, cm.pattern.sendindices)
         KernelAbstractions.copyto!(backend, cm.sendbufferhost, cm.sendbufferdevice)
         KernelAbstractions.synchronize(backend)
         copyto!(cm.sendbuffercomm, cm.sendbufferhost)

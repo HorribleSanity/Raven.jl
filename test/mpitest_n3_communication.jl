@@ -106,10 +106,10 @@ let
         data4 = CuArray(data4)
 
         pattern = Raven.CommPattern{CuArray}(
-            recvindices,
+            CuArray(recvindices),
             recvranks,
             recvrankindices,
-            sendindices,
+            CuArray(sendindices),
             sendranks,
             sendrankindices,
         )
