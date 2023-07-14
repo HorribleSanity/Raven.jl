@@ -160,7 +160,7 @@ end
 
 Return a `GridArray` with the same data as `A` but with the ghost cells accessible.
 """
-@inline function viewwithghosts(a::GridArray{T,N,A,G,F,L,C,D,W}) where {T,N,A,G,F,L,C,D,W}
+@inline function viewwithghosts(a::GridArray{T,N,A,false,F,L,C,D,W}) where {T,N,A,F,L,C,D,W}
     GridArray{T,N,A,true,F,L,C,D,W}(
         a.comm,
         a.data,
