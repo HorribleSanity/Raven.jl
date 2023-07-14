@@ -304,34 +304,43 @@ function start!(A, cm::CommManagerTripleBuffered)
 
     # Wait for kernels on the main thread/stream to finish before launching
     # kernels on on different threads which each have their own streams.
-    KernelAbstractions.synchronize(backend)
-
-    MPI.Startall(cm.recvrequests)
-    cm.recvtask[] = Base.Threads.@spawn begin
-        KernelAbstractions.priority!(backend, :high)
-        cooperative_testall(cm.recvrequests)
-        copyto!(cm.recvbufferhost, cm.recvbuffercomm)
-        KernelAbstractions.copyto!(backend, cm.recvbufferdevice, cm.recvbufferhost)
-        A = viewwithghosts(A)
-        getbuffer!(A, cm.recvbufferdevice, cm.pattern.recvindices)
+    if !isempty(cm.recvrequests) || !isempty(cm.sendrequests)
         KernelAbstractions.synchronize(backend)
     end
 
-    cm.sendtask[] = Base.Threads.@spawn begin
-        setbuffer!(cm.sendbufferdevice, A, cm.pattern.sendindices)
-        KernelAbstractions.copyto!(backend, cm.sendbufferhost, cm.sendbufferdevice)
-        KernelAbstractions.synchronize(backend)
-        copyto!(cm.sendbuffercomm, cm.sendbufferhost)
-        MPI.Startall(cm.sendrequests)
-        cooperative_testall(cm.sendrequests)
+    if !isempty(cm.recvrequests)
+        MPI.Startall(cm.recvrequests)
+        cm.recvtask[] = Base.Threads.@spawn begin
+            KernelAbstractions.priority!(backend, :high)
+            cooperative_testall(cm.recvrequests)
+            copyto!(cm.recvbufferhost, cm.recvbuffercomm)
+            KernelAbstractions.copyto!(backend, cm.recvbufferdevice, cm.recvbufferhost)
+            getbuffer!(viewwithghosts(A), cm.recvbufferdevice, cm.pattern.recvindices)
+            KernelAbstractions.synchronize(backend)
+        end
+    end
+
+    if !isempty(cm.sendrequests)
+        cm.sendtask[] = Base.Threads.@spawn begin
+            setbuffer!(cm.sendbufferdevice, A, cm.pattern.sendindices)
+            KernelAbstractions.copyto!(backend, cm.sendbufferhost, cm.sendbufferdevice)
+            KernelAbstractions.synchronize(backend)
+            copyto!(cm.sendbuffercomm, cm.sendbufferhost)
+            MPI.Startall(cm.sendrequests)
+            cooperative_testall(cm.sendrequests)
+        end
     end
 
     return
 end
 
 function finish!(_, cm::CommManagerTripleBuffered)
-    cooperative_wait(cm.recvtask[])
-    cooperative_wait(cm.sendtask[])
+    if !isempty(cm.recvrequests)
+        cooperative_wait(cm.recvtask[])
+    end
+    if !isempty(cm.sendrequests)
+        cooperative_wait(cm.sendtask[])
+    end
 
     return
 end
