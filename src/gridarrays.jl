@@ -229,8 +229,19 @@ Return a tuple containing the dimensions of `A` including the ghost cells.
 """
 @inline sizewithghosts(a::GridArray) = a.dimswithghosts
 
-function Base.similar(a::GridArray{S,N,A,G,F}, ::Type{T}, dims::Dims) where {S,N,A,G,F,T}
-    GridArray{T}(undef, A, dims, a.dimswithghosts, comm(a), G, F)
+function Base.similar(a::GridArray{S,N,A,G,F}, ::Type{T}, dims::Tuple{Vararg{Int64, M}}) where {S,N,A,G,F,T,M}
+    if M == N
+        if (!G && (dims[end] == a.dims[end])) || (G && (dims[end] == a.dimswithghosts[end]))
+            # Create ghost layer
+            dimswithghosts = (dims[1:end-1]..., a.dimswithghosts[end])
+        else
+            # No ghost layer
+            dimswithghosts = dims
+        end
+        return GridArray{T}(undef, A, dims, dimswithghosts, comm(a), G, F)
+    else
+        return A{T}(undef, dims)
+    end
 end
 
 @inline function Base.getindex(
