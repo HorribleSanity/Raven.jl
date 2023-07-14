@@ -217,6 +217,8 @@ get_backend(cm::AbstractCommManager) = get_backend(arraytype(cm.pattern))
 
 function progress(::AbstractCommManager)
     MPI.Iprobe(MPI.ANY_SOURCE, MPI.ANY_TAG, MPI.COMM_WORLD)
+
+    return
 end
 
 function start!(A, cm::CommManagerBuffered)
@@ -225,6 +227,8 @@ function start!(A, cm::CommManagerBuffered)
 
     MPI.Startall(cm.recvrequests)
     MPI.Startall(cm.sendrequests)
+
+    return
 end
 
 function finish!(A, cm::CommManagerBuffered)
@@ -232,6 +236,8 @@ function finish!(A, cm::CommManagerBuffered)
     MPI.Waitall(cm.sendrequests)
 
     A[cm.pattern.recvindices] .= cm.recvbufferdevice
+
+    return
 end
 
 function cooperative_testall(requests)
@@ -289,11 +295,15 @@ function start!(A, cm::CommManagerTripleBuffered)
         MPI.Startall(cm.sendrequests)
         cooperative_testall(cm.sendrequests)
     end
+
+    return
 end
 
 function finish!(_, cm::CommManagerTripleBuffered)
     cooperative_wait(cm.recvtask[])
     cooperative_wait(cm.sendtask[])
+
+    return
 end
 
 function share!(A, cm::AbstractCommManager)
@@ -302,4 +312,6 @@ function share!(A, cm::AbstractCommManager)
     progress(cm)
 
     finish!(A, cm)
+
+    return
 end
