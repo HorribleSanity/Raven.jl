@@ -235,6 +235,7 @@ function finish!(A, cm::CommManagerBuffered)
     MPI.Waitall(cm.recvrequests)
     MPI.Waitall(cm.sendrequests)
 
+    A = viewwithghosts(A)
     A[cm.pattern.recvindices] .= cm.recvbufferdevice
 
     return
@@ -283,6 +284,7 @@ function start!(A, cm::CommManagerTripleBuffered)
         cooperative_testall(cm.recvrequests)
         copyto!(cm.recvbufferhost, cm.recvbuffercomm)
         KernelAbstractions.copyto!(backend, cm.recvbufferdevice, cm.recvbufferhost)
+        A = viewwithghosts(A)
         A[cm.pattern.recvindices] .= cm.recvbufferdevice
         KernelAbstractions.synchronize(backend)
     end
