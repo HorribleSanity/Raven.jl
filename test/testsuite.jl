@@ -33,9 +33,17 @@ function testsuite(AT, FT)
         @testset "Grid generation ($AT, $FT)" begin
             grids_testsuite(AT, FT)
         end
+
+        @testset "Kronecker operators (GridArray 2D) ($AT, $FT)" begin
+            kron2dgridarray_testsuite(AT, FT)
+        end
+
+        @testset "Kronecker operators (GridArray 3D) ($AT, $FT)" begin
+            kron3dgridarray_testsuite(AT, FT)
+        end
     end
 
-    @testset "Kronecker operators ($AT, $FT)" begin
+    @testset "Kronecker operators (primitive) ($AT, $FT)" begin
         kron_testsuite(AT, FT)
     end
 end

@@ -38,6 +38,18 @@ function (*)(K::Kron{Tuple{D}}, f::F) where {D<:AbstractMatrix,F<:AbstractVecOrM
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
+function (*)(K::Kron{Tuple{D}}, f::GridArray) where {D<:AbstractMatrix}
+    (d,) = components(K)
+
+    r = similar(f, size(d, 1), size(f, 2))
+
+    backend = get_backend(r)
+    kernel! = kron_D_kernel(backend, size(r, 1))
+    kernel!(r, d, f, Val(axes(d, 2)); ndrange = size(r))
+
+    return r
+end
+
 @kernel function kron_E_D_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k) = @index(Global, NTuple)
     acc = zero(T)
@@ -62,6 +74,18 @@ function (*)(K::Kron{Tuple{E,D}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:Abstr
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
+function (*)(K::Kron{Tuple{E,D}}, f::GridArray) where {D<:AbstractMatrix,E<:Eye}
+    e, d = components(K)
+
+    r = similar(f, size(d, 1), size(e, 1), size(f, 3))
+
+    backend = get_backend(r)
+    kernel! = kron_E_D_kernel(backend, size(r)[begin:end-1])
+    kernel!(r, d, f, Val(axes(d, 2)); ndrange = size(r))
+
+    return r
+end
+
 @kernel function kron_D_E_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k) = @index(Global, NTuple)
     acc = zero(T)
@@ -84,6 +108,18 @@ function (*)(K::Kron{Tuple{D,E}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:Abstr
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
+end
+
+function (*)(K::Kron{Tuple{D,E}}, f::GridArray) where {D<:AbstractMatrix,E<:Eye}
+    d, e = components(K)
+
+    r = similar(f, size(e, 1), size(d, 1), size(f, 3))
+
+    backend = get_backend(r)
+    kernel! = kron_D_E_kernel(backend, size(r)[begin:end-1])
+    kernel!(r, d, f, Val(axes(d, 2)); ndrange = size(r))
+
+    return r
 end
 
 @kernel function kron_B_A_kernel(
@@ -123,6 +159,21 @@ function (*)(
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
+function (*)(
+    K::Kron{Tuple{B,A}},
+    f::GridArray,
+) where {A<:AbstractMatrix,B<:AbstractMatrix}
+    b, a = components(K)
+
+    r = similar(f, size(a, 1), size(b, 1), size(f, 3))
+
+    backend = get_backend(r)
+    kernel! = kron_B_A_kernel(backend, size(r)[begin:end-1])
+    kernel!(r, a, b, f, Val(axes(a, 2)), Val(axes(b, 2)); ndrange = size(r))
+
+    return r
+end
+
 @kernel function kron_E_E_D_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k, e) = @index(Global, NTuple)
     acc = zero(T)
@@ -148,6 +199,21 @@ function (*)(
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
+end
+
+function (*)(
+    K::Kron{Tuple{E₃,E₂,D}},
+    f::GridArray,
+) where {D<:AbstractMatrix,E₃<:Eye,E₂<:Eye}
+    e₃, e₂, d = components(K)
+
+    r = similar(f, size(d, 1), size(e₂, 1), size(e₃, 1), size(f, 4))
+
+    backend = get_backend(r)
+    kernel! = kron_E_E_D_kernel(backend, size(r)[begin:end-1])
+    kernel!(r, d, f, Val(axes(d, 2)); ndrange = size(r))
+
+    return r
 end
 
 @kernel function kron_E_D_E_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
@@ -177,6 +243,21 @@ function (*)(
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
+function (*)(
+    K::Kron{Tuple{E₃,D,E₁}},
+    f::GridArray,
+) where {D<:AbstractMatrix,E₁<:Eye,E₃<:Eye}
+    e₃, d, e₁ = components(K)
+
+    r = similar(f, size(e₁, 1), size(d, 1), size(e₃, 1), size(f, 4))
+
+    backend = get_backend(r)
+    kernel! = kron_E_D_E_kernel(backend, size(r)[begin:end-1])
+    kernel!(r, d, f, Val(axes(d, 2)); ndrange = size(r))
+
+    return r
+end
+
 @kernel function kron_D_E_E_kernel(r::AbstractArray{T}, d, g, ::Val{L}) where {T,L}
     (i, j, k, e) = @index(Global, NTuple)
     acc = zero(T)
@@ -202,6 +283,21 @@ function (*)(
     kernel!(r, d, g, Val(axes(d, 2)); ndrange = size(r))
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
+end
+
+function (*)(
+    K::Kron{Tuple{D,E₂,E₁}},
+    f::GridArray,
+) where {D<:AbstractMatrix,E₁<:Eye,E₂<:Eye}
+    d, e₂, e₁ = components(K)
+
+    r = similar(f, size(e₁, 1), size(e₂, 1), size(d, 1), size(f, 4))
+
+    backend = get_backend(r)
+    kernel! = kron_D_E_E_kernel(backend, size(r)[begin:end-1])
+    kernel!(r, d, f, Val(axes(d, 2)); ndrange = size(r))
+
+    return r
 end
 
 @kernel function kron_C_B_A_kernel(
@@ -253,4 +349,29 @@ function (*)(
     )
 
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
+end
+
+function (*)(
+    K::Kron{Tuple{C,B,A}},
+    f::GridArray,
+) where {A<:AbstractMatrix,B<:AbstractMatrix,C<:AbstractMatrix}
+    c, b, a = components(K)
+
+    r = similar(f, size(a, 1), size(b, 1), size(c, 1), size(f, 4))
+
+    backend = get_backend(r)
+    kernel! = kron_C_B_A_kernel(backend, size(r)[begin:end-1])
+    kernel!(
+        r,
+        a,
+        b,
+        c,
+        f,
+        Val(axes(a, 2)),
+        Val(axes(b, 2)),
+        Val(axes(c, 2));
+        ndrange = size(r),
+    )
+
+    return r
 end

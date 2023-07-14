@@ -38,3 +38,62 @@ function kron_testsuite(AT, FT)
         @test adapt(Array, Raven.Kron(args)) == Raven.Kron(adapt.(Array, args))
     end
 end
+
+function kron2dgridarray_testsuite(AT, FT)
+    rng = StableRNG(37)
+    A = adapt(AT, rand(rng, FT, 5, 2))
+    B = adapt(AT, rand(rng, FT, 2, 3))
+
+    cell = LobattoCell{Tuple{2, 3}, FT, AT}()
+    gm = GridManager(cell, Raven.brick(2, 1) ; min_level = 1)
+    grid = generate(gm)
+
+    EntryType = SVector{2, FT}
+    v = GridArray{EntryType}(undef, grid)
+    v .= adapt(AT, rand(rng, EntryType, size(v)))
+
+    for args in (
+        (Raven.Eye{FT, 3}(), A),
+        (B, Raven.Eye{FT, 2}()),
+        (B, A)
+    )
+        K = adapt(AT, collect(Raven.Kron(adapt(Array, args))))
+        Kv1 = adapt(Array, Raven.Kron(args)*v)
+        dimsIn = (prod(size(v)[1:end-1]), size(v)[end])
+        dimsOut = (size.(reverse(args), 1)..., size(v)[end])
+        Kv2 = reshape(Array(K)*reshape(adapt(Array, v), dimsIn), dimsOut)
+        @test isapprox(Kv1, Kv2)
+    end
+end
+
+function kron3dgridarray_testsuite(AT, FT)
+    rng = StableRNG(37)
+    A = adapt(AT, rand(rng, FT, 5, 2))
+    B = adapt(AT, rand(rng, FT, 2, 3))
+    C = adapt(AT, rand(rng, FT, 3, 5))
+
+    cell = LobattoCell{Tuple{2, 3, 5}, FT, AT}()
+    gm = GridManager(cell, Raven.brick(2, 1, 1) ; min_level = 1)
+    grid = generate(gm)
+
+    EntryType = SVector{2, FT}
+    v = GridArray{EntryType}(undef, grid)
+    v .= adapt(AT, rand(rng, EntryType, size(v)))
+
+    for args in (
+        (Raven.Eye{FT, 5}(), Raven.Eye{FT, 3}(), A),
+        (Raven.Eye{FT, 5}(), B, Raven.Eye{FT, 2}()),
+        (C, Raven.Eye{FT, 3}(), Raven.Eye{FT, 2}()),
+        (Raven.Eye{FT, 5}(), B, A),
+        (C, Raven.Eye{FT, 3}(), A),
+        (C, B, Raven.Eye{FT, 2}()),
+        (C, B, A),
+    )
+        K = adapt(AT, collect(Raven.Kron(adapt(Array, args))))
+        Kv1 = adapt(Array, Raven.Kron(args)*v)
+        dimsIn = (prod(size(v)[1:end-1]), size(v)[end])
+        dimsOut = (size.(reverse(args), 1)..., size(v)[end])
+        Kv2 = reshape(Array(K)*reshape(adapt(Array, v), dimsIn), dimsOut)
+        @test isapprox(Kv1, Kv2)
+    end
+end
