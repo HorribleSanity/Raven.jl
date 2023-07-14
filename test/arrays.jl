@@ -8,4 +8,7 @@
     B = Raven.numbercontiguous(Int32, A, by = x -> -x)
     @test eltype(B) == Int32
     @test B == [1, 3, 2, 4, 2]
+
+    A = [1, 2]
+    @test viewwithghosts(A) == A
 end
