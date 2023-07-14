@@ -177,6 +177,9 @@ Returns the `KernelAbstractions.Backend` used to launch kernels interacting
 with `A`.
 """
 @inline get_backend(::GridArray{T,N,A}) where {T,N,A} = get_backend(A)
+
+@inline GPUArraysCore.backend(x::GridArray{<:Any,<:Any,<:AbstractGPUArray}) = GPUArraysCore.backend(x.datawithghosts)
+
 """
     arraytype(A::GridArray) -> DataType
 
