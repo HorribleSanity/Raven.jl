@@ -328,6 +328,9 @@ function start!(A, cm::CommManagerTripleBuffered)
             getbuffer!(viewwithghosts(A), cm.recvbufferdevice, cm.pattern.recvindices)
             KernelAbstractions.synchronize(backend)
         end
+        @static if VERSION >= v"1.7"
+            cm.recvtask[] = errormonitor(cm.recvtask[])
+        end
     end
 
     if !isempty(cm.sendrequests)
@@ -338,6 +341,9 @@ function start!(A, cm::CommManagerTripleBuffered)
             copyto!(cm.sendbuffercomm, cm.sendbufferhost)
             MPI.Startall(cm.sendrequests)
             cooperative_testall(cm.sendrequests)
+        end
+        @static if VERSION >= v"1.7"
+            cm.sendtask[] = errormonitor(cm.sendtask[])
         end
     end
 
