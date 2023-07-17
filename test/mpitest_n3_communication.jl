@@ -4,7 +4,7 @@ using MPI
 using Test
 using Raven
 
-MPI.Init()
+MPI.Init(; threadlevel = MPI.THREAD_MULTIPLE)
 
 let
     mpisize = MPI.Comm_size(MPI.COMM_WORLD)
