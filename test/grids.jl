@@ -1,3 +1,5 @@
+using ReadVTK
+
 function grids_testsuite(AT, FT)
     rng = StableRNG(37)
 
@@ -25,13 +27,16 @@ function grids_testsuite(AT, FT)
         @test grid isa Raven.Grid
         @test issparse(grid.continuoustodiscontinuous)
 
-        @test_nowarn mktempdir() do tmpdir
+        mktempdir() do tmpdir
             vtk_grid("$tmpdir/grid", grid) do vtk
                 vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
                 P = toequallyspaced(referencecell(grid))
                 x = P * points(grid)
                 vtk["x"] = Adapt.adapt(Array, x)
             end
+            @test isfile("$tmpdir/grid.pvtu")
+            @test isdir("$tmpdir/grid")
+            @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
         end
     end
 
@@ -57,13 +62,16 @@ function grids_testsuite(AT, FT)
         @test grid isa Raven.Grid
         @test issparse(grid.continuoustodiscontinuous)
 
-        @test_nowarn mktempdir() do tmpdir
+        mktempdir() do tmpdir
             vtk_grid("$tmpdir/grid", grid) do vtk
                 vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
                 P = toequallyspaced(referencecell(grid))
                 x = P * points(grid)
                 vtk["x"] = Adapt.adapt(Array, x)
             end
+            @test isfile("$tmpdir/grid.pvtu")
+            @test isdir("$tmpdir/grid")
+            @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
         end
     end
 
@@ -88,13 +96,16 @@ function grids_testsuite(AT, FT)
         @test grid isa Raven.Grid
         @test issparse(grid.continuoustodiscontinuous)
 
-        @test_nowarn mktempdir() do tmpdir
+        mktempdir() do tmpdir
             vtk_grid("$tmpdir/grid", grid) do vtk
                 vtk["CellNumber"] = (1:length(grid)) .+ Raven.offset(grid)
                 P = toequallyspaced(referencecell(grid))
                 x = P * points(grid)
                 vtk["x"] = Adapt.adapt(Array, x)
             end
+            @test isfile("$tmpdir/grid.pvtu")
+            @test isdir("$tmpdir/grid")
+            @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
         end
     end
 
@@ -124,13 +135,16 @@ function grids_testsuite(AT, FT)
         @test grid isa Raven.Grid
         @test issparse(grid.continuoustodiscontinuous)
 
-        @test_nowarn mktempdir() do tmpdir
+        mktempdir() do tmpdir
             vtk_grid("$tmpdir/grid", grid) do vtk
                 vtk["CellNumber"] = (1:length(grid)) .+ Raven.offset(grid)
                 P = toequallyspaced(referencecell(grid))
                 x = P * points(grid)
                 vtk["x"] = Adapt.adapt(Array, x)
             end
+            @test isfile("$tmpdir/grid.pvtu")
+            @test isdir("$tmpdir/grid")
+            @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
         end
     end
 end
