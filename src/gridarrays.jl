@@ -234,7 +234,7 @@ MPI communicator used by `A`.
     ifelse(G, a.datawithghosts, a.data)
 
 """
-    sizewithghosts(A::GridArray)
+    parentwithghosts(A::GridArray)
 
 Return the underlying "parent array" which includes the ghost cells.
 """
@@ -249,6 +249,13 @@ Return the underlying "parent array" which includes the ghost cells.
 Return a tuple containing the dimensions of `A` including the ghost cells.
 """
 @inline sizewithghosts(a::GridArray) = a.dimswithghosts
+
+"""
+    sizewithoutghosts(A::GridArray)
+
+Return a tuple containing the dimensions of `A` excluding the ghost cells.
+"""
+@inline sizewithoutghosts(a::GridArray) = a.dims
 
 function Base.similar(
     a::GridArray{S,N,A,G,F},
@@ -347,19 +354,20 @@ function Base.similar(
     A = arraytype(a)
     G = showingghosts(a)
     F = fieldindex(a)
-    elemdims = sizewithghosts(a)[F:end]
+    elemdims = sizewithoutghosts(a)[F:end]
+    elemdimswithghosts = sizewithghosts(a)[F:end]
 
     for b in gridarrays
         if A != arraytype(b) ||
            G != showingghosts(b) ||
            F != fieldindex(b) ||
            MPI.Comm_compare(comm(a), comm(b)) != MPI.IDENT ||
-           elemdims != sizewithghosts(b)[F:end]
+           elemdimswithghosts != sizewithghosts(b)[F:end]
             throw(ArgumentError("Incompatible GridArray arguments in broadcast"))
         end
     end
 
-    return GridArray{T}(undef, A, dims, (dims[1:F-1]..., elemdims...), comm(a), G, F)
+    return GridArray{T}(undef, A, (dims[1:F-1]..., elemdims...), (dims[1:F-1]..., elemdimswithghosts...), comm(a), G, F)
 end
 
 @kernel function broadcast_kernel!(dest, bc)
