@@ -340,13 +340,8 @@ function generate(warp::Function, gm::GridManager)
         comm(gm),
     )
 
-    grid = coarsegrid(gm)
-    if grid isa Raven.CoarseGrid
-        coarsegrid_warp = Raven.getwarp(coarsegrid(gm))
-        points = coarsegrid_warp.(points)               #warp associated with CoarseGrid object
-    end
-
-    points = warp.(points)              #User warp defaulting to Identity
+    coarsegrid_warp = Raven.getwarp(coarsegrid(gm))
+    points = warp.(coarsegrid_warp.(points))
 
     part = MPI.Comm_rank(comm(gm)) + 1
     nparts = MPI.Comm_size(comm(gm))

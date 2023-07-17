@@ -8,6 +8,9 @@ struct CoarseGrid{C,V,L,W,U} <: AbstractCoarseGrid
     unwarp::U
 end
 
+getwarp(::AbstractCoarseGrid) = identity
+getunwarp(::AbstractCoarseGrid) = identity
+
 connectivity(g::CoarseGrid) = g.connectivity
 vertices(g::CoarseGrid) = g.vertices
 cells(g::CoarseGrid) = g.cells
