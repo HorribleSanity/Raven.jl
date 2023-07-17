@@ -340,7 +340,7 @@ function generate(warp::Function, gm::GridManager)
         comm(gm),
     )
 
-    coarsegrid_warp = Raven.getwarp(coarsegrid(gm))
+    coarsegrid_warp = Raven.warp(coarsegrid(gm))
     points = warp.(coarsegrid_warp.(points))
 
     part = MPI.Comm_rank(comm(gm)) + 1
