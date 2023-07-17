@@ -159,10 +159,7 @@ function (*)(
     return F <: AbstractVector ? vec(r) : reshape(r, size(K, 1), size(f, 2))
 end
 
-function (*)(
-    K::Kron{Tuple{B,A}},
-    f::GridArray,
-) where {A<:AbstractMatrix,B<:AbstractMatrix}
+function (*)(K::Kron{Tuple{B,A}}, f::GridArray) where {A<:AbstractMatrix,B<:AbstractMatrix}
     b, a = components(K)
 
     r = similar(f, size(a, 1), size(b, 1), size(f, 3))

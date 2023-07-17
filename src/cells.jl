@@ -436,7 +436,7 @@ function materializepoints(
     quadranttotreeid,
     quadranttocoordinate,
     forest,
-    comm
+    comm,
 )
     r = vec.(points_1d(referencecell))
     Q = max(512 ÷ prod(length.(r)), 1)
@@ -450,7 +450,7 @@ function materializepoints(
         (length.(r)..., length(quadranttolevel)),
         comm,
         true,
-        length(r) + 1
+        length(r) + 1,
     )
 
     backend = get_backend(points)
@@ -574,7 +574,7 @@ function materializepoints(
     quadranttotreeid,
     quadranttocoordinate,
     forest,
-    comm
+    comm,
 )
     r = vec.(points_1d(referencecell))
 
@@ -587,7 +587,7 @@ function materializepoints(
         (length.(r)..., length(quadranttolevel)),
         comm,
         true,
-        length(r) + 1
+        length(r) + 1,
     )
 
     backend = get_backend(points)

@@ -160,7 +160,9 @@ end
 
 Return a `GridArray` with the same data as `A` but with the ghost cells inaccessible.
 """
-@inline function viewwithoutghosts(a::GridArray{T,N,A,true,F,L,C,D,W}) where {T,N,A,F,L,C,D,W}
+@inline function viewwithoutghosts(
+    a::GridArray{T,N,A,true,F,L,C,D,W},
+) where {T,N,A,F,L,C,D,W}
     GridArray{T,N,A,false,F,L,C,D,W}(
         a.comm,
         a.data,
@@ -193,7 +195,8 @@ with `A`.
 """
 @inline get_backend(::GridArray{T,N,A}) where {T,N,A} = get_backend(A)
 
-@inline GPUArraysCore.backend(x::GridArray{<:Any,<:Any,<:AbstractGPUArray}) = GPUArraysCore.backend(x.datawithghosts)
+@inline GPUArraysCore.backend(x::GridArray{<:Any,<:Any,<:AbstractGPUArray}) =
+    GPUArraysCore.backend(x.datawithghosts)
 
 """
     arraytype(A::GridArray) -> DataType
@@ -247,7 +250,11 @@ Return a tuple containing the dimensions of `A` including the ghost cells.
 """
 @inline sizewithghosts(a::GridArray) = a.dimswithghosts
 
-function Base.similar(a::GridArray{S,N,A,G,F}, ::Type{T}, dims::Tuple{Vararg{Int64, M}}) where {S,N,A,G,F,T,M}
+function Base.similar(
+    a::GridArray{S,N,A,G,F},
+    ::Type{T},
+    dims::Tuple{Vararg{Int64,M}},
+) where {S,N,A,G,F,T,M}
     if M == N
         if (!G && (dims[end] == a.dims[end])) || (G && (dims[end] == a.dimswithghosts[end]))
             # Create ghost layer

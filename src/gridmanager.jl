@@ -337,7 +337,7 @@ function generate(warp::Function, gm::GridManager)
         quadranttotreeid,
         quadranttocoordinate,
         forest(gm),
-        comm(gm)
+        comm(gm),
     )
 
     points = warp.(points)
