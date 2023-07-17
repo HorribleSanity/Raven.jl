@@ -24,6 +24,7 @@ end
 using Raven
 using WriteVTK
 using StaticArrays
+import Adapt
 
 # here the level is a tuple to 
 # coarsegrid = extrude(cubesphere(2, 2), 1)

@@ -1,4 +1,5 @@
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Raven = "cfd3f2ab-0fb0-4d51-9553-03e53d33f144"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
