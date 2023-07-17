@@ -10,7 +10,7 @@ function grids_testsuite(AT, FT)
             ntuple(d -> range(-one(FT), stop = one(FT), length = K[d] + 1), length(K))
 
         gm = GridManager(
-            LobattoCell{Tuple{N...},Float64,AT}(),
+            LobattoCell{Tuple{N...},FT,AT}(),
             Raven.brick(K...; coordinates);
             min_level = 2,
         )
@@ -43,15 +43,10 @@ function grids_testsuite(AT, FT)
     let
         N = (3, 3)
         R = 1
-        nedge = 3
 
         coarse_grid = Raven.cubeshellgrid(R)
 
-        gm = GridManager(
-            LobattoCell{Tuple{N...},Float64,Array}(),
-            coarse_grid,
-            min_level = 2,
-        )
+        gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 2)
 
         indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
         adapt!(gm, indicator)
@@ -66,7 +61,7 @@ function grids_testsuite(AT, FT)
                 vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
                 P = toequallyspaced(referencecell(grid))
                 x = P * reshape(points(grid), size(P, 2), :)
-                vtk["x"] = collect(x)
+                vtk["x"] = Adapt.adapt(Array, x)
             end
             @test isfile("$tmpdir/grid.pvtu")
             @test isdir("$tmpdir/grid")
@@ -81,7 +76,7 @@ function grids_testsuite(AT, FT)
             ntuple(d -> range(-one(FT), stop = one(FT), length = K[d] + 1), length(K))
 
         gm = GridManager(
-            LobattoCell{Tuple{N...},Float64,AT}(),
+            LobattoCell{Tuple{N...},FT,AT}(),
             Raven.brick(K...; coordinates);
             min_level = 1,
         )
