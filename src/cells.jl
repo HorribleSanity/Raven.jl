@@ -449,7 +449,7 @@ function materializepoints(
         (length.(r)..., num_local),
         (length.(r)..., length(quadranttolevel)),
         comm,
-        true,
+        false,
         length(r) + 1,
     )
 
@@ -586,7 +586,7 @@ function materializepoints(
         (length.(r)..., num_local),
         (length.(r)..., length(quadranttolevel)),
         comm,
-        true,
+        false,
         length(r) + 1,
     )
 

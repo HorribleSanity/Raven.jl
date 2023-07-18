@@ -105,3 +105,4 @@ function numbercontiguous(::Type{T}, A; by = identity) where {T}
 end
 
 viewwithghosts(A::AbstractArray) = A
+viewwithoutghosts(A::AbstractArray) = A
