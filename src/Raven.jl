@@ -21,6 +21,8 @@ export derivatives, facemass, mass, points, toequallyspaced, tohalves
 export derivatives_1d, points_1d, weights_1d, tohalves_1d
 export referencecell, levels, trees, offset, numcells
 
+export volumemetrics, surfacemetrics
+
 export flatten, unflatten
 
 export brick, coarsegrid

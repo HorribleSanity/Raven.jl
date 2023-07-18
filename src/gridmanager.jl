@@ -343,6 +343,8 @@ function generate(warp::Function, gm::GridManager)
     coarsegrid_warp = Raven.warp(coarsegrid(gm))
     points = warp.(coarsegrid_warp.(points))
 
+    volumemetrics, surfacemetrics = materializemetrics(referencecell(gm), points)
+
     part = MPI.Comm_rank(comm(gm)) + 1
     nparts = MPI.Comm_size(comm(gm))
     GC.@preserve gm begin
@@ -358,6 +360,8 @@ function generate(warp::Function, gm::GridManager)
         offset,
         length(gm),
         points,
+        volumemetrics,
+        surfacemetrics,
         quadranttolevel,
         quadranttotreeid,
         quadranttofacecode,

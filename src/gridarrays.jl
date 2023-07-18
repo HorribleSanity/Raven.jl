@@ -383,7 +383,15 @@ function Base.similar(
         end
     end
 
-    return GridArray{T}(undef, A, (dims[1:F-1]..., elemdims...), (dims[1:F-1]..., elemdimswithghosts...), comm(a), G, F)
+    return GridArray{T}(
+        undef,
+        A,
+        (dims[1:F-1]..., elemdims...),
+        (dims[1:F-1]..., elemdimswithghosts...),
+        comm(a),
+        G,
+        F,
+    )
 end
 
 @kernel function broadcast_kernel!(dest, bc)

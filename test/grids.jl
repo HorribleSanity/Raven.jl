@@ -176,4 +176,223 @@ function grids_testsuite(AT, FT)
             @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
         end
     end
+
+    @testset "2D metrics" begin
+
+        f(x) = SA[
+            9*x[1]-(1+x[1])*x[2]^2+(x[1]-1)^2*(1-x[2]^2+x[2]^3),
+            10*x[2]+x[1]*x[1]^3*(1-x[2])+x[1]^2*x[2]*(1+x[2]),
+        ]
+        f11(x) = 7 + x[2]^2 - 2 * x[2]^3 + 2 * x[1] * (1 - x[2]^2 + x[2]^3)
+        f12(x) = -2 * (1 + x[1]) * x[2] + (-1 + x[1])^2 * x[2] * (-2 + 3 * x[2])
+        f21(x) = -4 * x[1]^3 * (-1 + x[2]) + 2 * x[1] * x[2] * (1 + x[2])
+        f22(x) = 10 - x[1] * x[1]^3 + x[1]^2 * (1 + 2 * x[2])
+
+        fJ(x, dx1, dx2, l) = SA[
+            f11(x)*(dx1/2^(l+1)) f12(x)*(dx2/2^(l+1))
+            f21(x)*(dx1/2^(l+1)) f22(x)*(dx2/2^(l+1))
+        ]
+
+        coordinates = (
+            range(-one(FT), stop = one(FT), length = 6),
+            range(-one(FT), stop = one(FT), length = 5),
+        )
+
+        K = length.(coordinates) .- 1
+        L = 10
+        M = 12
+        level = 2
+
+        gm = GridManager(
+            LobattoCell{Tuple{L,M},FT,AT}(),
+            Raven.brick(K...; coordinates);
+            min_level = level,
+        )
+
+        unwarpedgrid = generate(gm)
+        grid = generate(f, gm)
+
+        wr, ws = weights_1d(referencecell(gm))
+        ux = points(unwarpedgrid)
+        uJ = fJ.(ux, step.(coordinates)..., level)
+        uwJ = wr .* ws .* det.(uJ)
+        uinvJ = inv.(uJ)
+        invJ, wJ = components(first(volumemetrics(grid)))
+
+        @test all(adapt(Array, wJ .≈ uwJ))
+        @test all(adapt(Array, invJ .≈ uinvJ))
+
+        wJinvG, wJ = components(last(volumemetrics(grid)))
+        @test all(adapt(Array, wJ .≈ uwJ))
+        g(x) = x * x'
+        @test all(adapt(Array, wJinvG) .≈ adapt(Array, uwJ .* g.(uinvJ)))
+
+    end
+
+    @testset "2D spherical shell" begin
+
+        L = 6
+        M = 7
+        level = 1
+        R = FT(3)
+
+        gm = GridManager(
+            LobattoCell{Tuple{L,M},FT,AT}(),
+            Raven.cubeshellgrid(R);
+            min_level = level,
+        )
+
+        grid = generate(gm)
+        _, wJ = components(first(volumemetrics(grid)))
+
+        @test sum(adapt(Array, wJ)) ≈ pi * R^2 * 4
+
+    end
+
+    @testset "2D constant preserving" begin
+
+        f(x) = SA[
+            9*x[1]-(1+x[1])*x[2]^2+(x[1]-1)^2*(1-x[2]^2+x[2]^3),
+            10*x[2]+x[1]*x[1]^3*(1-x[2])+x[1]^2*x[2]*(1+x[2]),
+        ]
+
+        coordinates = (
+            range(-one(FT), stop = one(FT), length = 3),
+            range(-one(FT), stop = one(FT), length = 5),
+        )
+
+        K = length.(coordinates) .- 1
+        L = 3
+        M = 4
+        level = 0
+
+        gm = GridManager(
+            LobattoCell{Tuple{L,M},FT,AT}(),
+            Raven.brick(K...; coordinates);
+            min_level = level,
+        )
+
+        grid = generate(f, gm)
+        invJ, wJ = components(first(volumemetrics(grid)))
+        invJ11, invJ21, invJ12, invJ22 = components(invJ)
+
+        wr, ws = weights_1d(referencecell(gm))
+        J = wJ ./ (wr .* ws)
+
+        Dr, Ds = derivatives(referencecell(grid))
+
+        cp1 = (Dr * (J .* invJ11) + Ds * (J .* invJ21))
+        cp2 = (Dr * (J .* invJ12) + Ds * (J .* invJ22))
+        @test norm(adapt(Array, cp1), Inf) < 100 * eps(FT)
+        @test norm(adapt(Array, cp2), Inf) < 100 * eps(FT)
+
+    end
+
+    @testset "3D metrics" begin
+
+        f(x) = SA[
+            3x[1]+x[2]/5+x[3]/10+x[1]*x[2]^2*x[3]^3/3,
+            4x[2]+x[1]^3*x[2]^2*x[3]/4,
+            2x[3]+x[1]^2*x[2]*x[3]^3/2,
+        ]
+        f11(x) = 3 * oneunit(eltype(x)) + x[2]^2 * x[3]^3 / 3
+        f12(x) = oneunit(eltype(x)) / 5 + 2 * x[1] * x[2] * x[3]^3 / 3
+        f13(x) = oneunit(eltype(x)) / 10 + 3 * x[1] * x[2]^2 * x[3]^2 / 3
+        f21(x) = 3 * x[1]^2 * x[2]^2 * x[3] / 4
+        f22(x) = 4 * oneunit(eltype(x)) + 2 * x[1]^3 * x[2] * x[3] / 4
+        f23(x) = x[1]^3 * x[2]^2 / 4
+        f31(x) = 2 * x[1] * x[2] * x[3]^3 / 2
+        f32(x) = x[1]^2 * x[3]^3 / 2
+        f33(x) = 2 * oneunit(eltype(x)) + 3 * x[1]^2 * x[2] * x[3]^2 / 2
+
+        fJ(x, dx1, dx2, dx3, l) = SA[
+            f11(x)*(dx1/2^(l+1)) f12(x)*(dx2/2^(l+1)) f13(x)*(dx3/2^(l+1))
+            f21(x)*(dx1/2^(l+1)) f22(x)*(dx2/2^(l+1)) f23(x)*(dx3/2^(l+1))
+            f31(x)*(dx1/2^(l+1)) f32(x)*(dx2/2^(l+1)) f33(x)*(dx3/2^(l+1))
+        ]
+
+        coordinates = (
+            range(-one(FT), stop = one(FT), length = 3),
+            range(-one(FT), stop = one(FT), length = 2),
+            range(-one(FT), stop = one(FT), length = 4),
+        )
+
+        K = length.(coordinates) .- 1
+        L = 6
+        M = 8
+        N = 7
+        level = 0
+
+        gm = GridManager(
+            LobattoCell{Tuple{L,M,N},FT,AT}(),
+            Raven.brick(K...; coordinates);
+            min_level = level,
+        )
+
+        unwarpedgrid = generate(gm)
+        grid = generate(f, gm)
+
+        wr, ws, wt = weights_1d(referencecell(gm))
+        ux = points(unwarpedgrid)
+        uJ = fJ.(ux, step.(coordinates)..., level)
+        uwJ = wr .* ws .* wt .* det.(uJ)
+        uinvJ = inv.(uJ)
+        invJ, wJ = components(first(volumemetrics(grid)))
+
+        @test all(adapt(Array, wJ .≈ uwJ))
+        @test all(adapt(Array, invJ .≈ uinvJ))
+
+        wJinvG, wJ = components(last(volumemetrics(grid)))
+
+        @test all(adapt(Array, wJ .≈ uwJ))
+        g(x) = x * x'
+        @test all(adapt(Array, wJinvG) .≈ adapt(Array, uwJ .* g.(uinvJ)))
+
+    end
+
+    @testset "3D constant preserving" begin
+
+        f(x) = SA[
+            3x[1]+x[2]/5+x[3]/10+x[1]*x[2]^2*x[3]^3/3,
+            4x[2]+x[1]^3*x[2]^2*x[3]/4,
+            2x[3]+x[1]^2*x[2]*x[3]^3/2,
+        ]
+
+        coordinates = (
+            range(-one(FT), stop = one(FT), length = 3),
+            range(-one(FT), stop = one(FT), length = 5),
+            range(-one(FT), stop = one(FT), length = 4),
+        )
+
+        K = length.(coordinates) .- 1
+        L = 3
+        M = 4
+        N = 2
+        level = 0
+
+        gm = GridManager(
+            LobattoCell{Tuple{L,M,N},FT,AT}(),
+            Raven.brick(K...; coordinates);
+            min_level = level,
+        )
+
+        grid = generate(f, gm)
+        invJ, wJ = components(first(volumemetrics(grid)))
+        invJc = components(invJ)
+
+        wr, ws, wt = weights_1d(referencecell(gm))
+        J = wJ ./ (wr .* ws .* wt)
+
+        Dr, Ds, Dt = derivatives(referencecell(grid))
+
+        cp1 = (Dr * (J .* invJc[1]) + Ds * (J .* invJc[2]) + Dt * (J .* invJc[3]))
+        cp2 = (Dr * (J .* invJc[4]) + Ds * (J .* invJc[5]) + Dt * (J .* invJc[6]))
+        cp3 = (Dr * (J .* invJc[7]) + Ds * (J .* invJc[8]) + Dt * (J .* invJc[9]))
+
+        @test norm(adapt(Array, cp1), Inf) < 100 * eps(FT)
+        @test norm(adapt(Array, cp2), Inf) < 100 * eps(FT)
+        @test norm(adapt(Array, cp3), Inf) < 100 * eps(FT)
+
+    end
+
 end

@@ -812,3 +812,271 @@ function materializeparentnodes(
 
     return reshape(parentdofs, size(cell)..., :)
 end
+
+@kernel function quadvolumemetrics!(
+    firstordermetrics,
+    secondordermetrics,
+    points,
+    Dr,
+    Ds,
+    wr,
+    ws,
+    ::Val{IR},
+    ::Val{IS},
+    ::Val{Q},
+) where {IR,IS,Q}
+    i, j, p = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(points)
+
+    X = @localmem T (IR, IS, Q)
+    dXdr = @private T (1,)
+    dXds = @private T (1,)
+
+    @inbounds begin
+        X[i, j, p] = points[i, j, q]
+
+        @synchronize
+
+        dXdr[] = -zero(T)
+        dXds[] = -zero(T)
+
+        @unroll for m = 1:IR
+            dXdr[] += Dr[i, m] * X[m, j, p]
+        end
+
+        @unroll for n = 1:IS
+            dXds[] += Ds[j, n] * X[i, n, p]
+        end
+
+        G = SHermitianCompact(
+            SVector(dot(dXdr[], dXdr[]), dot(dXdr[], dXds[]), dot(dXds[], dXds[])),
+        )
+
+        invG = SHermitianCompact(inv(G))
+
+        dRdX = invG * [dXdr[] dXds[]]'
+
+        J = norm(cross(dXdr[], dXds[]))
+
+        wJ = wr[i] * ws[j] * J
+
+        wJinvG = wJ * invG
+
+        firstordermetrics[i, j, q] = (; dRdX, wJ)
+        secondordermetrics[i, j, q] = (; wJinvG, wJ)
+    end
+end
+
+function materializemetrics(
+    cell::LobattoQuad,
+    points::AbstractArray{SVector{N,FT}},
+) where {N,FT}
+    Q = max(512 ÷ prod(size(cell)), 1)
+
+    D = derivatives_1d(cell)
+    w = vec.(weights_1d(cell))
+
+    T1 = NamedTuple{(:dRdX, :wJ),Tuple{SMatrix{2,N,FT,2 * N},FT}}
+    firstordermetrics = similar(points, T1)
+
+    T2 = NamedTuple{(:wJinvG, :wJ),Tuple{SHermitianCompact{2,FT,3},FT}}
+    secondordermetrics = similar(points, T2)
+
+    backend = get_backend(points)
+
+    kernel! = quadvolumemetrics!(backend, (size(cell)..., Q))
+    kernel!(
+        firstordermetrics,
+        secondordermetrics,
+        points,
+        D...,
+        w...,
+        Val.(size(cell))...,
+        Val(Q);
+        ndrange = size(points),
+    )
+
+    volumemetrics = (firstordermetrics, secondordermetrics)
+
+    return (volumemetrics, nothing)
+end
+
+@kernel function hexvolumemetrics!(
+    firstordermetrics,
+    secondordermetrics,
+    points,
+    Dr,
+    Ds,
+    Dt,
+    wr,
+    ws,
+    wt,
+    ::Val{IR},
+    ::Val{IS},
+    ::Val{IT},
+    ::Val{Q},
+) where {IR,IS,IT,Q}
+    i, j, p = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(points)
+    @uniform FT = eltype(eltype(points))
+
+    vtmp = @localmem T (IR, IS, Q)
+
+    X = @private T (IT,)
+    dXdr = @private T (IT,)
+    dXds = @private T (IT,)
+    dXdt = @private T (IT,)
+
+    a1 = @private T (1,)
+    a2 = @private T (1,)
+    a3 = @private T (1,)
+
+    @inbounds begin
+        @unroll for k = 1:IT
+            dXdr[k] = -zero(T)
+            dXds[k] = -zero(T)
+            dXdt[k] = -zero(T)
+        end
+
+        @unroll for k = 1:IT
+            X[k] = points[i, j, k, q]
+
+            vtmp[i, j, p] = X[k]
+
+            @synchronize
+
+            @unroll for m = 1:IR
+                dXdr[k] += Dr[i, m] * vtmp[m, j, p]
+            end
+
+            @unroll for n = 1:IS
+                dXds[k] += Ds[j, n] * vtmp[i, n, p]
+            end
+
+            @unroll for o = 1:IT
+                dXdt[o] += Dt[o, k] * vtmp[i, j, p]
+            end
+
+            @synchronize
+        end
+
+        @unroll for k = 1:IT
+
+            # Instead of
+            # ```julia
+            # @. invJ = inv(J)
+            # ```
+            # we use the curl invariant formulation of Kopriva, equation (37) of
+            # <https://doi.org/10.1007/s10915-005-9070-8>.
+
+            a1[] = -zero(T) # Ds * cross(X, dXdt) - Dt * cross(X, dXds)
+            a2[] = -zero(T) # Dt * cross(X, dXdr) - Dr * cross(X, dXdt)
+            a3[] = -zero(T) # Dr * cross(X, dXds) - Ds * cross(X, dXdr)
+
+            # Dr * cross(X, dXds)
+            @synchronize
+
+            vtmp[i, j, p] = cross(X[k], dXds[k])
+
+            @synchronize
+
+            @unroll for m = 1:IR
+                a3[] += Dr[i, m] * vtmp[m, j, p]
+            end
+
+            # Dr * cross(X, dXdt)
+            @synchronize
+
+            vtmp[i, j, p] = cross(X[k], dXdt[k])
+
+            @synchronize
+
+            @unroll for m = 1:IR
+                a2[] -= Dr[i, m] * vtmp[m, j, p]
+            end
+
+
+            # Ds * cross(X, dXdt)
+            @synchronize
+
+            vtmp[i, j, p] = cross(X[k], dXdt[k])
+
+            @synchronize
+
+            @unroll for n = 1:IS
+                a1[] += Ds[j, n] * vtmp[i, n, p]
+            end
+
+            # Ds * cross(X, dXdr)
+            @synchronize
+
+            vtmp[i, j, p] = cross(X[k], dXdr[k])
+
+            @synchronize
+
+            @unroll for n = 1:IS
+                a3[] -= Ds[j, n] * vtmp[i, n, p]
+            end
+
+            # Dt * cross(X, dXdr)
+            @unroll for o = 1:IT
+                a2[] += Dt[k, o] * cross(X[o], dXdr[o])
+            end
+
+            # Dt * cross(X, dXds)
+            @unroll for o = 1:IT
+                a1[] -= Dt[k, o] * cross(X[o], dXds[o])
+            end
+
+            J = [dXdr[k] dXds[k] dXdt[k]]
+            detJ = det(J)
+            invJ = [a1[] a2[] a3[]]' ./ 2detJ
+
+
+            invG = invJ * invJ'
+            wJ = wr[i] * ws[j] * wt[k] * detJ
+            wJinvG = wJ * invG
+
+            firstordermetrics[i, j, k, q] = (; dRdX = invJ, wJ)
+            secondordermetrics[i, j, k, q] = (; wJinvG, wJ)
+        end
+    end
+end
+
+function materializemetrics(
+    cell::LobattoHex,
+    points::AbstractArray{SVector{3,FT}},
+) where {FT}
+    Q = max(512 ÷ (size(cell, 1) * size(cell, 2)), 1)
+
+    D = derivatives_1d(cell)
+    w = vec.(weights_1d(cell))
+
+    T1 = NamedTuple{(:dRdX, :wJ),Tuple{SMatrix{3,3,FT,9},FT}}
+    firstordermetrics = similar(points, T1)
+
+    T2 = NamedTuple{(:wJinvG, :wJ),Tuple{SHermitianCompact{3,FT,6},FT}}
+    secondordermetrics = similar(points, T2)
+
+    backend = get_backend(points)
+
+    kernel! = hexvolumemetrics!(backend, (size(cell, 1), size(cell, 2), Q))
+    kernel!(
+        firstordermetrics,
+        secondordermetrics,
+        points,
+        D...,
+        w...,
+        Val.(size(cell))...,
+        Val(Q);
+        ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
+    )
+
+    volumemetrics = (firstordermetrics, secondordermetrics)
+
+    return (volumemetrics, nothing)
+end

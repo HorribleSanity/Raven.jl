@@ -8,7 +8,7 @@ floattype(grid::AbstractGrid) = floattype(typeof(grid))
 arraytype(grid::AbstractGrid) = arraytype(typeof(grid))
 celltype(grid::AbstractGrid) = celltype(typeof(grid))
 
-struct Grid{C<:AbstractCell,P,L,T,F,PN,N,CTOD,DTOC} <: AbstractGrid{C}
+struct Grid{C<:AbstractCell,P,V,S,L,T,F,PN,N,CTOD,DTOC} <: AbstractGrid{C}
     comm::MPI.Comm
     part::Int
     nparts::Int
@@ -16,6 +16,8 @@ struct Grid{C<:AbstractCell,P,L,T,F,PN,N,CTOD,DTOC} <: AbstractGrid{C}
     offset::Int
     locallength::Int32
     points::P
+    volumemetrics::V
+    surfacemetrics::S
     levels::L
     trees::T
     facecodes::F
@@ -48,6 +50,9 @@ facecodes(::Grid, ::Val{true}) =
 
 nodecommpattern(grid::Grid) = grid.nodecommpattern
 continuoustodiscontinuous(grid::Grid) = grid.continuoustodiscontinuous
+
+volumemetrics(grid::Grid) = grid.volumemetrics
+surfacemetrics(grid::Grid) = grid.surfacemetrics
 
 offset(grid::Grid) = grid.offset
 numcells(grid::Grid) = numcells(grid, Val(false))
