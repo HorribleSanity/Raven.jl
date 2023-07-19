@@ -29,13 +29,84 @@ function coarsegrid(
     return CoarseGrid{C,V,L,W,U}(conn, vertices, cells, warp, unwarp)
 end
 
+function cubeshellgrid(R::Real, r::Real)
+    @assert R>r "R (outter radius) must be greater that r (inner radius)"
+    vertices = zeros(SVector{3,Float64}, 16)
+
+    vertices[1] = SVector(+R, +R, -R)
+    vertices[2] = SVector(+R, -R, -R)
+    vertices[3] = SVector(+R, +R, +R)
+    vertices[4] = SVector(+R, -R, +R)
+    vertices[5] = SVector(-R, +R, -R)
+    vertices[6] = SVector(-R, -R, -R)
+    vertices[7] = SVector(-R, +R, +R)
+    vertices[8] = SVector(-R, -R, +R)
+
+    vertices[9] = SVector(+r, +r, -r)
+    vertices[10] = SVector(+r, -r, -r)
+    vertices[11] = SVector(+r, +r, +r)
+    vertices[12] = SVector(+r, -r, +r)
+    vertices[13] = SVector(-r, +r, -r)
+    vertices[14] = SVector(-r, -r, -r)
+    vertices[15] = SVector(-r, +r, +r)
+    vertices[16] = SVector(-r, -r, +r)
+
+
+    cells = [(1,2,3,4,9,10,11,12), (2,6,4,8,10,14,12,16), (6,5,8,7,14,13,16,15),
+             (5,1,7,3,13,9,15,11),(3,4,7,8,11,12,15,16),(1,2,5,6,9,10,13,14)]
+
+    function cubespherewarp(point)
+        # Put the points in reverse magnitude order
+        p = sortperm(abs.(point))
+        point = point[p]
+
+        # Convert to angles
+        ξ = π * point[2] / 4point[3]
+        η = π * point[1] / 4point[3]
+
+        # Compute the ratios
+        y_x = tan(ξ)
+        z_x = tan(η)
+
+        # Compute the new points
+        x = point[3] / hypot(1, y_x, z_x)
+        y = x * y_x
+        z = x * z_x
+
+        # Compute the new points and unpermute
+        point = SVector(z, y, x)[sortperm(p)]
+        return point
+    end
+
+    function cubesphereunwarp(point)
+        # Put the points in reverse magnitude order
+        p = sortperm(abs.(point))
+        point = point[p]
+
+        # Convert to angles
+        ξ = 4atan(point[2] / point[3]) / π
+        η = 4atan(point[1] / point[3]) / π
+        R = sign(point[3]) * hypot(point...)
+
+        x = R
+        y = R * ξ
+        z = R * η
+        # Compute the new points and unpermute
+        point = SVector(z, y, x)[sortperm(p)]
+        return point
+    end
+
+    return coarsegrid(vertices, cells, cubespherewarp, cubesphereunwarp)
+end
+
+
 """
-    function cubeshellgrid(R::Real)
+    function cubeshell2dgrid(R::Real)
 
     This function will construct the CoarseGrid of a cube shell of radius R. 
     A cube shell is a 2D connectivity.
 """
-function cubeshellgrid(R::Real)
+function cubeshell2dgrid(R::Real)
     vertices = zeros(SVector{3,Float64}, 8)
 
     vertices[1] = SVector(+R, +R, -R)

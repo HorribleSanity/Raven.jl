@@ -61,7 +61,7 @@ function grids_testsuite(AT, FT)
         N = (3, 3)
         R = 1
 
-        coarse_grid = Raven.cubeshellgrid(R)
+        coarse_grid = Raven.cubeshell2dgrid(R)
 
         gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 2)
 
