@@ -119,6 +119,11 @@ function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
 
         B = copy(A)
         @test all(adapt(Array, (B .== A)))
+
+        C = AT{FT}(undef, size(A))
+        C .= -zero(FT)
+        @test all(adapt(Array, (A .== (A .+ C))))
+        @test all(adapt(Array, (A .== (C .+ A))))
     end
 end
 

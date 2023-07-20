@@ -335,6 +335,22 @@ function Adapt.adapt_structure(to, a::GridArray{T,N,A,G,F,L}) where {T,N,A,G,F,L
 end
 
 Base.BroadcastStyle(::Type{<:GridArray}) = Broadcast.ArrayStyle{GridArray}()
+Base.Broadcast.BroadcastStyle(
+    ::A,
+    ::Base.Broadcast.ArrayStyle{GridArray},
+) where {M,A<:Base.Broadcast.AbstractArrayStyle{M}} = Broadcast.ArrayStyle{GridArray}()
+Base.Broadcast.BroadcastStyle(
+    ::Base.Broadcast.ArrayStyle{GridArray},
+    ::A,
+) where {M,A<:Base.Broadcast.AbstractArrayStyle{M}} = Broadcast.ArrayStyle{GridArray}()
+Base.Broadcast.BroadcastStyle(
+    ::A,
+    ::Base.Broadcast.ArrayStyle{GridArray},
+) where {M,A<:Base.Broadcast.DefaultArrayStyle{M}} = Broadcast.ArrayStyle{GridArray}()
+Base.Broadcast.BroadcastStyle(
+    ::Base.Broadcast.ArrayStyle{GridArray},
+    ::A,
+) where {M,A<:Base.Broadcast.DefaultArrayStyle{M}} = Broadcast.ArrayStyle{GridArray}()
 
 cat_gridarrays(t::Broadcast.Broadcasted, rest...) =
     (cat_gridarrays(t.args...)..., cat_gridarrays(rest...)...)
