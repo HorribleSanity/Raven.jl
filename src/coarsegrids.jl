@@ -94,19 +94,16 @@ function cubeshellgrid(R::Real)
     return coarsegrid(vertices, cells, cubespherewarp, cubesphereunwarp)
 end
 
-struct BrickGrid{T,C,D,M} <: AbstractCoarseGrid
+struct BrickGrid{T,C,D} <: AbstractCoarseGrid
     connectivity::C
     coordinates::D
-    mapping::M
 end
 
 connectivity(g::BrickGrid) = g.connectivity
 coordinates(g::BrickGrid) = g.coordinates
-mapping(g::BrickGrid) = g.mapping
 function vertices(g::BrickGrid{T}) where {T}
     conn = connectivity(g)
     coords = coordinates(g)
-    m = mapping(g)
     indices =
         GC.@preserve conn convert.(Tuple{Int,Int,Int}, P4estTypes.unsafe_vertices(conn))
     if conn isa P4estTypes.Connectivity{4}
@@ -117,7 +114,7 @@ function vertices(g::BrickGrid{T}) where {T}
             i in indices
         ]
     end
-    return m.(verts)
+    return verts
 end
 function cells(g::BrickGrid)
     conn = connectivity(g)
@@ -129,7 +126,6 @@ function brick(
     n::Tuple{Integer,Integer},
     p::Tuple{Bool,Bool} = (false, false);
     coordinates = (zero(T):n[1], zero(T):n[2]),
-    mapping = identity,
 )
     if length.(coordinates) != n .+ 1
         throw(
@@ -142,11 +138,7 @@ function brick(
 
     connectivity = P4estTypes.brick(n, p)
 
-    return BrickGrid{T,typeof(connectivity),typeof(coordinates),typeof(mapping)}(
-        connectivity,
-        coordinates,
-        mapping,
-    )
+    return BrickGrid{T,typeof(connectivity),typeof(coordinates)}(connectivity, coordinates)
 end
 
 function brick(
@@ -154,7 +146,6 @@ function brick(
     n::Tuple{Integer,Integer,Integer},
     p::Tuple{Bool,Bool,Bool} = (false, false, false);
     coordinates = (zero(T):n[1], zero(T):n[2], zero(T):n[3]),
-    mapping = identity,
 )
     if length.(coordinates) != n .+ 1
         throw(
@@ -166,11 +157,7 @@ function brick(
 
     connectivity = P4estTypes.brick(n, p)
 
-    return BrickGrid{T,typeof(connectivity),typeof(coordinates),typeof(mapping)}(
-        connectivity,
-        coordinates,
-        mapping,
-    )
+    return BrickGrid{T,typeof(connectivity),typeof(coordinates)}(connectivity, coordinates)
 end
 
 function brick(n::Tuple{Integer,Integer}, p::Tuple{Bool,Bool} = (false, false); kwargs...)
