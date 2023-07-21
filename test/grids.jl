@@ -11,7 +11,7 @@ function grids_testsuite(AT, FT)
 
         gm = GridManager(
             LobattoCell{Tuple{N...},FT,AT}(),
-            Raven.brick(K...; coordinates);
+            Raven.brick(coordinates);
             min_level = 2,
         )
 
@@ -77,7 +77,7 @@ function grids_testsuite(AT, FT)
 
         gm = GridManager(
             LobattoCell{Tuple{N...},FT,AT}(),
-            Raven.brick(K...; coordinates);
+            Raven.brick(coordinates);
             min_level = 1,
         )
 
@@ -198,14 +198,13 @@ function grids_testsuite(AT, FT)
             range(-one(FT), stop = one(FT), length = 5),
         )
 
-        K = length.(coordinates) .- 1
         L = 10
         M = 12
         level = 2
 
         gm = GridManager(
             LobattoCell{Tuple{L,M},FT,AT}(),
-            Raven.brick(K...; coordinates);
+            Raven.brick(coordinates);
             min_level = level,
         )
 
@@ -261,14 +260,13 @@ function grids_testsuite(AT, FT)
             range(-one(FT), stop = one(FT), length = 5),
         )
 
-        K = length.(coordinates) .- 1
         L = 3
         M = 4
         level = 0
 
         gm = GridManager(
             LobattoCell{Tuple{L,M},FT,AT}(),
-            Raven.brick(K...; coordinates);
+            Raven.brick(coordinates);
             min_level = level,
         )
 
@@ -317,7 +315,6 @@ function grids_testsuite(AT, FT)
             range(-one(FT), stop = one(FT), length = 4),
         )
 
-        K = length.(coordinates) .- 1
         L = 6
         M = 8
         N = 7
@@ -325,7 +322,7 @@ function grids_testsuite(AT, FT)
 
         gm = GridManager(
             LobattoCell{Tuple{L,M,N},FT,AT}(),
-            Raven.brick(K...; coordinates);
+            Raven.brick(coordinates);
             min_level = level,
         )
 
@@ -364,7 +361,6 @@ function grids_testsuite(AT, FT)
             range(-one(FT), stop = one(FT), length = 4),
         )
 
-        K = length.(coordinates) .- 1
         L = 3
         M = 4
         N = 2
@@ -372,7 +368,7 @@ function grids_testsuite(AT, FT)
 
         gm = GridManager(
             LobattoCell{Tuple{L,M,N},FT,AT}(),
-            Raven.brick(K...; coordinates);
+            Raven.brick(coordinates);
             min_level = level,
         )
 

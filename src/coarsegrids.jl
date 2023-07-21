@@ -121,61 +121,68 @@ function cells(g::BrickGrid)
     GC.@preserve conn map.(x -> x + 1, P4estTypes.unsafe_trees(conn))
 end
 
-function brick(
-    T::Type,
-    n::Tuple{Integer,Integer},
-    p::Tuple{Bool,Bool} = (false, false);
-    coordinates = (zero(T):n[1], zero(T):n[2]),
-)
-    if length.(coordinates) != n .+ 1
-        throw(
-            DimensionMismatch(
-                "coordinates lengths $(length.(coordinates)) should correspond to the number of trees + 1, $(n .+ 1)",
-            ),
-        )
-    end
-
-
+function brick(T::Type, coordinates, p)
+    n = length.(coordinates) .- 0x1
     connectivity = P4estTypes.brick(n, p)
 
     return BrickGrid{T,typeof(connectivity),typeof(coordinates)}(connectivity, coordinates)
 end
 
+function brick(coordinates::Tuple{<:Any,<:Any}, p::Tuple{Bool,Bool} = (false, false))
+    T = promote_type(eltype.(coordinates)...)
+    return brick(T, coordinates, p)
+end
+
+function brick(
+    coordinates::Tuple{<:Any,<:Any,<:Any},
+    p::Tuple{Bool,Bool,Bool} = (false, false, false),
+)
+    T = promote_type(eltype.(coordinates)...)
+    return brick(T, coordinates, p)
+end
+
+function brick(T::Type, n::Tuple{Integer,Integer}, p::Tuple{Bool,Bool} = (false, false))
+    coordinates = (zero(T):n[1], zero(T):n[2])
+    return brick(T, coordinates, p)
+end
+
 function brick(
     T::Type,
     n::Tuple{Integer,Integer,Integer},
-    p::Tuple{Bool,Bool,Bool} = (false, false, false);
-    coordinates = (zero(T):n[1], zero(T):n[2], zero(T):n[3]),
+    p::Tuple{Bool,Bool,Bool} = (false, false, false),
 )
-    if length.(coordinates) != n .+ 1
-        throw(
-            DimensionMismatch(
-                "Coordinate lengths $(length.(coordinates)) should correspond to the number of trees + 1, $(n .+ 1)",
-            ),
-        )
-    end
-
-    connectivity = P4estTypes.brick(n, p)
-
-    return BrickGrid{T,typeof(connectivity),typeof(coordinates)}(connectivity, coordinates)
+    coordinates = (zero(T):n[1], zero(T):n[2], zero(T):n[3])
+    return brick(T, coordinates, p)
 end
 
-function brick(n::Tuple{Integer,Integer}, p::Tuple{Bool,Bool} = (false, false); kwargs...)
-    return brick(Float64, n, p, kwargs...)
+function brick(n::Tuple{Integer,Integer}, p::Tuple{Bool,Bool} = (false, false))
+    return brick(Float64, n, p)
 end
 
 function brick(
     n::Tuple{Integer,Integer,Integer},
-    p::Tuple{Bool,Bool,Bool} = (false, false, false);
-    kwargs...,
+    p::Tuple{Bool,Bool,Bool} = (false, false, false),
 )
-    return brick(Float64, n, p, kwargs...)
+    return brick(Float64, n, p)
 end
 
-brick(l::Integer, m::Integer, p::Bool = false, q::Bool = false; kwargs...) =
-    brick(Float64, (l, m), (p, q); kwargs...)
-brick(T::Type, l::Integer, m::Integer, p::Bool = false, q::Bool = false; kwargs...) =
-    brick(T, (l, m), (p, q); kwargs...)
+brick(a::AbstractArray, b::AbstractArray, p::Bool = false, q::Bool = false) =
+    brick((a, b), (p, q))
+brick(l::Integer, m::Integer, p::Bool = false, q::Bool = false) =
+    brick(Float64, (l, m), (p, q))
+brick(T::Type, l::Integer, m::Integer, p::Bool = false, q::Bool = false) =
+    brick(T, (l, m), (p, q))
+
+function brick(
+    a::AbstractArray,
+    b::AbstractArray,
+    c::AbstractArray,
+    p::Bool = false,
+    q::Bool = false,
+    r::Bool = false,
+)
+    return brick((a, b, c), (p, q, r))
+end
 
 function brick(
     l::Integer,
@@ -183,10 +190,9 @@ function brick(
     n::Integer,
     p::Bool = false,
     q::Bool = false,
-    r::Bool = false;
-    kwargs...,
+    r::Bool = false,
 )
-    return brick(Float64, (l, m, n), (p, q, r); kwargs...)
+    return brick(Float64, (l, m, n), (p, q, r))
 end
 
 function brick(
@@ -196,10 +202,9 @@ function brick(
     n::Integer,
     p::Bool = false,
     q::Bool = false,
-    r::Bool = false;
-    kwargs...,
+    r::Bool = false,
 )
-    return brick(T, (l, m, n), (p, q, r); kwargs...)
+    return brick(T, (l, m, n), (p, q, r))
 end
 
 
