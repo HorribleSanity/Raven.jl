@@ -364,10 +364,11 @@ end
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
+    ::Val{isunwarpedbrick},
     ::Val{I},
     ::Val{J},
     ::Val{Q},
-) where {I,J,Q}
+) where {isunwarpedbrick,I,J,Q}
     i, j, q1 = @index(Local, NTuple)
     _, _, q = @index(Global, NTuple)
 
@@ -412,20 +413,40 @@ end
 
             h = one(T) / (1 << (level + 1))
 
-            r = cr + h * (rl[i] + 1)
-            s = cs + h * (sl[j] + 1)
-
-            w1 = (1 - r) * (1 - s)
-            w2 = r * (1 - s)
-            w3 = (1 - r) * s
-            w4 = r * s
-
             c1 = treecoords[1, 1, q1]
             c2 = treecoords[2, 1, q1]
             c3 = treecoords[1, 2, q1]
             c4 = treecoords[2, 2, q1]
 
-            points[i, j, q] = w1 * c1 + w2 * c2 + w3 * c3 + w4 * c4
+            if isunwarpedbrick
+                hr = muladd(h, rl[i], h)
+                hs = muladd(h, sl[j], h)
+
+                x = muladd(
+                    -c1[1],
+                    hr,
+                    muladd(-c1[1], cr, muladd(c2[1], hr, muladd(c2[1], cr, c1[1]))),
+                )
+                y = muladd(
+                    -c1[2],
+                    hs,
+                    muladd(-c1[2], cs, muladd(c3[2], hs, muladd(c3[2], cs, c1[2]))),
+                )
+
+                point = SA[x; y]
+            else
+                r = cr + h * (rl[i] + 1)
+                s = cs + h * (sl[j] + 1)
+
+                w1 = (1 - r) * (1 - s)
+                w2 = r * (1 - s)
+                w3 = (1 - r) * s
+                w4 = r * s
+
+                point = w1 * c1 + w2 * c2 + w3 * c3 + w4 * c4
+            end
+
+            points[i, j, q] = point
         end
     end
 end
@@ -439,6 +460,7 @@ function materializepoints(
     quadranttocoordinate,
     forest,
     comm,
+    isunwarpedbrick,
 )
     r = vec.(points_1d(referencecell))
     Q = max(512 ÷ prod(length.(r)), 1)
@@ -467,6 +489,7 @@ function materializepoints(
         quadranttolevel,
         quadranttotreeid,
         quadranttocoordinate,
+        Val(isunwarpedbrick),
         Val.(length.(r))...,
         Val(Q);
         ndrange = size(points),
@@ -486,10 +509,11 @@ end
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
+    ::Val{isunwarpedbrick},
     ::Val{I},
     ::Val{J},
     ::Val{K},
-) where {I,J,K}
+) where {isunwarpedbrick,I,J,K}
     i, j, k = @index(Local, NTuple)
     q = @index(Group, Linear)
 
@@ -542,28 +566,60 @@ end
 
             h = one(T) / (1 << (level + 1))
 
-            r = cr + h * (rl[i] + 1)
-            s = cs + h * (sl[j] + 1)
-            t = ct + h * (tl[k] + 1)
+            if isunwarpedbrick
+                c1 = treecoords[1]
+                c2 = treecoords[2]
+                c3 = treecoords[3]
+                c5 = treecoords[5]
 
-            w1 = (1 - r) * (1 - s) * (1 - t)
-            w2 = r * (1 - s) * (1 - t)
-            w3 = (1 - r) * s * (1 - t)
-            w4 = r * s * (1 - t)
-            w5 = (1 - r) * (1 - s) * t
-            w6 = r * (1 - s) * t
-            w7 = (1 - r) * s * t
-            w8 = r * s * t
+                hr = muladd(h, rl[i], h)
+                hs = muladd(h, sl[j], h)
+                ht = muladd(h, tl[k], h)
 
-            points[i, j, k, q] =
-                w1 * treecoords[1] +
-                w2 * treecoords[2] +
-                w3 * treecoords[3] +
-                w4 * treecoords[4] +
-                w5 * treecoords[5] +
-                w6 * treecoords[6] +
-                w7 * treecoords[7] +
-                w8 * treecoords[8]
+                x = muladd(
+                    -c1[1],
+                    hr,
+                    muladd(-c1[1], cr, muladd(c2[1], hr, muladd(c2[1], cr, c1[1]))),
+                )
+                y = muladd(
+                    -c1[2],
+                    hs,
+                    muladd(-c1[2], cs, muladd(c3[2], hs, muladd(c3[2], cs, c1[2]))),
+                )
+                z = muladd(
+                    -c1[3],
+                    ht,
+                    muladd(-c1[3], ct, muladd(c5[3], ht, muladd(c5[3], ct, c1[3]))),
+                )
+
+                point = SA[x; y; z]
+            else
+
+                r = cr + h * (rl[i] + 1)
+                s = cs + h * (sl[j] + 1)
+                t = ct + h * (tl[k] + 1)
+
+                w1 = (1 - r) * (1 - s) * (1 - t)
+                w2 = r * (1 - s) * (1 - t)
+                w3 = (1 - r) * s * (1 - t)
+                w4 = r * s * (1 - t)
+                w5 = (1 - r) * (1 - s) * t
+                w6 = r * (1 - s) * t
+                w7 = (1 - r) * s * t
+                w8 = r * s * t
+
+                point =
+                    w1 * treecoords[1] +
+                    w2 * treecoords[2] +
+                    w3 * treecoords[3] +
+                    w4 * treecoords[4] +
+                    w5 * treecoords[5] +
+                    w6 * treecoords[6] +
+                    w7 * treecoords[7] +
+                    w8 * treecoords[8]
+            end
+
+            points[i, j, k, q] = point
         end
     end
 end
@@ -577,6 +633,7 @@ function materializepoints(
     quadranttocoordinate,
     forest,
     comm,
+    isunwarpedbrick,
 )
     r = vec.(points_1d(referencecell))
 
@@ -603,6 +660,7 @@ function materializepoints(
         quadranttolevel,
         quadranttotreeid,
         quadranttocoordinate,
+        Val(isunwarpedbrick),
         Val.(length.(r))...;
         ndrange = size(points),
     )

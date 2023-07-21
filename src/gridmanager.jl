@@ -329,6 +329,8 @@ function generate(warp::Function, gm::GridManager)
     continuoustodiscontinuous = adaptsparse(A, continuoustodiscontinuous)
     discontinuoustocontinuous = Adapt.adapt(A, discontinuoustocontinuous)
 
+    isunwarpedbrick = warp isa typeof(identity) && coarsegrid(gm) isa BrickGrid
+
     points = materializepoints(
         referencecell(gm),
         coarsegridcells(gm),
@@ -338,6 +340,7 @@ function generate(warp::Function, gm::GridManager)
         quadranttocoordinate,
         forest(gm),
         comm(gm),
+        isunwarpedbrick,
     )
 
     coarsegrid_warp = Raven.warp(coarsegrid(gm))
