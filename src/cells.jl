@@ -405,8 +405,8 @@ end
             P4EST_MAXLEVEL = 30
             P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
 
-            cr = ix / P4EST_ROOT_LEN
-            cs = iy / P4EST_ROOT_LEN
+            cr = T(ix) / P4EST_ROOT_LEN
+            cs = T(iy) / P4EST_ROOT_LEN
 
             h = one(T) / (1 << (level + 1))
 
@@ -534,9 +534,9 @@ end
             P4EST_MAXLEVEL = 30
             P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
 
-            cr = ix / P4EST_ROOT_LEN
-            cs = iy / P4EST_ROOT_LEN
-            ct = iz / P4EST_ROOT_LEN
+            cr = T(ix) / P4EST_ROOT_LEN
+            cs = T(iy) / P4EST_ROOT_LEN
+            ct = T(iz) / P4EST_ROOT_LEN
 
             h = one(T) / (1 << (level + 1))
 
