@@ -289,18 +289,24 @@ end
     return unflatten(T, d)
 end
 
-@inline function Base.setindex!(
+@generated function _unsafe_setindex!(
     a::GridArray{T,N,A,G,F,L},
     v,
     I::Vararg{Int,N},
 ) where {T,N,A,G,F,L}
-    @boundscheck Base.checkbounds_indices(Bool, axes(a), I) || Base.throw_boundserror(a, I)
-    data = parent(a)
-    vt = flatten(convert(T, v)::T)
-    @unroll for i = 1:L
-        @inbounds setindex!(data, vt[i], insert(I, Val(F), i)...)
+    quote
+        $(Expr(:meta, :inline))
+        data = parent(a)
+        vt = flatten(convert(T, v)::T)
+        Base.Cartesian.@nexprs $L i ->
+            @inbounds setindex!(data, vt[i], insert(I, Val(F), i)...)
+        return a
     end
-    return a
+end
+
+@inline function Base.setindex!(a::GridArray{<:Any,N}, v, I::Vararg{Int,N}) where {N}
+    @boundscheck Base.checkbounds_indices(Bool, axes(a), I) || Base.throw_boundserror(a, I)
+    return _unsafe_setindex!(a, v, I...)
 end
 
 LinearAlgebra.norm(a::GridArray) = sqrt(MPI.Allreduce(norm(parent(a))^2, +, comm(a)))
