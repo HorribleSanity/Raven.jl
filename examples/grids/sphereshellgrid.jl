@@ -4,6 +4,24 @@ MPI.Initialized() || MPI.Init()
 
 const comm = MPI.COMM_WORLD
 
+if false 
+    using CUDA
+    using CUDA.CUDAKernels
+
+    if CUDA.functional()
+        const AT = CuArray
+        const local_comm =
+            MPI.Comm_split_type(comm, MPI.COMM_TYPE_SHARED, MPI.Comm_rank(comm))
+        CUDA.device!(MPI.Comm_rank(local_comm) % length(CUDA.devices()))
+        CUDA.allowscalar(false)
+    else
+        const AT = Array
+    end
+else
+    const AT = Array
+end
+
+
 using Raven
 using WriteVTK
 using StaticArrays
@@ -15,7 +33,7 @@ using StaticArrays
 N = (3, 3)
 R = 1
 
-coarse_grid = Raven.cubeshellgrid(R)
+coarse_grid = Raven.cubeshell2dgrid(R)
 
 gm = GridManager(LobattoCell{Tuple{N...},Float64,Array}(), coarse_grid, min_level = 2)
 

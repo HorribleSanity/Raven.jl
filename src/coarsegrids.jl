@@ -30,7 +30,7 @@ function coarsegrid(
 end
 
 function cubeshellgrid(R::Real, r::Real)
-    @assert R>r "R (outter radius) must be greater that r (inner radius)"
+    @assert R > r "R (outter radius) must be greater that r (inner radius)"
     vertices = zeros(SVector{3,Float64}, 16)
 
     vertices[1] = SVector(+R, +R, -R)
@@ -52,8 +52,14 @@ function cubeshellgrid(R::Real, r::Real)
     vertices[16] = SVector(-r, -r, +r)
 
 
-    cells = [(1,2,3,4,9,10,11,12), (2,6,4,8,10,14,12,16), (6,5,8,7,14,13,16,15),
-             (5,1,7,3,13,9,15,11),(3,4,7,8,11,12,15,16),(1,2,5,6,9,10,13,14)]
+    cells = [
+        (1, 2, 3, 4, 9, 10, 11, 12),
+        (2, 6, 4, 8, 10, 14, 12, 16),
+        (6, 5, 8, 7, 14, 13, 16, 15),
+        (5, 1, 7, 3, 13, 9, 15, 11),
+        (3, 4, 7, 8, 11, 12, 15, 16),
+        (1, 2, 5, 6, 9, 10, 13, 14),
+    ]
 
     function cubespherewarp(point)
         # Put the points in reverse magnitude order
