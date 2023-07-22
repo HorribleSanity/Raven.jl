@@ -58,6 +58,36 @@ function grids_testsuite(AT, FT)
     end
 
     let
+        N = (3, 3, 3)
+        R = 2
+        r = 1
+
+        coarse_grid = Raven.cubeshellgrid(R,r)
+
+        gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 2)
+
+        indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
+        adapt!(gm, indicator)
+
+        grid = generate(gm)
+
+        @test grid isa Raven.Grid
+        @test issparse(grid.continuoustodiscontinuous)
+
+        mktempdir() do tmpdir
+            vtk_grid("$tmpdir/grid", grid) do vtk
+                vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
+                P = toequallyspaced(referencecell(grid))
+                x = P * reshape(points(grid), size(P, 2), :)
+                vtk["x"] = Adapt.adapt(Array, x)
+            end
+            @test isfile("$tmpdir/grid.pvtu")
+            @test isdir("$tmpdir/grid")
+            @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
+        end
+    end
+
+    let
         N = (3, 3)
         R = 1
 
@@ -293,7 +323,7 @@ function grids_testsuite(AT, FT)
             # We currently do not support different polynomial orders for
             # joining faces.
             LobattoCell{Tuple{L,L},FT,AT}(),
-            Raven.cubeshellgrid(R);
+            Raven.cubeshell2dgrid(R);
             min_level = level,
         )
 
