@@ -32,6 +32,7 @@ export GridArray, components, sizewithghosts, viewwithghosts, parentwithghosts
 
 export adapt!
 
+include("orientation.jl")
 include("arrays.jl")
 include("sparsearrays.jl")
 include("eye.jl")
