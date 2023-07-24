@@ -34,6 +34,8 @@ jobs:
           arch: ${{ matrix.arch }}
           version: ${{ matrix.version }}
       - uses: julia-actions/cache@v1
+        with:
+          cache-compiled: "true"
       - uses: julia-actions/julia-runtest@latest
 
   test-system-apt:
