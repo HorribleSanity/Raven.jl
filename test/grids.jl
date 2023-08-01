@@ -231,12 +231,14 @@ function grids_testsuite(AT, FT)
     @testset "2D spherical shell" begin
 
         L = 6
-        M = 7
         level = 1
         R = FT(3)
 
         gm = GridManager(
-            LobattoCell{Tuple{L,M},FT,AT}(),
+            # Polynomial orders need to be the same to match up faces.
+            # We currently do not support different polynomial orders for
+            # joining faces.
+            LobattoCell{Tuple{L,L},FT,AT}(),
             Raven.cubeshellgrid(R);
             min_level = level,
         )
@@ -246,6 +248,14 @@ function grids_testsuite(AT, FT)
 
         @test sum(adapt(Array, wJ)) ≈ pi * R^2 * 4
 
+        pts = points(grid)
+        fmapM, fmapP = facemaps(grid)
+
+        pts = Adapt.adapt(Array, pts)
+        fmapM = Adapt.adapt(Array, fmapM)
+        fmapP = Adapt.adapt(Array, fmapP)
+        @test isapprox(pts[fmapM[1]], pts[fmapP[1]])
+        @test isapprox(pts[fmapM[2]], pts[fmapP[2]])
     end
 
     @testset "2D constant preserving" begin

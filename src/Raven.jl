@@ -22,6 +22,7 @@ export derivatives_1d, points_1d, weights_1d, tohalves_1d
 export referencecell, levels, trees, offset, numcells, facecodes
 export continuoustodiscontinuous, nodecommpattern
 export communicatingcells, noncommunicatingcells
+export facemaps
 
 export volumemetrics, surfacemetrics
 

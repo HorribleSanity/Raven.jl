@@ -733,6 +733,151 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
     return dtoc
 end
 
+function materializefacemaps(
+    cell::LobattoCell,
+    numcells_local,
+    ctod_degree3_local,
+    dtoc_degree3_local,
+    dtoc_degree3_global,
+)
+    numcells = last(size(dtoc_degree3_local))
+    cellindices = LinearIndices(size(cell))
+
+    if cell isa LobattoQuad
+        degree3faceindices = ((1, 2:3), (4, 2:3), (2:3, 1), (2:3, 4))
+        degree3facelinearindices = ((5, 9), (8, 12), (2, 3), (14, 15))
+        cellfacedims = ((size(cell, 2),), (size(cell, 1),))
+        @views cellfaceindices = (
+            cellindices[1, 1:end],
+            cellindices[end, 1:end],
+            cellindices[1:end, 1],
+            cellindices[1:end, end],
+        )
+    elseif cell isa LobattoHex
+        degree3faceindices = (
+            (1, 2:3, 2:3),
+            (4, 2:3, 2:3),
+            (2:3, 1, 2:3),
+            (2:3, 4, 2:3),
+            (2:3, 2:3, 1),
+            (2:3, 2:3, 4),
+        )
+        degree3facelinearindices = (
+            (21, 25, 37, 41),
+            (24, 28, 40, 44),
+            (18, 19, 34, 35),
+            (30, 31, 46, 47),
+            (6, 7, 10, 11),
+            (54, 55, 58, 59),
+        )
+        cellfacedims = (
+            (size(cell, 2), size(cell, 3)),
+            (size(cell, 1), size(cell, 3)),
+            (size(cell, 1), size(cell, 2)),
+        )
+        @views cellfaceindices = (
+            cellindices[1, 1:end, 1:end],
+            cellindices[end, 1:end, 1:end],
+            cellindices[1:end, 1, 1:end],
+            cellindices[1:end, end, 1:end],
+            cellindices[1:end, 1:end, 1],
+            cellindices[1:end, 1:end, end],
+        )
+    else
+        error("Unsupported element type $(typeof(cell))")
+    end
+
+    numchildfaces = 2^(ndims(cell) - 1)
+
+    faceorientations =
+        zeros(Raven.Orientation{numchildfaces}, length(degree3faceindices), numcells)
+    for q = 1:numcells
+        for (f, faceindices) in enumerate(degree3faceindices)
+            edge = dtoc_degree3_global[faceindices..., q]
+            faceorientations[f, q] = orient(Val(numchildfaces), edge)
+        end
+    end
+
+    vmapM = ntuple(length(cellfacedims)) do n
+        zeros(Int, cellfacedims[n]..., 2, numcells_local)
+    end
+
+    for q = 1:numcells_local,
+        fg = 1:length(cellfacedims),
+        fn = 1:2,
+        j in CartesianIndices(cellfacedims[fg])
+
+        f = 2 * (fg - 1) + fn
+        vmapM[fg][j, fn, q] = cellfaceindices[f][j] + (q - 1) * length(cell)
+    end
+
+    vmapP = ntuple(length(cellfacedims)) do n
+        zeros(Int, cellfacedims[n]..., 2, numcells_local)
+    end
+
+    rows = rowvals(ctod_degree3_local)
+    for q = 1:numcells_local
+        for (f, faceindices) in enumerate(degree3faceindices)
+            fg, fn = fldmod1(f, 2)
+            face = dtoc_degree3_local[faceindices..., q]
+            neighborsrange = nzrange(ctod_degree3_local, face[1])
+            kind = length(neighborsrange)
+
+            if kind == 1
+                # boundary cell
+                for j in CartesianIndices(cellfacedims[fg])
+                    vmapP[fg][j, fn, q] = vmapM[fg][j, fn, q]
+                end
+            elseif kind == 2
+                # conforming face
+                nf = 0
+                nq = 0
+                for ii in neighborsrange
+                    pq, pi = fldmod1(rows[ii], 4^ndims(cell))
+                    if pq != q
+                        for (ff, findices) in enumerate(degree3facelinearindices)
+                            if pi ∈ findices
+                                nf = ff
+                                break
+                            end
+                        end
+                        nq = pq
+                        break
+                    end
+                end
+
+                # Make sure we found the connecting face
+                @assert nf > 0
+                @assert nq > 0
+
+                # If faces are paired up from different face groups then
+                # make sure that each face has the same number of
+                # degrees-of-freedom
+                @assert fld1(f, ndims(cell)) == fld1(nf, ndims(cell)) ||
+                        length(cellfaceindices[f]) == length(cellfaceindices[nf])
+
+                no = inv(faceorientations[f, q]) ∘ faceorientations[nf, nq]
+                faceindices = orientindices(no, cellfacedims[fg])
+
+                for j in CartesianIndices(cellfacedims[fg])
+                    vmapP[fg][j, fn, q] =
+                        cellfaceindices[nf][faceindices[j]] + (nq - 1) * length(cell)
+                end
+            else
+                # non-conforming face
+                @assert kind == 1 + numchildfaces
+                # For now just mark the neighbor as the face itself.  This is the same
+                # as for the boundary cells.  Should we do something different?
+                for j in CartesianIndices(cellfacedims[fg])
+                    vmapP[fg][j, fn, q] = vmapM[fg][j, fn, q]
+                end
+            end
+        end
+    end
+
+    return (; vmapM, vmapP)
+end
+
 function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern)
     ghostranktompirank = quadrantcommpattern.recvranks
     ghostranktoindices =

@@ -9,6 +9,72 @@ using Raven.SparseArrays
 
 MPI.Init(; threadlevel = MPI.THREAD_MULTIPLE)
 
+let
+    FT = Float64
+    AT = Array
+
+    N = 4
+    cell = LobattoCell{Tuple{N,N},FT,AT}()
+
+    # 4--------5--------6
+    # |        |        |
+    # |        |        |
+    # |        |        |
+    # |        |        |
+    # 1--------2--------3
+
+    vertices = [
+        SVector{2,FT}(0, 0), # 1
+        SVector{2,FT}(1, 0), # 2
+        SVector{2,FT}(2, 0), # 3
+        SVector{2,FT}(0, 1), # 4
+        SVector{2,FT}(1, 1), # 5
+        SVector{2,FT}(2, 1), # 6
+    ]
+
+    for cells in [[(1, 2, 4, 5), (2, 3, 5, 6)], [(1, 2, 4, 5), (5, 6, 2, 3)]]
+        min_level = 0
+        cg = coarsegrid(vertices, cells)
+        gm = GridManager(cell, cg; min_level)
+        grid = generate(gm)
+
+        A = continuoustodiscontinuous(grid)
+        pts = points(grid, Val(true))
+        rows = rowvals(A)
+        vals = nonzeros(A)
+        _, n = size(A)
+
+        ci = CartesianIndices(pts)
+
+        for j = 1:n
+            x = pts[rows[first(nzrange(A, j))]]
+            for ii in nzrange(A, j)
+                p = pts[rows[ii]]
+                @test x ≈ p || (all(isnan.(x)) && all(isnan.(p)))
+
+                # make sure all points that have all NaNs are in the
+                # ghost layer
+                if (all(isnan.(x)) && all(isnan.(p)))
+                    i = rows[ii]
+                    @test fld1(i, length(cell)) > numcells(grid)
+                end
+            end
+        end
+
+        cp = nodecommpattern(grid)
+        commcells = communicatingcells(grid)
+        noncommcells = noncommunicatingcells(grid)
+        for i in cp.sendindices
+            q = fld1(i, length(cell))
+            @test q ∈ commcells
+        end
+        @test noncommcells == setdiff(0x1:numcells(grid), commcells)
+
+        fmapM, fmapP = facemaps(grid)
+        @test isapprox(pts[fmapM[1]], pts[fmapP[1]])
+        @test isapprox(pts[fmapM[2]], pts[fmapP[2]])
+    end
+end
 
 let
     FT = Float64
@@ -179,5 +245,10 @@ let
             @test q ∈ commcells
         end
         @test noncommcells == setdiff(0x1:numcells(grid), commcells)
+
+        fmapM, fmapP = facemaps(grid)
+        @test isapprox(pts[fmapM[1]], pts[fmapP[1]])
+        @test isapprox(pts[fmapM[2]], pts[fmapP[2]])
+        @test isapprox(pts[fmapM[3]], pts[fmapP[3]])
     end
 end

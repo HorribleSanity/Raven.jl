@@ -275,6 +275,63 @@
         end
     end
 
+    let
+        FT = Float64
+        AT = Array
+
+        N = 4
+        cell = LobattoCell{Tuple{N,N},FT,AT}()
+
+        # 4--------5--------6
+        # |        |        |
+        # |        |        |
+        # |        |        |
+        # |        |        |
+        # 1--------2--------3
+
+        vertices = [
+            SVector{2,FT}(0, 0), # 1
+            SVector{2,FT}(1, 0), # 2
+            SVector{2,FT}(2, 0), # 3
+            SVector{2,FT}(0, 1), # 4
+            SVector{2,FT}(1, 1), # 5
+            SVector{2,FT}(2, 1), # 6
+        ]
+
+        for cells in [[(1, 2, 4, 5), (2, 3, 5, 6)], [(1, 2, 4, 5), (5, 6, 2, 3)]]
+            cg = coarsegrid(vertices, cells)
+            gm = GridManager(cell, cg)
+            grid = generate(gm)
+
+            A = continuoustodiscontinuous(grid)
+            pts = points(grid)
+            rows = rowvals(A)
+            vals = nonzeros(A)
+            _, n = size(A)
+
+            ncontinuous = 0
+            ndiscontinuous = 0
+            for j = 1:n
+                x = pts[rows[first(nzrange(A, j))]]
+                if length(nzrange(A, j)) > 0
+                    ncontinuous += 1
+                end
+                for ii in nzrange(A, j)
+                    ndiscontinuous += 1
+                    @test pts[rows[ii]] ≈ x
+                end
+            end
+            @test ncontinuous == 2N^2 - N
+            @test ndiscontinuous == 2N^2
+
+            pts = Adapt.adapt(Array, pts)
+            fmapM, fmapP = facemaps(grid)
+            fmapM = Adapt.adapt(Array, fmapM)
+            fmapP = Adapt.adapt(Array, fmapP)
+            @test isapprox(pts[fmapM[1]], pts[fmapP[1]])
+            @test isapprox(pts[fmapM[2]], pts[fmapP[2]])
+        end
+    end
 
     let
         FT = Float64
@@ -432,6 +489,14 @@
             end
             @test ncontinuous == 2N^3 - N^2
             @test ndiscontinuous == 2N^3
+
+            pts = Adapt.adapt(Array, pts)
+            fmapM, fmapP = facemaps(grid)
+            fmapM = Adapt.adapt(Array, fmapM)
+            fmapP = Adapt.adapt(Array, fmapP)
+            @test isapprox(pts[fmapM[1]], pts[fmapP[1]])
+            @test isapprox(pts[fmapM[2]], pts[fmapP[2]])
+            @test isapprox(pts[fmapM[3]], pts[fmapP[3]])
         end
     end
 end

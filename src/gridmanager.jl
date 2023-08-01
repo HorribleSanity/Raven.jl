@@ -317,6 +317,16 @@ function generate(warp::Function, gm::GridManager)
     discontinuoustocontinuous =
         materializedtoc(referencecell(gm), dtoc_degree3_local, dtoc_degree3_global)
 
+    ctod_degree3_local = materializectod(dtoc_degree3_local)
+
+    facemaps = materializefacemaps(
+        referencecell(gm),
+        P4estTypes.lengthoflocalquadrants(forest(gm)),
+        ctod_degree3_local,
+        dtoc_degree3_local,
+        dtoc_degree3_global,
+    )
+
     continuoustodiscontinuous = materializectod(discontinuoustocontinuous)
 
     nodecommpattern = materializenodecommpattern(
@@ -348,6 +358,7 @@ function generate(warp::Function, gm::GridManager)
     discontinuoustocontinuous = Adapt.adapt(A, discontinuoustocontinuous)
     communicatingquadrants = Adapt.adapt(A, communicatingquadrants)
     noncommunicatingquadrants = Adapt.adapt(A, noncommunicatingquadrants)
+    facemaps = Adapt.adapt(A, facemaps)
 
     points = materializepoints(
         referencecell(gm),
@@ -395,5 +406,6 @@ function generate(warp::Function, gm::GridManager)
         discontinuoustocontinuous,
         communicatingquadrants,
         noncommunicatingquadrants,
+        facemaps,
     )
 end

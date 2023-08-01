@@ -8,7 +8,7 @@ floattype(grid::AbstractGrid) = floattype(typeof(grid))
 arraytype(grid::AbstractGrid) = arraytype(typeof(grid))
 celltype(grid::AbstractGrid) = celltype(typeof(grid))
 
-struct Grid{C<:AbstractCell,P,V,S,L,T,F,PN,N,CTOD,DTOC,CC} <: AbstractGrid{C}
+struct Grid{C<:AbstractCell,P,V,S,L,T,F,PN,N,CTOD,DTOC,CC,FM} <: AbstractGrid{C}
     comm::MPI.Comm
     part::Int
     nparts::Int
@@ -27,6 +27,7 @@ struct Grid{C<:AbstractCell,P,V,S,L,T,F,PN,N,CTOD,DTOC,CC} <: AbstractGrid{C}
     discontinuoustocontinuous::DTOC
     communicatingcells::CC
     noncommunicatingcells::CC
+    facemaps::FM
 end
 
 comm(grid::Grid) = grid.comm
@@ -58,6 +59,11 @@ noncommunicatingcells(grid::Grid) = grid.noncommunicatingcells
 
 volumemetrics(grid::Grid) = grid.volumemetrics
 surfacemetrics(grid::Grid) = grid.surfacemetrics
+
+facemaps(grid::Grid) = facemaps(grid, Val(false))
+facemaps(grid::Grid, ::Val{false}) = grid.facemaps
+facemaps(::Grid, ::Val{true}) =
+    throw(error("Face maps are currently stored for local quadrants."))
 
 offset(grid::Grid) = grid.offset
 numcells(grid::Grid) = numcells(grid, Val(false))
