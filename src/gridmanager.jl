@@ -293,7 +293,7 @@ function generate(warp::Function, gm::GridManager)
     A = arraytype(referencecell(gm))
 
     ghost = P4estTypes.ghostlayer(forest(gm))
-    nodes = P4estTypes.lnodes(forest(gm); ghost, degree = 2)
+    nodes = P4estTypes.lnodes(forest(gm); ghost, degree = 3)
     P4estTypes.expand!(ghost, forest(gm), nodes)
 
     (quadranttolevel, quadranttotreeid, quadranttocoordinate) =
@@ -303,11 +303,11 @@ function generate(warp::Function, gm::GridManager)
 
     quadrantcommpattern = materializequadrantcommpattern(forest(gm), ghost)
 
-    (dtoc_degree2_local, dtoc_degree2_global) =
+    (dtoc_degree3_local, dtoc_degree3_global) =
         materializedtoc(forest(gm), ghost, nodes, quadrantcommpattern, comm(gm))
 
     discontinuoustocontinuous =
-        materializedtoc(referencecell(gm), dtoc_degree2_local, dtoc_degree2_global)
+        materializedtoc(referencecell(gm), dtoc_degree3_local, dtoc_degree3_global)
 
     continuoustodiscontinuous = materializectod(discontinuoustocontinuous)
 
@@ -350,9 +350,7 @@ function generate(warp::Function, gm::GridManager)
     coarsegrid_warp = Raven.warp(coarsegrid(gm))
     points = warp.(coarsegrid_warp.(points))
 
-    # Fill the ghost layer with NaNs for debugging.  This helps us identify
-    # when unset values are accidentally used.
-    points.datawithghosts[:,:,:,:,last(size(points))+1:end] .= NaN
+    fillghosts!(points, fill(NaN, eltype(points)))
     pcm = commmanager(eltype(points), comm(gm), nodecommpattern, 0)
     share!(points, pcm)
 

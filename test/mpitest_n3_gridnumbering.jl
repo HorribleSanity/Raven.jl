@@ -73,14 +73,14 @@ let
     P4estTypes.refine!(forest; refine = (_, tid, _) -> tid == 4)
     P4estTypes.balance!(forest)
     ghost = P4estTypes.ghostlayer(forest)
-    nodes = P4estTypes.lnodes(forest; ghost, degree = 2)
+    nodes = P4estTypes.lnodes(forest; ghost, degree = 3)
     P4estTypes.expand!(ghost, forest, nodes)
 
     forest_self = P4estTypes.pxest(Raven.connectivity(cg); comm = MPI.COMM_SELF)
     P4estTypes.refine!(forest_self; refine = (_, tid, _) -> tid == 4)
     P4estTypes.balance!(forest_self)
     ghost_self = P4estTypes.ghostlayer(forest_self)
-    nodes_self = P4estTypes.lnodes(forest_self; ghost = ghost_self, degree = 2)
+    nodes_self = P4estTypes.lnodes(forest_self; ghost = ghost_self, degree = 3)
     P4estTypes.expand!(ghost_self, forest_self, nodes_self)
 
     quadranttoglobalids = Raven.materializequadranttoglobalid(forest, ghost)
@@ -116,11 +116,11 @@ let
         @test quadrantcommpattern.sendrankindices == [1:4, 5:8]
     end
 
-    (dtoc_degree_2_local, dtoc_degree_2_global) =
+    (dtoc_degree_3_local, dtoc_degree_3_global) =
         Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
 
     quadrantcommpattern_self = Raven.materializequadrantcommpattern(forest_self, ghost_self)
-    (dtoc_degree_2_local_self, dtoc_degree_2_global_self) = Raven.materializedtoc(
+    (dtoc_degree_3_local_self, dtoc_degree_3_global_self) = Raven.materializedtoc(
         forest_self,
         ghost_self,
         nodes_self,
@@ -128,53 +128,58 @@ let
         MPI.COMM_SELF,
     )
 
-    @test dtoc_degree_2_local == Raven.numbercontiguous(Int32, dtoc_degree_2_global)
-    @test eltype(dtoc_degree_2_local) == Int32
+    @test dtoc_degree_3_local == Raven.numbercontiguous(Int32, dtoc_degree_3_global)
+    @test eltype(dtoc_degree_3_local) == Int32
     if rank == 0
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, 1:1],
-            dtoc_degree_2_global_self[:, :, 1:1],
+            dtoc_degree_3_global[:, :, 1:1],
+            dtoc_degree_3_global_self[:, :, 1:1],
         )
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, 2:6],
-            dtoc_degree_2_global_self[:, :, 2:6],
+            dtoc_degree_3_global[:, :, 2:6],
+            dtoc_degree_3_global_self[:, :, 2:6],
         )
     elseif rank == 1
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, 1:1],
-            dtoc_degree_2_global_self[:, :, 2:2],
+            dtoc_degree_3_global[:, :, 1:1],
+            dtoc_degree_3_global_self[:, :, 2:2],
         )
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, 2:6],
-            dtoc_degree_2_global_self[:, :, vcat(1:1, 3:6)],
+            dtoc_degree_3_global[:, :, 2:6],
+            dtoc_degree_3_global_self[:, :, vcat(1:1, 3:6)],
         )
     elseif rank == 2
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, 1:5],
-            dtoc_degree_2_global_self[:, :, 3:7],
+            dtoc_degree_3_global[:, :, 1:5],
+            dtoc_degree_3_global_self[:, :, 3:7],
         )
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, 6:7],
-            dtoc_degree_2_global_self[:, :, [1, 2]],
+            dtoc_degree_3_global[:, :, 6:7],
+            dtoc_degree_3_global_self[:, :, [1, 2]],
         )
-    end
-
-    cell = LobattoCell{Tuple{3,3},Float64,Array}()
-    dtoc = Raven.materializedtoc(cell, dtoc_degree_2_local, dtoc_degree_2_global)
-    if rank == 0
-        @test isisomorphic(dtoc[:, :, 1:1], dtoc_degree_2_global_self[:, :, 1:1])
-        @test isisomorphic(dtoc[:, :, 2:6], dtoc_degree_2_global_self[:, :, 2:6])
-    elseif rank == 1
-        @test isisomorphic(dtoc[:, :, 1:1], dtoc_degree_2_global_self[:, :, 2:2])
-        @test isisomorphic(dtoc[:, :, 2:6], dtoc_degree_2_global_self[:, :, vcat(1:1, 3:6)])
-    elseif rank == 2
-        @test isisomorphic(dtoc[:, :, 1:5], dtoc_degree_2_global_self[:, :, 3:7])
-        @test isisomorphic(dtoc[:, :, 6:7], dtoc_degree_2_global_self[:, :, [1, 2]])
     end
 
     cell_degree_3 = LobattoCell{Tuple{4,4},Float64,Array}()
     dtoc_degree_3 =
-        Raven.materializedtoc(cell_degree_3, dtoc_degree_2_local, dtoc_degree_2_global)
+        Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
+
+    if rank == 0
+        @test isisomorphic(dtoc_degree_3[:, :, 1:1], dtoc_degree_3_global_self[:, :, 1:1])
+        @test isisomorphic(dtoc_degree_3[:, :, 2:6], dtoc_degree_3_global_self[:, :, 2:6])
+    elseif rank == 1
+        @test isisomorphic(dtoc_degree_3[:, :, 1:1], dtoc_degree_3_global_self[:, :, 2:2])
+        @test isisomorphic(
+            dtoc_degree_3[:, :, 2:6],
+            dtoc_degree_3_global_self[:, :, vcat(1:1, 3:6)],
+        )
+    elseif rank == 2
+        @test isisomorphic(dtoc_degree_3[:, :, 1:5], dtoc_degree_3_global_self[:, :, 3:7])
+        @test isisomorphic(
+            dtoc_degree_3[:, :, 6:7],
+            dtoc_degree_3_global_self[:, :, [1, 2]],
+        )
+    end
+
     ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
     nodecommpattern_degree_3 =
         Raven.materializenodecommpattern(cell_degree_3, ctod_degree_3, quadrantcommpattern)
@@ -271,14 +276,14 @@ let
     P4estTypes.refine!(forest; refine = (_, tid, _) -> tid == 4)
     P4estTypes.balance!(forest)
     ghost = P4estTypes.ghostlayer(forest)
-    nodes = P4estTypes.lnodes(forest; ghost, degree = 2)
+    nodes = P4estTypes.lnodes(forest; ghost, degree = 3)
     P4estTypes.expand!(ghost, forest, nodes)
 
     forest_self = P4estTypes.pxest(Raven.connectivity(cg); comm = MPI.COMM_SELF)
     P4estTypes.refine!(forest_self; refine = (_, tid, _) -> tid == 4)
     P4estTypes.balance!(forest_self)
     ghost_self = P4estTypes.ghostlayer(forest_self)
-    nodes_self = P4estTypes.lnodes(forest_self; ghost = ghost_self, degree = 2)
+    nodes_self = P4estTypes.lnodes(forest_self; ghost = ghost_self, degree = 3)
     P4estTypes.expand!(ghost_self, forest_self, nodes_self)
 
     quadranttoglobalids = Raven.materializequadranttoglobalid(forest, ghost)
@@ -314,11 +319,11 @@ let
         @test quadrantcommpattern.sendrankindices == [1:7, 8:14]
     end
 
-    (dtoc_degree_2_local, dtoc_degree_2_global) =
+    (dtoc_degree_3_local, dtoc_degree_3_global) =
         Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
 
     quadrantcommpattern_self = Raven.materializequadrantcommpattern(forest_self, ghost_self)
-    (dtoc_degree_2_local_self, dtoc_degree_2_global_self) = Raven.materializedtoc(
+    (dtoc_degree_3_local_self, dtoc_degree_3_global_self) = Raven.materializedtoc(
         forest_self,
         ghost_self,
         nodes_self,
@@ -326,59 +331,69 @@ let
         MPI.COMM_SELF,
     )
 
-    @test dtoc_degree_2_local == Raven.numbercontiguous(Int32, dtoc_degree_2_global)
-    @test eltype(dtoc_degree_2_local) == Int32
+    @test dtoc_degree_3_local == Raven.numbercontiguous(Int32, dtoc_degree_3_global)
+    @test eltype(dtoc_degree_3_local) == Int32
     if rank == 0
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, :, 1:1],
-            dtoc_degree_2_global_self[:, :, :, 1:1],
+            dtoc_degree_3_global[:, :, :, 1:1],
+            dtoc_degree_3_global_self[:, :, :, 1:1],
         )
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, :, 2:9],
-            dtoc_degree_2_global_self[:, :, :, [2, 3, 4, 5, 6, 8, 9, 10]],
+            dtoc_degree_3_global[:, :, :, 2:9],
+            dtoc_degree_3_global_self[:, :, :, [2, 3, 4, 5, 6, 8, 9, 10]],
         )
     elseif rank == 1
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, :, 1:1],
-            dtoc_degree_2_global_self[:, :, :, 2:2],
+            dtoc_degree_3_global[:, :, :, 1:1],
+            dtoc_degree_3_global_self[:, :, :, 2:2],
         )
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, :, 2:9],
-            dtoc_degree_2_global_self[:, :, :, [1, 3, 4, 5, 6, 8, 9, 10]],
+            dtoc_degree_3_global[:, :, :, 2:9],
+            dtoc_degree_3_global_self[:, :, :, [1, 3, 4, 5, 6, 8, 9, 10]],
         )
     elseif rank == 2
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, :, 1:9],
-            dtoc_degree_2_global_self[:, :, :, 3:11],
+            dtoc_degree_3_global[:, :, :, 1:9],
+            dtoc_degree_3_global_self[:, :, :, 3:11],
         )
         @test isisomorphic(
-            dtoc_degree_2_global[:, :, :, 10:11],
-            dtoc_degree_2_global_self[:, :, :, [1, 2]],
+            dtoc_degree_3_global[:, :, :, 10:11],
+            dtoc_degree_3_global_self[:, :, :, [1, 2]],
         )
-    end
-
-    cell = LobattoCell{Tuple{3,3,3},Float64,Array}()
-    dtoc = Raven.materializedtoc(cell, dtoc_degree_2_local, dtoc_degree_2_global)
-    if rank == 0
-        @test isisomorphic(dtoc[:, :, :, 1:1], dtoc_degree_2_global_self[:, :, :, 1:1])
-        @test isisomorphic(
-            dtoc[:, :, :, 2:9],
-            dtoc_degree_2_global_self[:, :, :, [2, 3, 4, 5, 6, 8, 9, 10]],
-        )
-    elseif rank == 1
-        @test isisomorphic(dtoc[:, :, :, 1:1], dtoc_degree_2_global_self[:, :, :, 2:2])
-        @test isisomorphic(
-            dtoc[:, :, :, 2:9],
-            dtoc_degree_2_global_self[:, :, :, [1, 3, 4, 5, 6, 8, 9, 10]],
-        )
-    elseif rank == 2
-        @test isisomorphic(dtoc[:, :, :, 1:9], dtoc_degree_2_global_self[:, :, :, 3:11])
-        @test isisomorphic(dtoc[:, :, :, 10:11], dtoc_degree_2_global_self[:, :, :, [1, 2]])
     end
 
     cell_degree_3 = LobattoCell{Tuple{4,4,4},Float64,Array}()
     dtoc_degree_3 =
-        Raven.materializedtoc(cell_degree_3, dtoc_degree_2_local, dtoc_degree_2_global)
+        Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
+    if rank == 0
+        @test isisomorphic(
+            dtoc_degree_3[:, :, :, 1:1],
+            dtoc_degree_3_global_self[:, :, :, 1:1],
+        )
+        @test isisomorphic(
+            dtoc_degree_3[:, :, :, 2:9],
+            dtoc_degree_3_global_self[:, :, :, [2, 3, 4, 5, 6, 8, 9, 10]],
+        )
+    elseif rank == 1
+        @test isisomorphic(
+            dtoc_degree_3[:, :, :, 1:1],
+            dtoc_degree_3_global_self[:, :, :, 2:2],
+        )
+        @test isisomorphic(
+            dtoc_degree_3[:, :, :, 2:9],
+            dtoc_degree_3_global_self[:, :, :, [1, 3, 4, 5, 6, 8, 9, 10]],
+        )
+    elseif rank == 2
+        @test isisomorphic(
+            dtoc_degree_3[:, :, :, 1:9],
+            dtoc_degree_3_global_self[:, :, :, 3:11],
+        )
+        @test isisomorphic(
+            dtoc_degree_3[:, :, :, 10:11],
+            dtoc_degree_3_global_self[:, :, :, [1, 2]],
+        )
+    end
+
     ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
     nodecommpattern_degree_3 =
         Raven.materializenodecommpattern(cell_degree_3, ctod_degree_3, quadrantcommpattern)
