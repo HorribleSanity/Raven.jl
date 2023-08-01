@@ -803,9 +803,10 @@ function materializeparentnodes(
                 pdof = i
             end
         end
-        @assert pdof != 0
+
         for ii in nzrange(ctod, j)
             i = rows[ii]
+            @assert pdof != 0
             parentdofs[i] = pdof
         end
     end
