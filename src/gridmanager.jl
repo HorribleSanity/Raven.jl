@@ -39,6 +39,8 @@ function GridManager(
         MPI.Init(; threadlevel)
     end
 
+    comm = MPI.Comm_dup(comm)
+
     p = P4estTypes.pxest(
         connectivity(coarsegrid);
         min_level = first(min_level),
