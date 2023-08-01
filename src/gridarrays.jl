@@ -321,6 +321,27 @@ function Base.fill!(a::GridArray{T}, x) where {T}
     return a
 end
 
+@kernel function fillghosts_kernel!(a, x, dims)
+    i = @index(Global)
+    @inbounds begin
+        I = CartesianIndices(a)[i]
+        if any(Tuple(I) .> dims)
+            a[i] = x
+        end
+    end
+end
+
+function fillghosts!(a::GridArray{T}, x) where {T}
+    b = viewwithghosts(a)
+    fillghosts_kernel!(get_backend(b), 256)(
+        b,
+        convert(T, x)::T,
+        b.dims,
+        ndrange = length(b),
+    )
+    return a
+end
+
 function Adapt.adapt_structure(to, a::GridArray{T,N,A,G,F,L}) where {T,N,A,G,F,L}
     newcomm = Adapt.adapt(to, a.comm)
     newdatawithghosts = Adapt.adapt(to, a.datawithghosts)

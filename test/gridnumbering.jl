@@ -84,7 +84,7 @@
         P4estTypes.refine!(forest; refine = (_, tid, _) -> tid == 4)
         P4estTypes.balance!(forest)
         ghost = P4estTypes.ghostlayer(forest)
-        nodes = P4estTypes.lnodes(forest; ghost, degree = 2)
+        nodes = P4estTypes.lnodes(forest; ghost, degree = 3)
         P4estTypes.expand!(ghost, forest, nodes)
 
         quadranttoglobalids = Raven.materializequadranttoglobalid(forest, ghost)
@@ -110,26 +110,15 @@
         #  7   8   9     9  11  10
         #  4   5   6     6  13  12
         #  1   2   3     3  15  14
-        (dtoc_degree_2_local, dtoc_degree_2_global) =
+        (dtoc_degree_3_local, dtoc_degree_3_global) =
             Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
-        @test dtoc_degree_2_local == dtoc_degree_2_global
-        @test dtoc_degree_2_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
+        @test dtoc_degree_3_local == dtoc_degree_3_global
+        @test dtoc_degree_3_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
 
-        dtoc = Raven.materializedtoc(
-            LobattoCell{Tuple{3,3},Float64,Array}(),
-            dtoc_degree_2_local,
-            dtoc_degree_2_global,
-        )
-        @test isisomorphic(dtoc, dtoc_degree_2_global)
-
-        nodes_degree_3 = P4estTypes.lnodes(forest; ghost, degree = 3)
         cell_degree_3 = LobattoCell{Tuple{4,4},Float64,Array}()
         dtoc_degree_3 =
-            Raven.materializedtoc(cell_degree_3, dtoc_degree_2_local, dtoc_degree_2_global)
-        GC.@preserve nodes_degree_3 begin
-            dtoc_degree_3_p4est = P4estTypes.unsafe_element_nodes(nodes_degree_3) .+ 0x1
-            @test isisomorphic(dtoc_degree_3, dtoc_degree_3_p4est)
-        end
+            Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
+        @test isisomorphic(dtoc_degree_3, dtoc_degree_3_global)
 
         ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
         @test ctod_degree_3 isa AbstractSparseMatrix
@@ -229,7 +218,7 @@
         P4estTypes.refine!(forest; refine = (_, tid, _) -> tid == 4)
         P4estTypes.balance!(forest)
         ghost = P4estTypes.ghostlayer(forest)
-        nodes = P4estTypes.lnodes(forest; ghost, degree = 2)
+        nodes = P4estTypes.lnodes(forest; ghost, degree = 3)
         P4estTypes.expand!(ghost, forest, nodes)
 
         quadranttoglobalids = Raven.materializequadranttoglobalid(forest, ghost)
@@ -243,24 +232,15 @@
         @test quadrantcommpattern.sendranks == []
         @test quadrantcommpattern.sendrankindices == []
 
-        (dtoc_degree_2_local, dtoc_degree_2_global) =
+        (dtoc_degree_3_local, dtoc_degree_3_global) =
             Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
-        @test dtoc_degree_2_local == dtoc_degree_2_global
-        @test dtoc_degree_2_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
-
-        cell_degree_2 = LobattoCell{Tuple{3,3,3},Float64,Array}()
-        dtoc_degree_2 =
-            Raven.materializedtoc(cell_degree_2, dtoc_degree_2_local, dtoc_degree_2_global)
-        @test isisomorphic(dtoc_degree_2, dtoc_degree_2_global)
+        @test dtoc_degree_3_local == dtoc_degree_3_global
+        @test dtoc_degree_3_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
 
         cell_degree_3 = LobattoCell{Tuple{4,4,4},Float64,Array}()
-        nodes_degree_3 = P4estTypes.lnodes(forest; ghost, degree = 3)
         dtoc_degree_3 =
-            Raven.materializedtoc(cell_degree_3, dtoc_degree_2_local, dtoc_degree_2_global)
-        GC.@preserve nodes_degree_3 begin
-            dtoc_degree_3_p4est = P4estTypes.unsafe_element_nodes(nodes_degree_3) .+ 0x1
-            @test isisomorphic(dtoc_degree_3, dtoc_degree_3_p4est)
-        end
+            Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
+        @test isisomorphic(dtoc_degree_3, dtoc_degree_3_global)
 
         ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
         @test ctod_degree_3 isa AbstractSparseMatrix
@@ -292,6 +272,166 @@
         GC.@preserve nodes begin
             @test Raven.materializequadranttofacecode(nodes) ==
                   P4estTypes.unsafe_face_code(nodes)
+        end
+    end
+
+
+    let
+        FT = Float64
+        AT = Array
+
+        N = 5
+        cell = LobattoCell{Tuple{N,N,N}}()
+
+        #    10-------11-------12
+        #    /|       /|       /|
+        #   / |      / |      / |
+        #  /  |     /  |     /  |
+        # 7--------8--------9   |
+        # |   4----|---5----|---6
+        # |  /     |  /     |  /
+        # | /      | /      | /
+        # |/       |/       |/
+        # 1--------2--------3
+        #
+        vertices = [
+            SVector{3,FT}(0, 0, 0), # 1
+            SVector{3,FT}(1, 0, 0), # 2
+            SVector{3,FT}(2, 0, 0), # 3
+            SVector{3,FT}(0, 1, 0), # 4
+            SVector{3,FT}(1, 1, 0), # 5
+            SVector{3,FT}(2, 1, 0), # 6
+            SVector{3,FT}(0, 0, 1), # 7
+            SVector{3,FT}(1, 0, 1), # 8
+            SVector{3,FT}(2, 0, 1), # 9
+            SVector{3,FT}(0, 1, 1), #10
+            SVector{3,FT}(1, 1, 1), #12
+            SVector{3,FT}(2, 1, 1), #13
+        ]
+
+        for cells in [
+            #     2--------6      55        4--------2
+            #    /|       /|               /|       /|
+            #   / |      / |              / |      / |
+            #  /  |     /  |             /  |     /  |
+            # 4--------8   |  59        8--------6   |
+            # |   1----|---5      54    |   3----|---1
+            # |  /     |  /             |  /     |  /
+            # | /      | /              | /      | /
+            # |/       |/               |/       |/
+            # 3--------7      58        7--------5
+            [(4, 10, 1, 7, 5, 11, 2, 8), (6, 12, 5, 11, 3, 9, 2, 8)],
+            #
+            #     2--------6      55        7--------5
+            #    /|       /|               /|       /|
+            #   / |      / |              / |      / |
+            #  /  |     /  |             /  |     /  |
+            # 4--------8   |  59        3--------1   |
+            # |   1----|---5      54    |   8----|---6
+            # |  /     |  /             |  /     |  /
+            # | /      | /              | /      | /
+            # |/       |/               |/       |/
+            # 3--------7      58        4--------2
+            [(4, 10, 1, 7, 5, 11, 2, 8), (9, 3, 8, 2, 12, 6, 11, 5)],
+            #
+            #     2--------6      55        8--------6
+            #    /|       /|               /|       /|
+            #   / |      / |              / |      / |
+            #  /  |     /  |             /  |     /  |
+            # 4--------8   |  59        7--------5   |
+            # |   1----|---5      54    |   4----|---2
+            # |  /     |  /             |  /     |  /
+            # | /      | /              | /      | /
+            # |/       |/               |/       |/
+            # 3--------7      58        3--------1
+            [(4, 10, 1, 7, 5, 11, 2, 8), (3, 6, 2, 5, 9, 12, 8, 11)],
+            #
+            #     2--------6      55        3--------1
+            #    /|       /|               /|       /|
+            #   / |      / |              / |      / |
+            #  /  |     /  |             /  |     /  |
+            # 4--------8   |  59        4--------2   |
+            # |   1----|---5      54    |   7----|---5
+            # |  /     |  /             |  /     |  /
+            # | /      | /              | /      | /
+            # |/       |/               |/       |/
+            # 3--------7      58        8--------6
+            [(4, 10, 1, 7, 5, 11, 2, 8), (12, 9, 11, 8, 6, 3, 5, 2)],
+            #
+            #     2--------6      55       5--------7
+            #    /|       /|              /|       /|
+            #   / |      / |             / |      / |
+            #  /  |     /  |            /  |     /  |
+            # 4--------8   |  59       6--------8   |
+            # |   1----|---5      54   |   1----|---3
+            # |  /     |  /            |  /     |  /
+            # | /      | /             | /      | /
+            # |/       |/              |/       |/
+            # 3--------7      58       2--------4
+            [(4, 10, 1, 7, 5, 11, 2, 8), (5, 2, 6, 3, 11, 8, 12, 9)],
+            #
+            #     2--------6      55       5--------1
+            #    /|       /|              /|       /|
+            #   / |      / |             / |      / |
+            #  /  |     /  |            /  |     /  |
+            # 4--------8   |  59       8--------3   |
+            # |   1----|---5      54   |   6----|---2
+            # |  /     |  /            |  /     |  /
+            # | /      | /             | /      | /
+            # |/       |/              |/       |/
+            # 3--------7      58       7--------4
+            [(4, 10, 1, 7, 5, 11, 2, 8), (12, 6, 9, 3, 11, 5, 8, 2)],
+            #
+            #     2--------6      55       8--------4
+            #    /|       /|              /|       /|
+            #   / |      / |             / |      / |
+            #  /  |     /  |            /  |     /  |
+            # 4--------8   |  59       6--------2   |
+            # |   1----|---5      54   |   7----|---3
+            # |  /     |  /            |  /     |  /
+            # | /      | /             | /      | /
+            # |/       |/              |/       |/
+            # 3--------7      58       5--------1
+            [(4, 10, 1, 7, 5, 11, 2, 8), (3, 9, 6, 12, 2, 8, 5, 11)],
+            #
+            #     2--------6      55       6--------2
+            #    /|       /|              /|       /|
+            #   / |      / |             / |      / |
+            #  /  |     /  |            /  |     /  |
+            # 4--------8   |  59       5--------1   |
+            # |   1----|---5      54   |   8----|---4
+            # |  /     |  /            |  /     |  /
+            # | /      | /             | /      | /
+            # |/       |/              |/       |/
+            # 3--------7      58       7--------3
+            [(4, 10, 1, 7, 5, 11, 2, 8), (9, 12, 3, 6, 8, 11, 2, 5)],
+        ]
+
+            cg = coarsegrid(vertices, cells)
+            gm = GridManager(cell, cg)
+
+            grid = generate(gm)
+
+            A = grid.continuoustodiscontinuous
+            pts = points(grid)
+            rows = rowvals(A)
+            vals = nonzeros(A)
+            _, n = size(A)
+
+            ncontinuous = 0
+            ndiscontinuous = 0
+            for j = 1:n
+                x = pts[rows[first(nzrange(A, j))]]
+                if length(nzrange(A, j)) > 0
+                    ncontinuous += 1
+                end
+                for ii in nzrange(A, j)
+                    ndiscontinuous += 1
+                    @test pts[rows[ii]] ≈ x
+                end
+            end
+            @test ncontinuous == 2N^3 - N^2
+            @test ndiscontinuous == 2N^3
         end
     end
 end
