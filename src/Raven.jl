@@ -38,6 +38,8 @@ export flatten, unflatten
 
 export brick, coarsegrid
 
+export AbaqusMeshImport
+
 export GridManager, generate
 export GridArray, components, sizewithghosts, viewwithghosts, parentwithghosts
 
@@ -54,6 +56,7 @@ include("cells.jl")
 include("lobattocells.jl")
 include("gausscells.jl")
 include("coarsegrids.jl")
+include("fileio.jl")
 include("communication.jl")
 include("grids.jl")
 include("gridmanager.jl")
