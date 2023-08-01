@@ -350,6 +350,12 @@ function generate(warp::Function, gm::GridManager)
     coarsegrid_warp = Raven.warp(coarsegrid(gm))
     points = warp.(coarsegrid_warp.(points))
 
+    # Fill the ghost layer with NaNs for debugging.  This helps us identify
+    # when unset values are accidentally used.
+    points.datawithghosts[:,:,:,:,last(size(points))+1:end] .= NaN
+    pcm = commmanager(eltype(points), comm(gm), nodecommpattern, 0)
+    share!(points, pcm)
+
     volumemetrics, surfacemetrics = materializemetrics(referencecell(gm), points)
 
     part = MPI.Comm_rank(comm(gm)) + 1
