@@ -34,6 +34,11 @@ function GridManager(
     min_level = 0,
     fill_uniform = true,
 )
+    if !MPI.Initialized()
+        threadlevel = usetriplebuffer(arraytype(referencecell)) ? :multiple : :serialized
+        MPI.Init(; threadlevel)
+    end
+
     p = P4estTypes.pxest(
         connectivity(coarsegrid);
         min_level = first(min_level),
