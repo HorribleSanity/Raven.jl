@@ -170,5 +170,14 @@ let
                 end
             end
         end
+
+        cp = nodecommpattern(grid)
+        commcells = communicatingcells(grid)
+        noncommcells = noncommunicatingcells(grid)
+        for i in cp.sendindices
+            q = fld1(i, length(cell))
+            @test q ∈ commcells
+        end
+        @test noncommcells == setdiff(0x1:numcells(grid), commcells)
     end
 end

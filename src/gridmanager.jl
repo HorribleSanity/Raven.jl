@@ -287,6 +287,14 @@ end
 
 materializequadranttofacecode(nodes) = copy(P4estTypes.unsafe_face_code(nodes))
 
+function materializequadrantcommlists(forest, quadrantcommpattern)
+    num_local = P4estTypes.lengthoflocalquadrants(forest)
+    communicatingcells = unique!(sort(quadrantcommpattern.sendindices))
+    noncommunicatingcells = setdiff(0x1:num_local, communicatingcells)
+
+    return (communicatingcells, noncommunicatingcells)
+end
+
 function generate(warp::Function, gm::GridManager)
     # Need to get integer coordinates of cells
 
@@ -326,6 +334,9 @@ function generate(warp::Function, gm::GridManager)
 
     quadranttofacecode = materializequadranttofacecode(nodes)
 
+    communicatingquadrants, noncommunicatingquadrants =
+        materializequadrantcommlists(forest(gm), quadrantcommpattern)
+
     # Send data to the device
     quadranttolevel = A(pin(A, quadranttolevel))
     quadranttotreeid = A(pin(A, quadranttotreeid))
@@ -335,6 +346,8 @@ function generate(warp::Function, gm::GridManager)
     nodecommpattern = Adapt.adapt(A, nodecommpattern)
     continuoustodiscontinuous = adaptsparse(A, continuoustodiscontinuous)
     discontinuoustocontinuous = Adapt.adapt(A, discontinuoustocontinuous)
+    communicatingquadrants = Adapt.adapt(A, communicatingquadrants)
+    noncommunicatingquadrants = Adapt.adapt(A, noncommunicatingquadrants)
 
     points = materializepoints(
         referencecell(gm),
@@ -380,5 +393,7 @@ function generate(warp::Function, gm::GridManager)
         nodecommpattern,
         continuoustodiscontinuous,
         discontinuoustocontinuous,
+        communicatingquadrants,
+        noncommunicatingquadrants,
     )
 end
