@@ -15,6 +15,8 @@ end
 
 kind(o::Orientation) = o.kind
 
+Base.zero(::Type{Orientation{N}}) where {N} = Orientation{N}(1)
+
 function orientindices(o::Orientation{2}, dims::Dims{1}, ::Bool = false)
     indices = (StepRange(1, Int8(1), dims[1]),)
 
