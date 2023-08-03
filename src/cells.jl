@@ -610,30 +610,6 @@ function materializepoints(
     return points
 end
 
-function _getdims(cellsize, dtoc_degree2_global, node, quad)
-    dims = ntuple(length(cellsize)) do n
-        # We use a StepRange here so that the return type is the same
-        # whether or not the dim gets reversed.
-        dim =
-            node[n] == 2 ? StepRange(2, Int8(1), cellsize[n] - 1) :
-            node[n] == 1 ? StepRange(1, Int8(1), 1) :
-            StepRange(cellsize[n], Int8(1), cellsize[n])
-
-        shift = ntuple(m -> m == n ? 1 : 0, length(cellsize))
-
-        # Flip the dimension to match the orientation of the degree 2 node numbering
-        if node[n] == 2 &&
-           dtoc_degree2_global[(node .+ shift)..., quad] <
-           dtoc_degree2_global[(node .- shift)..., quad]
-            dim = reverse(dim)
-        end
-
-        return dim
-    end
-
-    return dims
-end
-
 function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_global)
     cellsize = size(cell)
 
