@@ -147,7 +147,7 @@ let
 
         grid = generate(gm)
 
-        A = grid.continuoustodiscontinuous
+        A = continuoustodiscontinuous(grid)
         pts = points(grid, Val(true))
 
         rows = rowvals(A)
