@@ -75,20 +75,22 @@ function abaqusmeshimport(filename::String)
     FT = Float64
     IT = Int
     # Extract node coords
-    nodes = Vector{NTuple{dims,FT}}(undef, node_count)
+    nodes = Vector{SVector{dims,FT}}(undef, node_count)
     for nodeline in filelines[nodes_linenum+1:elements_linenum-1]
         temp_data = split(nodeline, ", ")
         nodenumber = parse(IT, temp_data[1])
-        nodes[nodenumber] = Tuple(parse.(FT, temp_data[2:dims+1]))
+        nodes[nodenumber] = SVector{dims,FT}(parse.(FT, temp_data[2:dims+1]))
     end
 
     # Extract element coords
+    # HOHQMesh uses right hand rule for node numbering. We need Z order perm will reorder
     nodes_per_element = (dims == 2) ? 4 : 8
+    perm = (dims == 2) ? [1, 2, 4, 3] : [1,2,4,3,5,6,8,7]
     connectivity = Vector{NTuple{nodes_per_element,IT}}(undef, element_count)
     for elementline in filelines[elements_linenum+1:curvature_linenum-1]
         temp_data = split(elementline, ", ")
         elementnumber = parse(IT, temp_data[1])
-        connectivity[elementnumber] = Tuple(parse.(FT, temp_data[2:end]))
+        connectivity[elementnumber] = Tuple(parse.(IT, temp_data[2:end]))[perm]
     end
 
     # Extract which edges are curved
@@ -96,7 +98,6 @@ function abaqusmeshimport(filename::String)
     faces_per_element = (dims == 2) ? 4 : 6
     face_iscurved = Vector{NTuple{faces_per_element,IT}}(undef, element_count)
     for i = 1:element_count
-        @assert connectivity[i] == Tuple(parse.(IT, split(filelines[scanningidx])[2:end])) "Unsupported: Element curvature data is out of order"
         scanningidx += 1
         face_iscurved[i] = Tuple(parse.(IT, split(filelines[scanningidx])[2:end]))
         scanningidx += sum(face_iscurved[i]) * (face_degree + 1)^(dims - 1) + 1
