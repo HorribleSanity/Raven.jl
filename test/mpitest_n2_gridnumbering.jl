@@ -70,20 +70,23 @@ let
         end
         @test noncommcells == setdiff(0x1:numcells(grid), commcells)
 
-        vmapM, vmapP, mapB = facemaps(grid)
-        @test isapprox(pts[vmapM[1]], pts[vmapP[1]])
-        @test isapprox(pts[vmapM[2]], pts[vmapP[2]])
+        fm = facemaps(grid)
+        @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
+        @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
 
-        for n in eachindex(mapB, vmapM)
+        for n in eachindex(fm.mapB, fm.vmapM)
             # Test that faces in mapB are on the boundary
             @test all(
-                isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapM[n][mapB[n]]])),
+                isapprox.(
+                    one(FT),
+                    map(x -> maximum(abs.(x)), pts[fm.vmapM[n][fm.mapB[n]]]),
+                ),
             )
 
             # Test that faces not in mapB are not on the boundary
             Nf = N^(ndims(cell) - 1)
-            mapBn = reshape(mapB[n], (Nf, :))
-            vmapMn = reshape(vmapM[n], (Nf, :))
+            mapBn = reshape(fm.mapB[n], (Nf, :))
+            vmapMn = reshape(fm.vmapM[n], (Nf, :))
             boundaryfaces = fld1.(mapBn, Nf)[1, :]
             nonboundaryfaces = setdiff(1:size(vmapMn, 2), boundaryfaces)
             for f in nonboundaryfaces
@@ -91,6 +94,24 @@ let
             end
         end
 
+        indicator =
+            map(tid -> (tid == 1 ? Raven.AdaptNone : Raven.AdaptRefine), trees(grid))
+        adapt!(gm, indicator)
+        grid = generate(gm)
+        fm = facemaps(grid)
+        tohalves = tohalves_1d(cell)
+        pts = points(grid, Val(true))
+        fgdims = ((2,), (1,))
+        for fg in eachindex(fm.vmapNC)
+            for i = 1:last(size(fm.vmapNC[fg]))
+                ppts = pts[fm.vmapNC[fg][:, 1, i]]
+                c1pts = pts[fm.vmapNC[fg][:, 2, i]]
+                c2pts = pts[fm.vmapNC[fg][:, 3, i]]
+
+                @assert isapprox(tohalves[fgdims[fg][1]][1] * ppts, c1pts)
+                @assert isapprox(tohalves[fgdims[fg][1]][2] * ppts, c2pts)
+            end
+        end
     end
 end
 
@@ -98,7 +119,7 @@ let
     FT = Float64
     AT = Array
 
-    N = 2
+    N = 3
     cell = LobattoCell{Tuple{N,N,N}}()
 
     #    10-------11-------12
@@ -264,28 +285,70 @@ let
         end
         @test noncommcells == setdiff(0x1:numcells(grid), commcells)
 
-        vmapM, vmapP, mapB = facemaps(grid)
-        @test isapprox(pts[vmapM[1]], pts[vmapP[1]])
-        @test isapprox(pts[vmapM[2]], pts[vmapP[2]])
-        @test isapprox(pts[vmapM[3]], pts[vmapP[3]])
+        fm = facemaps(grid)
+        @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
+        @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
+        @test isapprox(pts[fm.vmapM[3]], pts[fm.vmapP[3]])
 
-        @test all(isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapM[2][mapB[2]]])))
-        @test all(isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapM[3][mapB[3]]])))
+        @test all(
+            isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[fm.vmapM[2][fm.mapB[2]]])),
+        )
+        @test all(
+            isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[fm.vmapM[3][fm.mapB[3]]])),
+        )
 
-        for n in eachindex(mapB, vmapM)
+        for n in eachindex(fm.mapB, fm.vmapM)
             # Test that faces in mapB are on the boundary
             @test all(
-                isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapM[n][mapB[n]]])),
+                isapprox.(
+                    one(FT),
+                    map(x -> maximum(abs.(x)), pts[fm.vmapM[n][fm.mapB[n]]]),
+                ),
             )
 
             # Test that faces not in mapB are not on the boundary
             Nf = N^(ndims(cell) - 1)
-            mapBn = reshape(mapB[n], (Nf, :))
-            vmapMn = reshape(vmapM[n], (Nf, :))
+            mapBn = reshape(fm.mapB[n], (Nf, :))
+            vmapMn = reshape(fm.vmapM[n], (Nf, :))
             boundaryfaces = fld1.(mapBn, Nf)[1, :]
             nonboundaryfaces = setdiff(1:size(vmapMn, 2), boundaryfaces)
             for f in nonboundaryfaces
                 @test !all(isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapMn])))
+            end
+        end
+
+        indicator =
+            map(tid -> (tid == 1 ? Raven.AdaptNone : Raven.AdaptRefine), trees(grid))
+        adapt!(gm, indicator)
+        grid = generate(gm)
+        fm = facemaps(grid)
+        tohalves = tohalves_1d(cell)
+        pts = points(grid, Val(true))
+        fgdims = ((2, 3), (1, 3), (1, 2))
+        for fg in eachindex(fm.vmapNC)
+            for i = 1:last(size(fm.vmapNC[fg]))
+                ppts = pts[fm.vmapNC[fg][:, :, 1, i]]
+                c1pts = pts[fm.vmapNC[fg][:, :, 2, i]]
+                c2pts = pts[fm.vmapNC[fg][:, :, 3, i]]
+                c3pts = pts[fm.vmapNC[fg][:, :, 4, i]]
+                c4pts = pts[fm.vmapNC[fg][:, :, 5, i]]
+
+                @assert isapprox(
+                    tohalves[fgdims[fg][1]][1] * ppts * tohalves[fgdims[fg][2]][1]',
+                    c1pts,
+                )
+                @assert isapprox(
+                    tohalves[fgdims[fg][1]][2] * ppts * tohalves[fgdims[fg][2]][1]',
+                    c2pts,
+                )
+                @assert isapprox(
+                    tohalves[fgdims[fg][1]][1] * ppts * tohalves[fgdims[fg][2]][2]',
+                    c3pts,
+                )
+                @assert isapprox(
+                    tohalves[fgdims[fg][1]][2] * ppts * tohalves[fgdims[fg][2]][2]',
+                    c4pts,
+                )
             end
         end
     end

@@ -249,13 +249,12 @@ function grids_testsuite(AT, FT)
         @test sum(adapt(Array, wJ)) ≈ pi * R^2 * 4
 
         pts = points(grid)
-        vmapM, vmapP, _ = facemaps(grid)
+        fm = facemaps(grid)
 
         pts = Adapt.adapt(Array, pts)
-        vmapM = Adapt.adapt(Array, vmapM)
-        vmapP = Adapt.adapt(Array, vmapP)
-        @test isapprox(pts[vmapM[1]], pts[vmapP[1]])
-        @test isapprox(pts[vmapM[2]], pts[vmapP[2]])
+        fm = Adapt.adapt(Array, fm)
+        @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
+        @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
     end
 
     @testset "2D constant preserving" begin

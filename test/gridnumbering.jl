@@ -325,22 +325,24 @@
             @test ndiscontinuous == 2N^2
 
             pts = Adapt.adapt(Array, pts)
-            vmapM, vmapP, mapB = facemaps(grid)
-            vmapM = Adapt.adapt(Array, vmapM)
-            vmapP = Adapt.adapt(Array, vmapP)
-            @test isapprox(pts[vmapM[1]], pts[vmapP[1]])
-            @test isapprox(pts[vmapM[2]], pts[vmapP[2]])
+            fm = Adapt.adapt(Array, facemaps(grid))
 
-            for n in eachindex(mapB, vmapM)
+            @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
+            @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
+
+            for n in eachindex(fm.mapB, fm.vmapM)
                 # Test that faces in mapB are on the boundary
                 @test all(
-                    isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapM[n][mapB[n]]])),
+                    isapprox.(
+                        one(FT),
+                        map(x -> maximum(abs.(x)), pts[fm.vmapM[n][fm.mapB[n]]]),
+                    ),
                 )
 
                 # Test that faces not in mapB are not on the boundary
                 Nf = N^(ndims(cell) - 1)
-                mapBn = reshape(mapB[n], (Nf, :))
-                vmapMn = reshape(vmapM[n], (Nf, :))
+                mapBn = reshape(fm.mapB[n], (Nf, :))
+                vmapMn = reshape(fm.vmapM[n], (Nf, :))
                 boundaryfaces = fld1.(mapBn, Nf)[1, :]
                 nonboundaryfaces = setdiff(1:size(vmapMn, 2), boundaryfaces)
                 for f in nonboundaryfaces
@@ -508,23 +510,24 @@
             @test ndiscontinuous == 2N^3
 
             pts = Adapt.adapt(Array, pts)
-            vmapM, vmapP, mapB = facemaps(grid)
-            vmapM = Adapt.adapt(Array, vmapM)
-            vmapP = Adapt.adapt(Array, vmapP)
-            @test isapprox(pts[vmapM[1]], pts[vmapP[1]])
-            @test isapprox(pts[vmapM[2]], pts[vmapP[2]])
-            @test isapprox(pts[vmapM[3]], pts[vmapP[3]])
+            fm = Adapt.adapt(Array, facemaps(grid))
+            @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
+            @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
+            @test isapprox(pts[fm.vmapM[3]], pts[fm.vmapP[3]])
 
-            for n in eachindex(mapB, vmapM)
+            for n in eachindex(fm.mapB, fm.vmapM)
                 # Test that faces in mapB are on the boundary
                 @test all(
-                    isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapM[n][mapB[n]]])),
+                    isapprox.(
+                        one(FT),
+                        map(x -> maximum(abs.(x)), pts[fm.vmapM[n][fm.mapB[n]]]),
+                    ),
                 )
 
                 # Test that faces not in mapB are not on the boundary
                 Nf = N^(ndims(cell) - 1)
-                mapBn = reshape(mapB[n], (Nf, :))
-                vmapMn = reshape(vmapM[n], (Nf, :))
+                mapBn = reshape(fm.mapB[n], (Nf, :))
+                vmapMn = reshape(fm.vmapM[n], (Nf, :))
                 boundaryfaces = fld1.(mapBn, Nf)[1, :]
                 nonboundaryfaces = setdiff(1:size(vmapMn, 2), boundaryfaces)
                 for f in nonboundaryfaces

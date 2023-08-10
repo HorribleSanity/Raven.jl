@@ -325,6 +325,8 @@ function generate(warp::Function, gm::GridManager)
         ctod_degree3_local,
         dtoc_degree3_local,
         dtoc_degree3_global,
+        quadranttolevel,
+        quadranttoglobalid,
     )
 
     continuoustodiscontinuous = materializectod(discontinuoustocontinuous)

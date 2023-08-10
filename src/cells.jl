@@ -733,12 +733,30 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
     return dtoc
 end
 
+function _indextoface(i, degree3facelinearindices)
+    f = 0
+
+    for (ff, findices) in enumerate(degree3facelinearindices)
+        if i ∈ findices
+            f = ff
+            break
+        end
+    end
+
+    @assert f != 0
+
+    return f
+end
+
+
 function materializefacemaps(
     cell::LobattoCell,
     numcells_local,
     ctod_degree3_local,
     dtoc_degree3_local,
     dtoc_degree3_global,
+    quadranttolevel,
+    quadranttoglobalid,
 )
     numcells = last(size(dtoc_degree3_local))
     cellindices = LinearIndices(size(cell))
@@ -793,8 +811,8 @@ function materializefacemaps(
         zeros(Raven.Orientation{numchildfaces}, length(degree3faceindices), numcells)
     for q = 1:numcells
         for (f, faceindices) in enumerate(degree3faceindices)
-            edge = dtoc_degree3_global[faceindices..., q]
-            faceorientations[f, q] = orient(Val(numchildfaces), edge)
+            face = dtoc_degree3_global[faceindices..., q]
+            faceorientations[f, q] = orient(Val(numchildfaces), face)
         end
     end
 
@@ -816,6 +834,11 @@ function materializefacemaps(
     end
 
     numberofboundayfaces = zeros(Int, length(cellfacedims))
+    numberofnonconfaces = zeros(Int, length(cellfacedims))
+    uniquenonconnfaces = zeros(Int, length(cellfacedims))
+    noncongfacedict = ntuple(length(cellfacedims)) do _
+        Dict{Vector{eltype(dtoc_degree3_global)},Int}()
+    end
     for q = 1:numcells_local
         for (f, faceindices) in enumerate(degree3faceindices)
             fg, _ = fldmod1(f, 2)
@@ -824,6 +847,18 @@ function materializefacemaps(
 
             if kind == 1
                 numberofboundayfaces[fg] += 1
+            elseif kind == 1 + numchildfaces
+                # Get the canonical orientation of the global face indices
+                gface = dtoc_degree3_global[faceindices..., q]
+                o = faceorientations[f, q]
+                oindices = orientindices(o, size(gface))
+                gface = gface[oindices]
+
+                get!(noncongfacedict[fg], vec(gface)) do
+                    uniquenonconnfaces[fg] += 1
+                end
+
+                numberofnonconfaces[fg] += 1
             end
         end
     end
@@ -832,12 +867,30 @@ function materializefacemaps(
         zeros(Int, cellfacedims[n]..., numberofboundayfaces[n])
     end
 
+    vmapNC = ntuple(length(cellfacedims)) do n
+        zeros(Int, cellfacedims[n]..., 1 + numchildfaces, uniquenonconnfaces[n])
+    end
+
+    ncids = ntuple(length(cellfacedims)) do n
+        zeros(Int, numberofnonconfaces[n])
+    end
+
+    nctypes = ntuple(length(cellfacedims)) do n
+        zeros(Int8, numberofnonconfaces[n])
+    end
+
+    ncfacegroups = ntuple(length(cellfacedims)) do n
+        zeros(Int8, 2, uniquenonconnfaces[n])
+    end
+
+
     boundayface = zeros(Int, length(cellfacedims))
+    nonconface = zeros(Int, length(cellfacedims))
     rows = rowvals(ctod_degree3_local)
     for q = 1:numcells_local
-        for (f, faceindices) in enumerate(degree3faceindices)
+        for (f, degree3faceindices) in enumerate(degree3faceindices)
             fg, fn = fldmod1(f, 2)
-            face = dtoc_degree3_local[faceindices..., q]
+            face = dtoc_degree3_local[degree3faceindices..., q]
             neighborsrange = nzrange(ctod_degree3_local, face[1])
             kind = length(neighborsrange)
 
@@ -859,12 +912,7 @@ function materializefacemaps(
                 for ii in neighborsrange
                     pq, pi = fldmod1(rows[ii], 4^ndims(cell))
                     if pq != q
-                        for (ff, findices) in enumerate(degree3facelinearindices)
-                            if pi ∈ findices
-                                nf = ff
-                                break
-                            end
-                        end
+                        nf = _indextoface(pi, degree3facelinearindices)
                         nq = pq
                         break
                     end
@@ -890,16 +938,82 @@ function materializefacemaps(
             else
                 # non-conforming face
                 @assert kind == 1 + numchildfaces
+
+                nonconface[fg] += 1
+
                 # For now just mark the neighbor as the face itself.  This is the same
                 # as for the boundary cells.  Should we do something different?
                 for j in CartesianIndices(cellfacedims[fg])
                     vmapP[fg][j, fn, q] = vmapM[fg][j, fn, q]
                 end
+
+                o = faceorientations[f, q]
+                gface = dtoc_degree3_global[degree3faceindices..., q]
+                oindices = orientindices(o, size(gface))
+                gface = gface[oindices]
+                ncid = noncongfacedict[fg][vec(gface)]
+                ncids[fg][nonconface[fg]] = ncid
+
+                # compute global quadrant ids that participate in the nonconforming interface
+                qs = fld1.(rows[neighborsrange], 4^ndims(cell))
+                fs = map(
+                    x -> _indextoface(x, degree3facelinearindices),
+                    mod1.(rows[neighborsrange], 4^ndims(cell)),
+                )
+
+                # use level to figure out which ones are the smaller ones
+                ls = quadranttolevel[qs]
+                childlevel = maximum(ls)
+
+                cids = findall(==(childlevel), ls)
+                pids = findall(==(childlevel - 1), ls)
+
+                @assert length(cids) == numchildfaces
+                @assert length(pids) == 1
+
+                childquadrants = qs[cids]
+                childquadrants =
+                    childquadrants[sortperm(quadranttoglobalid[childquadrants])]
+                parentquadrant = first(qs[pids])
+
+                # use orientation to transform the elements order
+                childface = fs[first(cids)]
+                childorientation = faceorientations[childface, first(childquadrants)]
+                coindices = orientindices(childorientation, size(gface))
+                childquadrants = reshape(childquadrants, size(gface))[coindices]
+                nctype = if q == parentquadrant
+                    1
+                else
+                    findfirst(==(q), vec(childquadrants)) + 1
+                end
+                nctypes[fg][nonconface[fg]] = nctype
+
+                if vmapNC[fg][ntuple((_ -> 1), ndims(cell) - 1)..., 1, ncid] == 0
+                    # fill the non-conforming group
+                    parentface = fs[first(pids)]
+                    parentorientation = faceorientations[parentface, parentquadrant]
+                    childfaceindices = orientindices(childorientation, cellfacedims[fg])
+                    parentfaceindices = orientindices(parentorientation, cellfacedims[fg])
+                    cfg = fld1(childface, 2)
+                    pfg = fld1(parentface, 2)
+                    ncfacegroups[fg][1, ncid] = pfg
+                    ncfacegroups[fg][2, ncid] = cfg
+                    for j in CartesianIndices(cellfacedims[fg])
+                        vmapNC[fg][j, 1, ncid] =
+                            cellfaceindices[parentface][parentfaceindices[j]] +
+                            (parentquadrant - 1) * length(cell)
+                        for c = 1:numchildfaces
+                            vmapNC[fg][j, c+1, ncid] =
+                                cellfaceindices[childface][childfaceindices[j]] +
+                                (childquadrants[c] - 1) * length(cell)
+                        end
+                    end
+                end
             end
         end
     end
 
-    return (; vmapM, vmapP, mapB)
+    return (; vmapM, vmapP, mapB, vmapNC, ncfacegroups, nctypes, ncids)
 end
 
 function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern)
