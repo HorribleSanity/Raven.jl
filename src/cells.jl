@@ -815,6 +815,24 @@ function materializefacemaps(
         zeros(Int, cellfacedims[n]..., 2, numcells_local)
     end
 
+    numberofboundayfaces = zeros(Int, length(cellfacedims))
+    for q = 1:numcells_local
+        for (f, faceindices) in enumerate(degree3faceindices)
+            fg, _ = fldmod1(f, 2)
+            face = dtoc_degree3_local[faceindices..., q]
+            kind = length(nzrange(ctod_degree3_local, face[1]))
+
+            if kind == 1
+                numberofboundayfaces[fg] += 1
+            end
+        end
+    end
+
+    mapB = ntuple(length(cellfacedims)) do n
+        zeros(Int, cellfacedims[n]..., numberofboundayfaces[n])
+    end
+
+    boundayface = zeros(Int, length(cellfacedims))
     rows = rowvals(ctod_degree3_local)
     for q = 1:numcells_local
         for (f, faceindices) in enumerate(degree3faceindices)
@@ -824,9 +842,15 @@ function materializefacemaps(
             kind = length(neighborsrange)
 
             if kind == 1
+                li = LinearIndices(vmapM[fg])
                 # boundary cell
                 for j in CartesianIndices(cellfacedims[fg])
                     vmapP[fg][j, fn, q] = vmapM[fg][j, fn, q]
+                end
+
+                boundayface[fg] += 1
+                for j in CartesianIndices(cellfacedims[fg])
+                    mapB[fg][j, boundayface[fg]] = li[j, fn, q]
                 end
             elseif kind == 2
                 # conforming face
@@ -875,7 +899,7 @@ function materializefacemaps(
         end
     end
 
-    return (; vmapM, vmapP)
+    return (; vmapM, vmapP, mapB)
 end
 
 function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern)

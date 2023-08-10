@@ -290,12 +290,12 @@
         # 1--------2--------3
 
         vertices = [
-            SVector{2,FT}(0, 0), # 1
-            SVector{2,FT}(1, 0), # 2
-            SVector{2,FT}(2, 0), # 3
-            SVector{2,FT}(0, 1), # 4
-            SVector{2,FT}(1, 1), # 5
-            SVector{2,FT}(2, 1), # 6
+            SVector{2,FT}(-1, -1), # 1
+            SVector{2,FT}(0, -1),  # 2
+            SVector{2,FT}(1, -1),  # 3
+            SVector{2,FT}(-1, 1),  # 4
+            SVector{2,FT}(0, 1),   # 5
+            SVector{2,FT}(1, 1),   # 6
         ]
 
         for cells in [[(1, 2, 4, 5), (2, 3, 5, 6)], [(1, 2, 4, 5), (5, 6, 2, 3)]]
@@ -325,11 +325,28 @@
             @test ndiscontinuous == 2N^2
 
             pts = Adapt.adapt(Array, pts)
-            fmapM, fmapP = facemaps(grid)
-            fmapM = Adapt.adapt(Array, fmapM)
-            fmapP = Adapt.adapt(Array, fmapP)
-            @test isapprox(pts[fmapM[1]], pts[fmapP[1]])
-            @test isapprox(pts[fmapM[2]], pts[fmapP[2]])
+            vmapM, vmapP, mapB = facemaps(grid)
+            vmapM = Adapt.adapt(Array, vmapM)
+            vmapP = Adapt.adapt(Array, vmapP)
+            @test isapprox(pts[vmapM[1]], pts[vmapP[1]])
+            @test isapprox(pts[vmapM[2]], pts[vmapP[2]])
+
+            for n in eachindex(mapB, vmapM)
+                # Test that faces in mapB are on the boundary
+                @test all(
+                    isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapM[n][mapB[n]]])),
+                )
+
+                # Test that faces not in mapB are not on the boundary
+                Nf = N^(ndims(cell) - 1)
+                mapBn = reshape(mapB[n], (Nf, :))
+                vmapMn = reshape(vmapM[n], (Nf, :))
+                boundaryfaces = fld1.(mapBn, Nf)[1, :]
+                nonboundaryfaces = setdiff(1:size(vmapMn, 2), boundaryfaces)
+                for f in nonboundaryfaces
+                    @test !all(isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapMn])))
+                end
+            end
         end
     end
 
@@ -352,18 +369,18 @@
         # 1--------2--------3
         #
         vertices = [
-            SVector{3,FT}(0, 0, 0), # 1
-            SVector{3,FT}(1, 0, 0), # 2
-            SVector{3,FT}(2, 0, 0), # 3
-            SVector{3,FT}(0, 1, 0), # 4
-            SVector{3,FT}(1, 1, 0), # 5
-            SVector{3,FT}(2, 1, 0), # 6
-            SVector{3,FT}(0, 0, 1), # 7
-            SVector{3,FT}(1, 0, 1), # 8
-            SVector{3,FT}(2, 0, 1), # 9
-            SVector{3,FT}(0, 1, 1), #10
-            SVector{3,FT}(1, 1, 1), #12
-            SVector{3,FT}(2, 1, 1), #13
+            SVector{3,FT}(-1, -1, -1), # 1
+            SVector{3,FT}(0, -1, -1),  # 2
+            SVector{3,FT}(1, -1, -1),  # 3
+            SVector{3,FT}(-1, 1, -1),  # 4
+            SVector{3,FT}(0, 1, -1),   # 5
+            SVector{3,FT}(1, 1, -1),   # 6
+            SVector{3,FT}(-1, -1, 1),  # 7
+            SVector{3,FT}(0, -1, 1),   # 8
+            SVector{3,FT}(1, -1, 1),   # 9
+            SVector{3,FT}(-1, 1, 1),   #10
+            SVector{3,FT}(0, 1, 1),    #12
+            SVector{3,FT}(1, 1, 1),    #13
         ]
 
         for cells in [
@@ -491,12 +508,29 @@
             @test ndiscontinuous == 2N^3
 
             pts = Adapt.adapt(Array, pts)
-            fmapM, fmapP = facemaps(grid)
-            fmapM = Adapt.adapt(Array, fmapM)
-            fmapP = Adapt.adapt(Array, fmapP)
-            @test isapprox(pts[fmapM[1]], pts[fmapP[1]])
-            @test isapprox(pts[fmapM[2]], pts[fmapP[2]])
-            @test isapprox(pts[fmapM[3]], pts[fmapP[3]])
+            vmapM, vmapP, mapB = facemaps(grid)
+            vmapM = Adapt.adapt(Array, vmapM)
+            vmapP = Adapt.adapt(Array, vmapP)
+            @test isapprox(pts[vmapM[1]], pts[vmapP[1]])
+            @test isapprox(pts[vmapM[2]], pts[vmapP[2]])
+            @test isapprox(pts[vmapM[3]], pts[vmapP[3]])
+
+            for n in eachindex(mapB, vmapM)
+                # Test that faces in mapB are on the boundary
+                @test all(
+                    isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapM[n][mapB[n]]])),
+                )
+
+                # Test that faces not in mapB are not on the boundary
+                Nf = N^(ndims(cell) - 1)
+                mapBn = reshape(mapB[n], (Nf, :))
+                vmapMn = reshape(vmapM[n], (Nf, :))
+                boundaryfaces = fld1.(mapBn, Nf)[1, :]
+                nonboundaryfaces = setdiff(1:size(vmapMn, 2), boundaryfaces)
+                for f in nonboundaryfaces
+                    @test !all(isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapMn])))
+                end
+            end
         end
     end
 end
