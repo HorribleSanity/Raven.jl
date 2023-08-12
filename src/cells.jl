@@ -613,120 +613,123 @@ end
 function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_global)
     cellsize = size(cell)
 
-    # Compute the offsets for the cell node numbering
-    offsets = zeros(Int, maximum(dtoc_degree3_local) + 1)
-    for i in eachindex(IndexCartesian(), dtoc_degree3_local)
-        l = dtoc_degree3_local[i]
-        I = Tuple(i)
-        node = I[1:end-1]
-
-        if 3 ∈ node
-            # These points are just for orientation
-            continue
-        end
-
-        # compute the cell dofs for the corner, edge, face or volume identified by node.
-        # This is an exclusive count, so the number of dofs in the volume do not include
-        # the ones that are also on the faces, edges, or corners.
-        ds = ntuple(length(node)) do n
-            m = node[n]
-            if m == 2
-                d = cellsize[n] - 2
-            else
-                d = 1
-            end
-            return d
-        end
-        # is this needed???
-        if offsets[l+1] == 0
-            offsets[l+1] = prod(ds)
-        end
-    end
-    cumsum!(offsets, offsets)
-
-    for i in eachindex(IndexCartesian(), dtoc_degree3_local)
-        l = dtoc_degree3_local[i]
-        I = Tuple(i)
-        node = I[1:end-1]
-        quad = I[end]
-
-        if 3 ∈ node
-            offset_node = map(x -> x == 3 ? 2 : x, node)
-            offsets[l] = offsets[dtoc_degree3_local[offset_node..., quad]]
-        end
-    end
-
     dtoc = zeros(Int, cellsize..., last(size(dtoc_degree3_local)))
-    for i in eachindex(IndexCartesian(), dtoc_degree3_local)
-        l = dtoc_degree3_local[i]
-        offset = offsets[l]
-        I = Tuple(i)
-        node = I[1:end-1]
-        quad = I[end]
 
-        # These points are just for orientation they are not associated
-        # with any dofs.
-        if 3 ∈ node
-            continue
+    if length(dtoc_degree3_global) > 0
+        # Compute the offsets for the cell node numbering
+        offsets = zeros(Int, maximum(dtoc_degree3_local) + 1)
+        for i in eachindex(IndexCartesian(), dtoc_degree3_local)
+            l = dtoc_degree3_local[i]
+            I = Tuple(i)
+            node = I[1:end-1]
+
+            if 3 ∈ node
+                # These points are just for orientation
+                continue
+            end
+
+            # compute the cell dofs for the corner, edge, face or volume identified by node.
+            # This is an exclusive count, so the number of dofs in the volume do not include
+            # the ones that are also on the faces, edges, or corners.
+            ds = ntuple(length(node)) do n
+                m = node[n]
+                if m == 2
+                    d = cellsize[n] - 2
+                else
+                    d = 1
+                end
+                return d
+            end
+            # is this needed???
+            if offsets[l+1] == 0
+                offsets[l+1] = prod(ds)
+            end
+        end
+        cumsum!(offsets, offsets)
+
+        for i in eachindex(IndexCartesian(), dtoc_degree3_local)
+            l = dtoc_degree3_local[i]
+            I = Tuple(i)
+            node = I[1:end-1]
+            quad = I[end]
+
+            if 3 ∈ node
+                offset_node = map(x -> x == 3 ? 2 : x, node)
+                offsets[l] = offsets[dtoc_degree3_local[offset_node..., quad]]
+            end
         end
 
-        twos = findall(==(2), node)
-        numtwos = length(twos)
+        for i in eachindex(IndexCartesian(), dtoc_degree3_local)
+            l = dtoc_degree3_local[i]
+            offset = offsets[l]
+            I = Tuple(i)
+            node = I[1:end-1]
+            quad = I[end]
 
-        dims = ntuple(length(cellsize)) do n
-            # We use a StepRange here so that the return type is the same
-            # whether or not the dim gets reversed.
-            dim =
-                node[n] == 2 ? StepRange(2, Int8(1), cellsize[n] - 1) :
-                node[n] == 1 ? StepRange(1, Int8(1), 1) :
-                StepRange(cellsize[n], Int8(1), cellsize[n])
+            # These points are just for orientation they are not associated
+            # with any dofs.
+            if 3 ∈ node
+                continue
+            end
 
-            return dim
-        end
+            twos = findall(==(2), node)
+            numtwos = length(twos)
 
-        unrotatedindices = CartesianIndices(dims)
+            dims = ntuple(length(cellsize)) do n
+                # We use a StepRange here so that the return type is the same
+                # whether or not the dim gets reversed.
+                dim =
+                    node[n] == 2 ? StepRange(2, Int8(1), cellsize[n] - 1) :
+                    node[n] == 1 ? StepRange(1, Int8(1), 1) :
+                    StepRange(cellsize[n], Int8(1), cellsize[n])
 
-        if numtwos == 0
-            indices = unrotatedindices
-        elseif numtwos == 1
-            # edge
-            shift = ntuple(m -> m == twos[1] ? 1 : 0, length(cellsize))
-            # get canonical orientation of the edge
-            M = SA[
-                dtoc_degree3_global[node..., quad],
-                dtoc_degree3_global[(node .+ shift)..., quad],
-            ]
-            p = orient(Val(2), M)
-            edgedims = (cellsize[twos[1]] - 2,)
+                return dim
+            end
 
-            edgeindices = orientindices(p, edgedims)
-            indices = unrotatedindices[LinearIndices(edgedims)[edgeindices]]
+            unrotatedindices = CartesianIndices(dims)
 
-        elseif numtwos == 2
-            # face
-            ashift = ntuple(m -> m == twos[1] ? 1 : 0, length(cellsize))
-            bshift = ntuple(m -> m == twos[2] ? 1 : 0, length(cellsize))
-            abshift = ashift .+ bshift
-            M = SA[
-                dtoc_degree3_global[node..., quad] dtoc_degree3_global[(node .+ bshift)..., quad]
-                dtoc_degree3_global[(node .+ ashift)..., quad] dtoc_degree3_global[(node .+ abshift)..., quad]
-            ]
-            # get canonical orientation of the edge
-            p = orient(Val(4), M)
+            if numtwos == 0
+                indices = unrotatedindices
+            elseif numtwos == 1
+                # edge
+                shift = ntuple(m -> m == twos[1] ? 1 : 0, length(cellsize))
+                # get canonical orientation of the edge
+                M = SA[
+                    dtoc_degree3_global[node..., quad],
+                    dtoc_degree3_global[(node .+ shift)..., quad],
+                ]
+                p = orient(Val(2), M)
+                edgedims = (cellsize[twos[1]] - 2,)
 
-            facedims = (cellsize[twos[1]] - 2, cellsize[twos[2]] - 2)
-            faceindices = orientindices(p, facedims)
+                edgeindices = orientindices(p, edgedims)
+                indices = unrotatedindices[LinearIndices(edgedims)[edgeindices]]
 
-            indices = unrotatedindices[LinearIndices(facedims)[faceindices]]
-        elseif numtwos == 3
-            # volume
-            indices = unrotatedindices
-        else
-            error("Not implemented")
-        end
+            elseif numtwos == 2
+                # face
+                ashift = ntuple(m -> m == twos[1] ? 1 : 0, length(cellsize))
+                bshift = ntuple(m -> m == twos[2] ? 1 : 0, length(cellsize))
+                abshift = ashift .+ bshift
+                M = SA[
+                    dtoc_degree3_global[node..., quad] dtoc_degree3_global[(node .+ bshift)..., quad]
+                    dtoc_degree3_global[(node .+ ashift)..., quad] dtoc_degree3_global[(node .+ abshift)..., quad]
+                ]
+                # get canonical orientation of the edge
+                p = orient(Val(4), M)
 
-        for (j, k) in enumerate(indices)
-            dtoc[k, quad] = j + offset
+                facedims = (cellsize[twos[1]] - 2, cellsize[twos[2]] - 2)
+                faceindices = orientindices(p, facedims)
+
+                indices = unrotatedindices[LinearIndices(facedims)[faceindices]]
+            elseif numtwos == 3
+                # volume
+                indices = unrotatedindices
+            else
+                error("Not implemented")
+            end
+
+            for (j, k) in enumerate(indices)
+                dtoc[k, quad] = j + offset
+            end
         end
     end
 
