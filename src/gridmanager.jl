@@ -125,6 +125,7 @@ function adapt!(gm::GridManager, flags)
 end
 
 generate(gm::GridManager) = generate(identity, gm)
+generate(gm::GridManager, abaqus::AbaqusMeshImport) = generate(identity, gm, abaqus)
 
 function _offsets_to_ranges(offsets; by = identity)
     indices = Cint[]
@@ -432,5 +433,128 @@ function generate(warp::Function, gm::GridManager)
         communicatingquadrants,
         noncommunicatingquadrants,
         facemaps,
+    )
+end
+
+
+function materializequadranttointerpolation(abaqus::AbaqusMeshImport)
+    dims = length(abaqus.face_interpolation[1])
+    nodesperface = (abaqus.face_degree + 1)^(dims-1)
+    numberofelements = length(abaqus.face_iscurved)
+    facesperelement = length(abaqus.face_iscurved[1])
+    quadranttointerpolation = Array{Int32}(undef, numberofelements, facesperelement)
+    idx = 1
+    for element in 1:numberofelements
+        for face in 1:facesperelement
+            if abaqus.face_iscurved[element][face] == 1
+                quadranttointerpolation[element, face] = idx
+                idx += nodesperface
+            else
+                quadranttointerpolation[element, face] = 0
+            end
+        end
+    end
+    
+    return quadranttointerpolation
+end
+
+function generate(warp::Function, gm::GridManager, abaqus::AbaqusMeshImport)
+    # Need to get integer coordinates of cells
+
+    A = arraytype(referencecell(gm))
+
+    ghost = P4estTypes.ghostlayer(forest(gm))
+    nodes = P4estTypes.lnodes(forest(gm); ghost, degree = 2)
+    P4estTypes.expand!(ghost, forest(gm), nodes)
+
+    (quadranttolevel, quadranttotreeid, quadranttocoordinate) =
+        materializequadrantdata(forest(gm), ghost)
+
+    quadranttoglobalid = materializequadranttoglobalid(forest(gm), ghost)
+
+    quadrantcommpattern = materializequadrantcommpattern(forest(gm), ghost)
+
+    (dtoc_degree2_local, dtoc_degree2_global) =
+        materializedtoc(forest(gm), ghost, nodes, quadrantcommpattern, comm(gm))
+
+    discontinuoustocontinuous =
+        materializedtoc(referencecell(gm), dtoc_degree2_local, dtoc_degree2_global)
+
+    continuoustodiscontinuous = materializectod(discontinuoustocontinuous)
+
+    nodecommpattern = materializenodecommpattern(
+        referencecell(gm),
+        continuoustodiscontinuous,
+        quadrantcommpattern,
+    )
+
+    parentnodes = materializeparentnodes(
+        referencecell(gm),
+        continuoustodiscontinuous,
+        quadranttoglobalid,
+        quadranttolevel,
+    )
+
+    quadranttofacecode = materializequadranttofacecode(nodes)
+
+    faceinterpolation = interpolation(abaqus)
+    faceinterpolation = collect(transpose(reinterpret(reshape,eltype(eltype(faceinterpolation)),faceinterpolation)))
+    quadranttointerpolation = materializequadranttointerpolation(abaqus)
+
+    # Send data to the device
+    quadranttolevel = A(pin(A, quadranttolevel))
+    quadranttotreeid = A(pin(A, quadranttotreeid))
+    quadranttocoordinate = A(pin(A, quadranttocoordinate))
+    quadranttofacecode = A(pin(A, quadranttofacecode))
+    faceinterpolation = A(pin(A, faceinterpolation))
+    quadranttointerpolation = A(pin(A, quadranttointerpolation))
+    parentnodes = A(pin(A, parentnodes))
+    nodecommpattern = Adapt.adapt(A, nodecommpattern)
+    continuoustodiscontinuous = adaptsparse(A, continuoustodiscontinuous)
+    discontinuoustocontinuous = Adapt.adapt(A, discontinuoustocontinuous)
+
+    points = materializepoints(
+        referencecell(gm),
+        coarsegridcells(gm),
+        coarsegridvertices(gm),
+        interpolationdegree(abaqus),
+        faceinterpolation,
+        quadranttointerpolation,
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        forest(gm),
+        comm(gm),
+    )
+
+    coarsegrid_warp = Raven.warp(coarsegrid(gm))
+    points = warp.(coarsegrid_warp.(points))
+
+    volumemetrics, surfacemetrics = materializemetrics(referencecell(gm), points)
+
+    part = MPI.Comm_rank(comm(gm)) + 1
+    nparts = MPI.Comm_size(comm(gm))
+    GC.@preserve gm begin
+        global_first_quadrant = P4estTypes.unsafe_global_first_quadrant(forest(gm))
+        offset = global_first_quadrant[part]
+    end
+
+    return Grid(
+        comm(gm),
+        part,
+        nparts,
+        referencecell(gm),
+        offset,
+        length(gm),
+        points,
+        volumemetrics,
+        surfacemetrics,
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttofacecode,
+        parentnodes,
+        nodecommpattern,
+        continuoustodiscontinuous,
+        discontinuoustocontinuous,
     )
 end

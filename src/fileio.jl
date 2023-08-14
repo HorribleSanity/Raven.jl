@@ -12,6 +12,8 @@ end
 
 dimensions(a::AbaqusMeshImport) = length(a.nodes[1])
 interpolation_degree(a::AbaqusMeshImport) = a.face_degree
+interpolation(a::AbaqusMeshImport) = a.face_interpolation
+interpolationdegree(a::AbaqusMeshImport) = a.face_degree
 
 function abaqusmeshimport(
     nodes,

@@ -365,6 +365,199 @@ function materializepoints(
     referencecell::LobattoQuad,
     coarsegridcells,
     coarsegridvertices,
+    interpolation_degree,
+    faceinterpolation,
+    quadranttointerpolation,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    forest,
+    comm,
+)
+    r = vec.(points_1d(referencecell))
+
+    FT = floattype(referencecell)
+    AT = arraytype(referencecell)
+    N = (interpolation_degree + 1, interpolation_degree + 1)
+    interp_r = vec.(points_1d(LobattoCell{Tuple{N...},FT,AT}()))
+
+    Q = max(512 ÷ prod(length.(r)), 1)
+
+    IntType = typeof(length(r))
+    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    points = GridArray{eltype(coarsegridvertices)}(
+        undef,
+        arraytype(referencecell),
+        (length.(r)..., num_local),
+        (length.(r)..., length(quadranttolevel)),
+        comm,
+        false,
+        length(r) + 1,
+    )
+
+    backend = get_backend(points)
+
+    kernel! = curvedquadpoints!(backend, (length.(r)..., Q))
+    kernel!(
+        points,
+        r...,
+        interp_r...,
+        coarsegridcells,
+        coarsegridvertices,
+        interpolation_degree,
+        faceinterpolation,
+        quadranttointerpolation,
+        length(quadranttolevel),
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        Val.(length.(r))...,
+        Val(Q);
+        ndrange=size(points)
+    )
+
+    return points
+end
+
+@inline function interp(t, n, y, offset, degree, xory)
+    total = zero(t)
+    t = 2 * t - 1
+    for i in 1:degree+1
+        li = one(t)
+        for j in 1:degree+1
+            if i != j
+                li *= (t - n[j]) / (n[i] - n[j])
+            end
+        end
+        total += y[offset+i-1, xory] * li
+    end
+    return total
+end
+
+@kernel function curvedquadpoints!(
+    points,
+    ri,
+    si,
+    interp_r,
+    interp_s,
+    coarsegridcells,
+    coarsegridvertices,
+    interpolation_degree,
+    faceinterpolation,
+    quadranttointerpolation,
+    numberofquadrants,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    ::Val{I},
+    ::Val{J},
+    ::Val{Q},
+) where {I,J,Q}
+    i, j, q1 = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(eltype(points))
+    treecoords = @localmem eltype(points) (2, 2, Q)
+    rl = @localmem eltype(ri) (I,)
+    sl = @localmem eltype(si) (J,)
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            if j == 1 && q1 == 1
+                rl[i] = ri[i]
+            end
+
+            if i == 1 && q1 == 1
+                sl[j] = si[j]
+            end
+
+            if i ≤ 2 && j ≤ 2
+                treeid = quadranttotreeid[q]
+                vids = coarsegridcells[treeid]
+                treecoords[i, j, q1] = coarsegridvertices[vids[i+2*(j-1)]]
+            end
+        end
+    end
+
+    @synchronize
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            treeid = quadranttotreeid[q]
+            level = quadranttolevel[q]
+            ix = quadranttocoordinate[q, 1]
+            iy = quadranttocoordinate[q, 2]
+
+            P4EST_MAXLEVEL = 30
+            P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
+
+            cr = T(ix) / P4EST_ROOT_LEN
+            cs = T(iy) / P4EST_ROOT_LEN
+
+            h = one(T) / (1 << (level + 1))
+
+            r = cr + h * (rl[i] + 1)
+            s = cs + h * (sl[j] + 1)
+
+            interp_idx1 = quadranttointerpolation[treeid, 1]
+            interp_idx2 = quadranttointerpolation[treeid, 2]
+            interp_idx3 = quadranttointerpolation[treeid, 3]
+            interp_idx4 = quadranttointerpolation[treeid, 4]
+
+            c1 = treecoords[1, 1, q1]
+            c2 = treecoords[2, 1, q1]
+            c3 = treecoords[1, 2, q1]
+            c4 = treecoords[2, 2, q1]
+
+            if interp_idx1 != 0
+                f1x = interp(r, interp_r, faceinterpolation, interp_idx1, interpolation_degree, 1)
+                f1y = interp(r, interp_r, faceinterpolation, interp_idx1, interpolation_degree, 2)
+            else
+                f1x = c1[1] + r * (c2[1] - c1[1])
+                f1y = c1[2] + r * (c2[2] - c1[2])
+            end
+
+            if interp_idx2 != 0
+                f2x = interp(s, interp_s, faceinterpolation, interp_idx2, interpolation_degree, 1)
+                f2y = interp(s, interp_s, faceinterpolation, interp_idx2, interpolation_degree, 2)
+            else
+                f2x = c2[1] + s * (c4[1] - c2[1])
+                f2y = c2[2] + s * (c4[2] - c2[2])
+            end
+
+            if interp_idx3 != 0
+                f3x = interp(r, interp_r, faceinterpolation, interp_idx3, interpolation_degree, 1)
+                f3y = interp(r, interp_r, faceinterpolation, interp_idx3, interpolation_degree, 2)
+            else
+                f3x = c3[1] + r * (c4[1] - c3[1])
+                f3y = c3[2] + r * (c4[2] - c3[2])
+            end
+
+            if interp_idx4 != 0
+                f4x = interp(s, interp_s, faceinterpolation, interp_idx4, interpolation_degree, 1)
+                f4y = interp(s, interp_s, faceinterpolation, interp_idx4, interpolation_degree, 2)
+            else
+                f4x = c1[1] + s * (c3[1] - c1[1])
+                f4y = c1[2] + s * (c3[2] - c1[2])
+            end
+
+            x = (1 - s) * f1x + s * f3x + (1 - r) * f4x + r * f2x
+            -(1 - s) * (1 - r) * c1[1] - (1 - s) * r * c3[1]
+            -s * (1 - r) * c2[1] - s * r * c4[1]
+
+            y = (1 - s) * f1y + s * f3y + (1 - r) * f4y + r * f2y
+            -(1 - s) * (1 - r) * c1[2] - (1 - s) * r * c3[2]
+            -s * (1 - r) * c2[2] - s * r * c4[2]
+
+            points[i, j, q] = (x / 2, y / 2)
+        end
+    end
+end
+
+function materializepoints(
+    referencecell::LobattoQuad,
+    coarsegridcells,
+    coarsegridvertices,
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
@@ -400,7 +593,7 @@ function materializepoints(
         quadranttocoordinate,
         Val.(length.(r))...,
         Val(Q);
-        ndrange = size(points),
+        ndrange=size(points)
     )
 
     return points
@@ -518,7 +711,7 @@ function materializebrickpoints(
         quadranttocoordinate,
         Val.(length.(r))...,
         Val(Q);
-        ndrange = size(points),
+        ndrange=size(points)
     )
 
     return points
@@ -653,7 +846,7 @@ function materializepoints(
         quadranttotreeid,
         quadranttocoordinate,
         Val.(length.(r))...;
-        ndrange = size(points),
+        ndrange=size(points)
     )
 
     return points
@@ -781,7 +974,7 @@ function materializebrickpoints(
         quadranttotreeid,
         quadranttocoordinate,
         Val.(length.(r))...;
-        ndrange = size(points),
+        ndrange=size(points)
     )
 
     return points
@@ -1545,7 +1738,7 @@ function materializemetrics(
             w...,
             Val.(size(cell))...,
             Val(Q);
-            ndrange = size(points),
+            ndrange=size(points)
         )
     else
         kernel! = quadvolumemetrics!(backend, (size(cell)..., Q))
@@ -1557,7 +1750,7 @@ function materializemetrics(
             w...,
             Val.(size(cell))...,
             Val(Q);
-            ndrange = size(points),
+            ndrange=size(points)
         )
     end
 
@@ -1601,7 +1794,7 @@ function materializemetrics(
             n,
             facegroupsize[n],
             facegroupoffsets,
-            ndrange = (J..., 2, last(size(surfacemetrics))),
+            ndrange=(J..., 2, last(size(surfacemetrics))),
         )
 
         M = 1 + 2^(ndims(cell) - 1)
@@ -1613,7 +1806,7 @@ function materializemetrics(
             facemaps.vmapNC[n],
             facemaps.nctoface[n],
             w,
-            ndrange = size(ncsurfacemetrics[n]),
+            ndrange=size(ncsurfacemetrics[n]),
         )
     end
 
@@ -1760,7 +1953,7 @@ end
             wJ = wr[i] * ws[j] * wt[k] * detJ
             wJinvG = wJ * invG
 
-            firstordermetrics[i, j, k, q] = (; dRdX = invJ, wJ)
+            firstordermetrics[i, j, k, q] = (; dRdX=invJ, wJ)
             secondordermetrics[i, j, k, q] = (; wJinvG, wJ)
         end
     end
@@ -1926,7 +2119,7 @@ function materializemetrics(
             w...,
             Val.(size(cell))...,
             Val(Q);
-            ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
+            ndrange=(size(cell, 1), size(cell, 2), size(points, 4))
         )
     else
         kernel! = hexvolumemetrics!(backend, (size(cell, 1), size(cell, 2), Q))
@@ -1938,7 +2131,7 @@ function materializemetrics(
             w...,
             Val.(size(cell))...,
             Val(Q);
-            ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
+            ndrange=(size(cell, 1), size(cell, 2), size(points, 4))
         )
     end
 
@@ -1989,7 +2182,7 @@ function materializemetrics(
             n,
             facegroupsize[n],
             facegroupoffsets,
-            ndrange = (J..., 2, last(size(surfacemetrics))),
+            ndrange=(J..., 2, last(size(surfacemetrics))),
         )
 
         M = 1 + 2^(ndims(cell) - 1)
@@ -2001,7 +2194,7 @@ function materializemetrics(
             facemaps.vmapNC[n],
             facemaps.nctoface[n],
             w,
-            ndrange = size(ncsurfacemetrics[n]),
+            ndrange=size(ncsurfacemetrics[n]),
         )
     end
 
