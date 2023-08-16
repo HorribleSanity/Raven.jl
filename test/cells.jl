@@ -41,18 +41,6 @@ function cells_testsuite(AT, FT)
         @test Array(h1d[2][1]) == I1
         @test Array(h1d[2][2]) == I2
     end
-    @test (1, 4, 4) == size.(Raven.materializefaces(cell), 2)
-    @test Raven.connectivity(cell) == adapt(
-        AT,
-        (
-            ([1 4 7; 2 5 8; 3 6 9],),
-            ([1, 4, 7], [3, 6, 9], [1, 2, 3], [7, 8, 9]),
-            (1, 3, 7, 9),
-        ),
-    )
-    @test Raven.connectivityoffsets(cell, Val(1)) == (0, 9)
-    @test Raven.connectivityoffsets(cell, Val(2)) == (0, 3, 6, 9, 12)
-    @test Raven.connectivityoffsets(cell, Val(3)) == (0, 1, 2, 3, 4)
     @test adapt(Array, cell) isa LobattoCell{S,FT,Array} where {S}
 
     S = Tuple{3,4,2}
@@ -93,41 +81,6 @@ function cells_testsuite(AT, FT)
             @test Array(h1d[n][2]) == Matrix{FT}(spectralinterpolation(p, (p .+ 1) ./ 2))
         end
     end
-    @test (1, 6, 12, 8) == size.(Raven.materializefaces(cell), 2)
-    @test Raven.connectivity(cell)[1] == (adapt(AT, reshape(collect(1:24), 3, 4, 2)),)
-    @test Raven.connectivity(cell)[2:end] == adapt(
-        AT,
-        (
-            (
-                [1 13; 4 16; 7 19; 10 22],
-                [3 15; 6 18; 9 21; 12 24],
-                [1 13; 2 14; 3 15],
-                [10 22; 11 23; 12 24],
-                [1 4 7 10; 2 5 8 11; 3 6 9 12],
-                [13 16 19 22; 14 17 20 23; 15 18 21 24],
-            ),
-            (
-                [1, 13],
-                [3, 15],
-                [10, 22],
-                [12, 24],
-                [1, 4, 7, 10],
-                [3, 6, 9, 12],
-                [13, 16, 19, 22],
-                [15, 18, 21, 24],
-                [1, 2, 3],
-                [10, 11, 12],
-                [13, 14, 15],
-                [22, 23, 24],
-            ),
-            (1, 3, 10, 12, 13, 15, 22, 24),
-        ),
-    )
-    @test Raven.connectivityoffsets(cell, Val(1)) == (0, 24)
-    @test Raven.connectivityoffsets(cell, Val(2)) == (0, 8, 16, 22, 28, 40, 52)
-    @test Raven.connectivityoffsets(cell, Val(3)) ==
-          (0, 2, 4, 6, 8, 12, 16, 20, 24, 27, 30, 33, 36)
-    @test Raven.connectivityoffsets(cell, Val(4)) == (0, 1, 2, 3, 4, 5, 6, 7, 8)
 
     cell = LobattoCell{Tuple{5},FT,AT}()
     @test floattype(cell) == FT
@@ -159,8 +112,4 @@ function cells_testsuite(AT, FT)
         @test Array(h1d[1][1]) == Matrix{FT}(spectralinterpolation(p, (p .- 1) ./ 2))
         @test Array(h1d[1][2]) == Matrix{FT}(spectralinterpolation(p, (p .+ 1) ./ 2))
     end
-    @test (1, 2) == size.(Raven.materializefaces(cell), 2)
-    @test Raven.connectivity(cell) == adapt(AT, (([1, 2, 3, 4, 5],), (1, 5)))
-    @test Raven.connectivityoffsets(cell, Val(1)) == (0, 5)
-    @test Raven.connectivityoffsets(cell, Val(2)) == (0, 1, 2)
 end

@@ -43,7 +43,7 @@ function lobattooperators_1d(::Type{T}, M) where {T}
     return (; points, weights, derivative, toequallyspaced, tohalves)
 end
 
-struct LobattoCell{S,T,A,N,O,P,D,M,FM,E,H,C} <: AbstractCell{S,T,A,N}
+struct LobattoCell{S,T,A,N,O,P,D,M,FM,E,H} <: AbstractCell{S,T,A,N}
     points_1d::O
     weights_1d::O
     points::P
@@ -52,7 +52,6 @@ struct LobattoCell{S,T,A,N,O,P,D,M,FM,E,H,C} <: AbstractCell{S,T,A,N}
     facemass::FM
     toequallyspaced::E
     tohalves_1d::H
-    connectivity::C
 end
 
 function Base.show(io::IO, ::LobattoCell{S,T,A}) where {S,T,A}
@@ -76,7 +75,6 @@ function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
     facemass = adapt(A, Diagonal([T(1), T(1)]))
     toequallyspaced = Kron((o.toequallyspaced,))
     tohalves_1d = ((o.tohalves[1], o.tohalves[2]),)
-    connectivity = materializeconnectivity(LobattoCell{Tuple{S1},T,A})
 
     args = (
         points_1d,
@@ -87,7 +85,6 @@ function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
         facemass,
         toequallyspaced,
         tohalves_1d,
-        connectivity,
     )
     LobattoCell{Tuple{S1},T,A,1,typeof.(args[2:end])...}(args...)
 end
@@ -106,7 +103,6 @@ function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
     toequallyspaced = Kron((o[2].toequallyspaced, o[1].toequallyspaced))
     tohalves_1d =
         ((o[1].tohalves[1], o[1].tohalves[2]), (o[2].tohalves[1], o[2].tohalves[2]))
-    connectivity = materializeconnectivity(LobattoCell{Tuple{S1,S2},T,A})
 
     args = (
         points_1d,
@@ -117,7 +113,6 @@ function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
         facemass,
         toequallyspaced,
         tohalves_1d,
-        connectivity,
     )
     LobattoCell{Tuple{S1,S2},T,A,2,typeof.(args[2:end])...}(args...)
 end
@@ -160,7 +155,6 @@ function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
         (o[2].tohalves[1], o[2].tohalves[2]),
         (o[3].tohalves[1], o[3].tohalves[2]),
     )
-    connectivity = materializeconnectivity(LobattoCell{Tuple{S1,S2,S3},T,A})
 
     args = (
         points_1d,
@@ -171,7 +165,6 @@ function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
         facemass,
         toequallyspaced,
         tohalves_1d,
-        connectivity,
     )
     LobattoCell{Tuple{S1,S2,S3},T,A,3,typeof.(args[2:end])...}(args...)
 end
@@ -203,156 +196,7 @@ mass(cell::LobattoCell) = cell.mass
 facemass(cell::LobattoCell) = cell.facemass
 toequallyspaced(cell::LobattoCell) = cell.toequallyspaced
 tohalves_1d(cell::LobattoCell) = cell.tohalves_1d
-connectivity(cell::LobattoCell) = cell.connectivity
 degrees(cell::LobattoCell) = size(cell) .- 1
-
-function materializeconnectivity(::Type{LobattoCell{Tuple{L},T,A}}) where {L,T,A}
-    indices = collect(LinearIndices((L,)))
-
-    conn = (
-        (A(indices),), # edge
-        ( # corners
-            indices[begin],
-            indices[end],
-        ),
-    )
-
-    return conn
-end
-
-function materializeconnectivity(::Type{LobattoCell{Tuple{L,M},T,A}}) where {L,M,T,A}
-    indices = collect(LinearIndices((L, M)))
-
-    conn = (
-        (A(indices),), # face
-        ( # edges
-            A(indices[begin, begin:end]),
-            A(indices[end, begin:end]),
-            A(indices[begin:end, begin]),
-            A(indices[begin:end, end]),
-        ),
-        ( # corners
-            (indices[begin, begin]),
-            (indices[end, begin]),
-            (indices[begin, end]),
-            (indices[end, end]),
-        ),
-    )
-
-    return conn
-end
-
-function materializeconnectivity(::Type{LobattoCell{Tuple{L,M,N},T,A}}) where {L,M,N,T,A}
-    indices = collect(LinearIndices((L, M, N)))
-
-    conn = (
-        (A(indices),), # volume
-        ( # faces
-            A(indices[begin, begin:end, begin:end]),
-            A(indices[end, begin:end, begin:end]),
-            A(indices[begin:end, begin, begin:end]),
-            A(indices[begin:end, end, begin:end]),
-            A(indices[begin:end, begin:end, begin]),
-            A(indices[begin:end, begin:end, end]),
-        ),
-        ( # edges
-            A(indices[begin, begin, begin:end]),
-            A(indices[end, begin, begin:end]),
-            A(indices[begin, end, begin:end]),
-            A(indices[end, end, begin:end]),
-            A(indices[begin, begin:end, begin]),
-            A(indices[end, begin:end, begin]),
-            A(indices[begin, begin:end, end]),
-            A(indices[end, begin:end, end]),
-            A(indices[begin:end, begin, begin]),
-            A(indices[begin:end, end, begin]),
-            A(indices[begin:end, begin, end]),
-            A(indices[begin:end, end, end]),
-        ),
-        ( # corners
-            (indices[begin, begin, begin]),
-            (indices[end, begin, begin]),
-            (indices[begin, end, begin]),
-            (indices[end, end, begin]),
-            (indices[begin, begin, end]),
-            (indices[end, begin, end]),
-            (indices[begin, end, end]),
-            (indices[end, end, end]),
-        ),
-    )
-
-    return conn
-end
-
-materializefaces(cell::AbstractCell) = materializefaces(typeof(cell))
-function materializefaces(::Type{<:LobattoLine})
-    return (
-        SA[1; 2], # edge
-        SA[1 2], # corners
-    )
-end
-
-function materializefaces(::Type{<:LobattoQuad})
-    return (
-        SA[1; 2; 3; 4; 5; 6; 7; 8], # face
-        SA[
-            1 2 1 3
-            3 4 2 4
-        ], # edges
-        SA[1 2 3 4], # corners
-    )
-end
-
-function materializefaces(::Type{<:LobattoHex})
-    return (
-        SA[1; 2; 3; 4; 5; 6; 7; 8], # volume
-        SA[1 2 1 3 1 5; 3 4 2 4 2 6; 5 6 5 7 3 7; 7 8 6 8 4 8], # faces
-        SA[
-            1 3 5 7 1 2 5 6 1 2 3 4
-            2 4 6 8 3 4 7 8 5 6 7 8
-        ], # edges
-        SA[1 2 3 4 5 6 7 8], # corners
-    )
-end
-
-@inline function connectivityoffsets(cell::LobattoCell, ::Val{N}) where {N}
-    connectivityoffsets(typeof(cell), Val(N))
-end
-@inline function connectivityoffsets(::Type{C}, ::Val{1}) where {C<:LobattoLine}
-    L, = size(C)
-    return (0, L)
-end
-@inline function connectivityoffsets(::Type{C}, ::Val{2}) where {C<:LobattoLine}
-    return (0, 1, 2)
-end
-
-@inline function connectivityoffsets(::Type{C}, ::Val{1}) where {C<:LobattoQuad}
-    L, M = size(C)
-    return (0, L * M)
-end
-@inline function connectivityoffsets(::Type{C}, ::Val{2}) where {C<:LobattoQuad}
-    L, M = size(C)
-    return (0, M, 2M, 2M + L, 2M + 2L)
-end
-@inline function connectivityoffsets(::Type{C}, ::Val{3}) where {C<:LobattoQuad}
-    return (0, 1, 2, 3, 4)
-end
-
-@inline function connectivityoffsets(::Type{C}, ::Val{1}) where {C<:LobattoHex}
-    L, M, N = size(C)
-    return (0, L * M * N)
-end
-@inline function connectivityoffsets(::Type{C}, ::Val{2}) where {C<:LobattoHex}
-    L, M, N = size(C)
-    return cumsum((0, M * N, M * N, L * N, L * N, L * M, L * M))
-end
-@inline function connectivityoffsets(::Type{C}, ::Val{3}) where {C<:LobattoHex}
-    L, M, N = size(C)
-    return cumsum((0, N, N, N, N, M, M, M, M, L, L, L, L))
-end
-@inline function connectivityoffsets(::Type{C}, ::Val{4}) where {C<:LobattoHex}
-    return (0, 1, 2, 3, 4, 5, 6, 7, 8)
-end
 
 @kernel function quadpoints!(
     points,
