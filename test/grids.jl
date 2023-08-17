@@ -226,6 +226,24 @@ function grids_testsuite(AT, FT)
         g(x) = x * x'
         @test all(adapt(Array, wJinvG) .≈ adapt(Array, uwJ .* g.(uinvJ)))
 
+        uJ = adapt(Array, uJ)
+        wr = adapt(Array, wr)
+        ws = adapt(Array, ws)
+        sm, _ = surfacemetrics(grid)
+        sm = adapt(Array, sm)
+
+        n, wsJ = components(sm[1])
+        a = n ./ vec(ws) .* wsJ
+        @test all(a[:, 1, :] .≈ map(g -> SA[-g[2, 2], g[1, 2]], uJ[1, :, :]))
+        @test all(a[:, 2, :] .≈ map(g -> SA[g[2, 2], -g[1, 2]], uJ[end, :, :]))
+
+        n, wsJ = components(sm[2])
+        a = n ./ vec(wr) .* wsJ
+        @test all(a[:, 1, :] .≈ map(g -> SA[g[2, 1], -g[1, 1]], uJ[:, 1, :]))
+        @test all(a[:, 2, :] .≈ map(g -> SA[-g[2, 1], g[1, 1]], uJ[:, end, :]))
+
+        @test all(norm.(n) .≈ 1)
+
     end
 
     @testset "2D spherical shell" begin
@@ -353,6 +371,32 @@ function grids_testsuite(AT, FT)
         @test all(adapt(Array, wJ .≈ uwJ))
         g(x) = x * x'
         @test all(adapt(Array, wJinvG) .≈ adapt(Array, uwJ .* g.(uinvJ)))
+
+        uJ = adapt(Array, uJ)
+        uinvJ = adapt(Array, uinvJ)
+        wr = adapt(Array, wr)
+        ws = adapt(Array, ws)
+        wt = adapt(Array, wt)
+        sm, _ = surfacemetrics(grid)
+        sm = adapt(Array, sm)
+        b = det.(uJ) .* uinvJ
+
+        n, wsJ = components(sm[1])
+        a = n ./ (vec(ws) .* vec(wt)') .* wsJ
+        @test all(a[:, :, 1, :] .≈ map(g -> -g[1, :], b[1, :, :, :]))
+        @test all(a[:, :, 2, :] .≈ map(g -> g[1, :], b[end, :, :, :]))
+
+        n, wsJ = components(sm[2])
+        a = n ./ (vec(wr) .* vec(wt)') .* wsJ
+        @test all(a[:, :, 1, :] .≈ map(g -> -g[2, :], b[:, 1, :, :]))
+        @test all(a[:, :, 2, :] .≈ map(g -> g[2, :], b[:, end, :, :]))
+
+        n, wsJ = components(sm[3])
+        a = n ./ (vec(wr) .* vec(ws)') .* wsJ
+        @test all(a[:, :, 1, :] .≈ map(g -> -g[3, :], b[:, :, 1, :]))
+        @test all(a[:, :, 2, :] .≈ map(g -> g[3, :], b[:, :, end, :]))
+
+        @test all(norm.(n) .≈ 1)
 
     end
 

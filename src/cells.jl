@@ -1064,9 +1064,56 @@ end
     end
 end
 
+@kernel function quadsurfacemetrics!(surfacemetrics, dRdXs, wJs, vmapM, wnormal, fg)
+    j, fn, _ = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @inbounds begin
+        i = vmapM[j, fn, q]
+        dRdX = dRdXs[i]
+        wJ = wJs[i]
+
+        wn = fn == 1 ? wnormal[1] : wnormal[end]
+        sn = fn == 1 ? -1 : 1
+
+        n = (sn * wJ / wn) * dRdX[fg, :]
+        wsJ = norm(n)
+        n = n / wsJ
+
+        surfacemetrics[j, fn, q] = (; n, wsJ)
+    end
+end
+
+@kernel function quadncsurfacemetrics!(surfacemetrics, dRdXs, wJs, vmapNC, nctoface, w)
+    j, ft, _ = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @inbounds begin
+        i = vmapNC[j, ft, q]
+        dRdX = dRdXs[i]
+        wJ = wJs[i]
+
+        f = ft == 1 ? nctoface[1, q] : nctoface[2, q]
+        fg, fn = fldmod1(f, 2)
+
+        wn = fn == 1 ? w[fg][1] : w[fg][end]
+        sn = fn == 1 ? -1 : 1
+
+        n = (sn * wJ / wn) * dRdX[fg, :]
+        wsJ = norm(n)
+        n = n / wsJ
+
+        surfacemetrics[j, ft, q] = (; n, wsJ)
+    end
+end
+
+
 function materializemetrics(
     cell::LobattoQuad,
     points::AbstractArray{SVector{N,FT}},
+    facemaps,
+    comm,
+    nodecommpattern,
 ) where {N,FT}
     Q = max(512 ÷ prod(size(cell)), 1)
 
@@ -1093,9 +1140,57 @@ function materializemetrics(
         ndrange = size(points),
     )
 
+    # We need this to compute the normals and surface Jacobian on the
+    # non-conforming faces.  Should we change the nonconforming surface
+    # information to avoid this communication?
+    fcm = commmanager(eltype(firstordermetrics), comm, nodecommpattern, 0)
+    share!(firstordermetrics, fcm)
+
     volumemetrics = (firstordermetrics, secondordermetrics)
 
-    return (volumemetrics, nothing)
+    TS = NamedTuple{(:n, :wsJ),Tuple{SVector{N,FT},FT}}
+
+    # TODO move this to cell
+    cellfacedims = ((size(cell, 2),), (size(cell, 1),))
+
+    allsurfacemetrics =
+        ntuple(n -> similar(points, TS, size(facemaps.vmapM[n])), Val(length(cellfacedims)))
+
+    ncsurfacemetrics = ntuple(
+        n -> similar(points, TS, size(facemaps.vmapNC[n])),
+        Val(length(cellfacedims)),
+    )
+
+    for n in eachindex(cellfacedims)
+        J = cellfacedims[n]
+        Q = max(512 ÷ 2prod(J), 1)
+
+        kernel! = quadsurfacemetrics!(backend, (J..., 2, Q))
+        kernel!(
+            allsurfacemetrics[n],
+            components(firstordermetrics)...,
+            facemaps.vmapM[n],
+            w[n],
+            n,
+            ndrange = size(allsurfacemetrics[n]),
+        )
+
+        M = 1 + 2^(ndims(cell) - 1)
+        Q = max(512 ÷ (M * prod(J)), 1)
+        kernel! = quadncsurfacemetrics!(backend, (J..., M, Q))
+        kernel!(
+            ncsurfacemetrics[n],
+            components(viewwithghosts(firstordermetrics))...,
+            facemaps.vmapNC[n],
+            facemaps.nctoface[n],
+            w,
+            ndrange = size(ncsurfacemetrics[n]),
+        )
+    end
+
+    surfacemetrics = (allsurfacemetrics, ncsurfacemetrics)
+
+    return (volumemetrics, surfacemetrics)
 end
 
 @kernel function hexvolumemetrics!(
@@ -1242,9 +1337,56 @@ end
     end
 end
 
+@kernel function hexsurfacemetrics!(surfacemetrics, dRdXs, wJs, vmapM, wnormal, fg)
+    i, j, fn, _ = @index(Local, NTuple)
+    _, _, _, q = @index(Global, NTuple)
+
+    @inbounds begin
+        k = vmapM[i, j, fn, q]
+        dRdX = dRdXs[k]
+        wJ = wJs[k]
+
+        wn = fn == 1 ? wnormal[1] : wnormal[end]
+        sn = fn == 1 ? -1 : 1
+
+        n = (sn * wJ / wn) * dRdX[fg, :]
+
+        wsJ = norm(n)
+        n = n / wsJ
+
+        surfacemetrics[i, j, fn, q] = (; n, wsJ)
+    end
+end
+
+@kernel function hexncsurfacemetrics!(surfacemetrics, dRdXs, wJs, vmapNC, nctoface, w)
+    i, j, ft, _ = @index(Local, NTuple)
+    _, _, _, q = @index(Global, NTuple)
+
+    @inbounds begin
+        k = vmapNC[i, j, ft, q]
+        dRdX = dRdXs[k]
+        wJ = wJs[k]
+
+        f = ft == 1 ? nctoface[1, q] : nctoface[2, q]
+        fg, fn = fldmod1(f, 2)
+
+        wn = fn == 1 ? w[fg][1] : w[fg][end]
+        sn = fn == 1 ? -1 : 1
+
+        n = (sn * wJ / wn) * dRdX[fg, :]
+        wsJ = norm(n)
+        n = n / wsJ
+
+        surfacemetrics[i, j, ft, q] = (; n, wsJ)
+    end
+end
+
 function materializemetrics(
     cell::LobattoHex,
     points::AbstractArray{SVector{3,FT}},
+    facemaps,
+    comm,
+    nodecommpattern,
 ) where {FT}
     Q = max(512 ÷ (size(cell, 1) * size(cell, 2)), 1)
 
@@ -1271,7 +1413,59 @@ function materializemetrics(
         ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
     )
 
+    # We need this to compute the normals and surface Jacobian on the
+    # non-conforming faces.  Should we change the nonconforming surface
+    # information to avoid this communication?
+    fcm = commmanager(eltype(firstordermetrics), comm, nodecommpattern, 0)
+    share!(firstordermetrics, fcm)
+
     volumemetrics = (firstordermetrics, secondordermetrics)
 
-    return (volumemetrics, nothing)
+    TS = NamedTuple{(:n, :wsJ),Tuple{SVector{3,FT},FT}}
+
+    # TODO move this to cell
+    cellfacedims = (
+        (size(cell, 2), size(cell, 3)),
+        (size(cell, 1), size(cell, 3)),
+        (size(cell, 1), size(cell, 2)),
+    )
+
+    allsurfacemetrics =
+        ntuple(n -> similar(points, TS, size(facemaps.vmapM[n])), Val(length(cellfacedims)))
+
+    ncsurfacemetrics = ntuple(
+        n -> similar(points, TS, size(facemaps.vmapNC[n])),
+        Val(length(cellfacedims)),
+    )
+
+    for n in eachindex(cellfacedims)
+        J = cellfacedims[n]
+        Q = max(512 ÷ prod(J), 1)
+
+        kernel! = hexsurfacemetrics!(backend, (J..., 2, Q))
+        kernel!(
+            allsurfacemetrics[n],
+            components(firstordermetrics)...,
+            facemaps.vmapM[n],
+            w[n],
+            n,
+            ndrange = size(allsurfacemetrics[n]),
+        )
+
+        M = 1 + 2^(ndims(cell) - 1)
+        Q = max(512 ÷ (M * prod(J)), 1)
+        kernel! = hexncsurfacemetrics!(backend, (J..., M, Q))
+        kernel!(
+            ncsurfacemetrics[n],
+            components(viewwithghosts(firstordermetrics))...,
+            facemaps.vmapNC[n],
+            facemaps.nctoface[n],
+            w,
+            ndrange = size(ncsurfacemetrics[n]),
+        )
+    end
+
+    surfacemetrics = (allsurfacemetrics, ncsurfacemetrics)
+
+    return (volumemetrics, surfacemetrics)
 end

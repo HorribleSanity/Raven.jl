@@ -380,7 +380,8 @@ function generate(warp::Function, gm::GridManager)
     pcm = commmanager(eltype(points), comm(gm), nodecommpattern, 0)
     share!(points, pcm)
 
-    volumemetrics, surfacemetrics = materializemetrics(referencecell(gm), points)
+    volumemetrics, surfacemetrics =
+        materializemetrics(referencecell(gm), points, facemaps, comm(gm), nodecommpattern)
 
     part = MPI.Comm_rank(comm(gm)) + 1
     nparts = MPI.Comm_size(comm(gm))
