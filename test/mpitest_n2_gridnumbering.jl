@@ -102,6 +102,7 @@ let
         tohalves = tohalves_1d(cell)
         pts = points(grid, Val(true))
         fgdims = ((2,), (1,))
+        _, ncsm = surfacemetrics(grid)
         for fg in eachindex(fm.vmapNC)
             for i = 1:last(size(fm.vmapNC[fg]))
                 ppts = pts[fm.vmapNC[fg][:, 1, i]]
@@ -110,6 +111,13 @@ let
 
                 @assert isapprox(tohalves[fgdims[fg][1]][1] * ppts, c1pts)
                 @assert isapprox(tohalves[fgdims[fg][1]][2] * ppts, c2pts)
+            end
+
+            if length(ncsm[fg]) > 0
+                n, wsJ = components(ncsm[fg])
+                @test all(n[:, 1, :] .≈ Ref(SA[1, 0]))
+                @test all(n[:, 2:end, :] .≈ Ref(SA[-1, 0]))
+                @test sum(wsJ[:, 1, :]) .≈ sum(wsJ[:, 2:end, :])
             end
         end
     end
@@ -325,6 +333,7 @@ let
         tohalves = tohalves_1d(cell)
         pts = points(grid, Val(true))
         fgdims = ((2, 3), (1, 3), (1, 2))
+        _, ncsm = surfacemetrics(grid)
         for fg in eachindex(fm.vmapNC)
             for i = 1:last(size(fm.vmapNC[fg]))
                 ppts = pts[fm.vmapNC[fg][:, :, 1, i]]
@@ -349,6 +358,12 @@ let
                     tohalves[fgdims[fg][1]][2] * ppts * tohalves[fgdims[fg][2]][2]',
                     c4pts,
                 )
+            end
+            if length(ncsm[fg]) > 0
+                n, wsJ = components(ncsm[fg])
+                @test all(n[:, :, 1, :] .≈ Ref(SA[1, 0, 0]))
+                @test all(n[:, :, 2:end, :] .≈ Ref(SA[-1, 0, 0]))
+                @test sum(wsJ[:, :, 1, :]) .≈ sum(wsJ[:, :, 2:end, :])
             end
         end
     end
