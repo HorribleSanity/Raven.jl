@@ -726,10 +726,9 @@ function materializefacemaps(
         zeros(Int8, numberofnonconfaces[n])
     end
 
-    ncfacegroups = ntuple(length(cellfacedims)) do n
+    nctoface = ntuple(length(cellfacedims)) do n
         zeros(Int8, 2, uniquenonconnfaces[n])
     end
-
 
     boundayface = zeros(Int, length(cellfacedims))
     nonconface = zeros(Int, length(cellfacedims))
@@ -841,10 +840,8 @@ function materializefacemaps(
                     parentorientation = faceorientations[parentface, parentquadrant]
                     childfaceindices = orientindices(childorientation, cellfacedims[fg])
                     parentfaceindices = orientindices(parentorientation, cellfacedims[fg])
-                    cfg = fld1(childface, 2)
-                    pfg = fld1(parentface, 2)
-                    ncfacegroups[fg][1, ncid] = pfg
-                    ncfacegroups[fg][2, ncid] = cfg
+                    nctoface[fg][1, ncid] = parentface
+                    nctoface[fg][2, ncid] = childface
                     for j in CartesianIndices(cellfacedims[fg])
                         vmapNC[fg][j, 1, ncid] =
                             cellfaceindices[parentface][parentfaceindices[j]] +
@@ -860,7 +857,7 @@ function materializefacemaps(
         end
     end
 
-    return (; vmapM, vmapP, mapB, vmapNC, ncfacegroups, nctypes, ncids)
+    return (; vmapM, vmapP, mapB, vmapNC, nctoface, nctypes, ncids)
 end
 
 function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern)
