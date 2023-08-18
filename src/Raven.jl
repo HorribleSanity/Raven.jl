@@ -23,6 +23,7 @@ export referencecell, levels, trees, offset, numcells, facecodes
 export continuoustodiscontinuous, nodecommpattern
 export communicatingcells, noncommunicatingcells
 export facemaps
+export decode
 
 export volumemetrics, surfacemetrics
 
@@ -39,6 +40,7 @@ include("orientation.jl")
 include("arrays.jl")
 include("sparsearrays.jl")
 include("eye.jl")
+include("facecode.jl")
 include("flatten.jl")
 include("cells.jl")
 include("coarsegrids.jl")

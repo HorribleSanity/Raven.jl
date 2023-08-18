@@ -51,6 +51,7 @@ MPI.Initialized() || MPI.Init()
 
 include("arrays.jl")
 include("communication.jl")
+include("facecode.jl")
 include("gridnumbering.jl")
 include("orientation.jl")
 include("sparsearrays.jl")
