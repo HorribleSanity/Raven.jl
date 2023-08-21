@@ -756,10 +756,9 @@ function materializefacemaps(
                 nf = 0
                 nq = 0
                 for ii in neighborsrange
-                    pq, pi = fldmod1(rows[ii], 4^ndims(cell))
-                    if pq != q
-                        nf = _indextoface(pi, degree3facelinearindices)
-                        nq = pq
+                    nq, pi = fldmod1(rows[ii], 4^ndims(cell))
+                    nf = _indextoface(pi, degree3facelinearindices)
+                    if nq != q && nf != f
                         break
                     end
                 end

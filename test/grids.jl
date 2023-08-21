@@ -70,6 +70,19 @@ function grids_testsuite(AT, FT)
     end
 
     let
+        N = (4, 4)
+        K = (2, 1)
+        coordinates =
+            ntuple(d -> range(-one(FT), stop = one(FT), length = K[d] + 1), length(K))
+        cell = LobattoCell{Tuple{N...},FT,AT}()
+        gm = GridManager(cell, brick(coordinates, (true, true)))
+        grid = generate(gm)
+        fm = facemaps(grid)
+        @test length(fm.mapB[1]) == 0
+        @test length(fm.mapB[2]) == 0
+    end
+
+    let
         N = (3, 2, 4)
         K = (2, 3, 1)
         coordinates =
