@@ -46,6 +46,7 @@ export GridArray, components, sizewithghosts, viewwithghosts, parentwithghosts
 export adapt!
 
 include("orientation.jl")
+include("fileio.jl")
 include("arrays.jl")
 include("sparsearrays.jl")
 include("streams.jl")
@@ -56,7 +57,6 @@ include("cells.jl")
 include("lobattocells.jl")
 include("gausscells.jl")
 include("coarsegrids.jl")
-include("fileio.jl")
 include("communication.jl")
 include("grids.jl")
 include("gridmanager.jl")
