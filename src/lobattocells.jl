@@ -365,6 +365,51 @@ function materializepoints(
     referencecell::LobattoQuad,
     coarsegridcells,
     coarsegridvertices,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    forest,
+    comm,
+)
+    r = vec.(points_1d(referencecell))
+    Q = max(512 ÷ prod(length.(r)), 1)
+
+    IntType = typeof(length(r))
+    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    points = GridArray{eltype(coarsegridvertices)}(
+        undef,
+        arraytype(referencecell),
+        (length.(r)..., num_local),
+        (length.(r)..., length(quadranttolevel)),
+        comm,
+        false,
+        length(r) + 1,
+    )
+
+    backend = get_backend(points)
+
+    kernel! = quadpoints!(backend, (length.(r)..., Q))
+    kernel!(
+        points,
+        r...,
+        coarsegridcells,
+        coarsegridvertices,
+        length(quadranttolevel),
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        Val.(length.(r))...,
+        Val(Q);
+        ndrange=size(points)
+    )
+
+    return points
+end
+
+function materializepoints(
+    referencecell::LobattoQuad,
+    coarsegridcells,
+    coarsegridvertices,
     interpolation_degree,
     faceinterpolation,
     quadranttointerpolation,
@@ -419,19 +464,79 @@ function materializepoints(
     return points
 end
 
-@inline function interp(t, n, y, offset, degree, xory)
-    total = zero(t)
+@inline function interp(t, n, data, offset, degree)
+    x = zero(t)
+    y = zero(t)
     t = 2 * t - 1
-    for i in 1:degree+1
+    for i = 1:degree+1
         li = one(t)
-        for j in 1:degree+1
+        for j = 1:degree+1
             if i != j
                 li *= (t - n[j]) / (n[i] - n[j])
             end
         end
-        total += y[offset+i-1, xory] * li
+        x += data[offset+i-1, 1] * li
+        y += data[offset+i-1, 2] * li
     end
-    return total
+    return x, y
+end
+
+@inline function bary_interp(t, n, data, offset, degree)
+    x = zero(t)
+    y = zero(t)
+    denom = zero(t)
+    t = 2 * t - 1
+    w = ones(typeof(t), degree + 1)
+
+    for i in 1:degree+1
+        for j in 1:degree+1
+            if i ≠ j
+                w[i] *= (n[i] - n[j])
+            end
+        end
+        w[i] = 1.0 / w[i]
+    end
+
+    for i in 1:degree+1
+        if i != 1 || i != degree + 1
+            x += w[i] * data[offset+i-1, 1] / (t - n[i])
+            y += w[i] * data[offset+i-1, 2] / (t - n[i])
+            denom += w[i] / (t - n[i])
+        else
+            x += data[offset+i-1, 1]
+            y += data[offset+i-1, 2]
+        end
+    end
+
+    return x / denom, y / denom
+end
+
+@inline function interp(t, s, n_t, n_s, data, offset, degree)
+    x = zero(t)
+    y = zero(t)
+    z = zero(t)
+
+    for i = 1:degree+1
+        for j = 1:degree+1
+            li_t = one(t)
+            li_s = one(s)
+            for k = 1:degree+1
+                if i != k
+                    li_t *= (t - n_t[k]) / (n_t[i] - n_t[k])
+                end
+            end
+
+            for k = 1:degree+1
+                if j != k
+                    li_s *= (s - n_s[k]) / (n_s[j] - n_s[k])
+                end
+            end
+            x += data[offset+(j-1)*(degree+1)+i-1, 1] * li_t * li_s
+            y += data[offset+(j-1)*(degree+1)+i-1, 2] * li_t * li_s
+            z += data[offset+(j-1)*(degree+1)+i-1, 3] * li_t * li_s
+        end
+    end
+    return x, y, z
 end
 
 @kernel function curvedquadpoints!(
@@ -510,35 +615,27 @@ end
             c4 = treecoords[2, 2, q1]
 
             if interp_idx1 != 0
-                f1x = interp(r, interp_r, faceinterpolation, interp_idx1, interpolation_degree, 1)
-                f1y = interp(r, interp_r, faceinterpolation, interp_idx1, interpolation_degree, 2)
+                f1x, f1y = interp(r, interp_r, faceinterpolation, interp_idx1, interpolation_degree,)
             else
-                f1x = c1[1] + r * (c2[1] - c1[1])
-                f1y = c1[2] + r * (c2[2] - c1[2])
+                f1x, f1y = c1 .+ (r * (c2 - c1))
             end
 
             if interp_idx2 != 0
-                f2x = interp(s, interp_s, faceinterpolation, interp_idx2, interpolation_degree, 1)
-                f2y = interp(s, interp_s, faceinterpolation, interp_idx2, interpolation_degree, 2)
+                f2x, f2y = interp(s, interp_s, faceinterpolation, interp_idx2, interpolation_degree,)
             else
-                f2x = c2[1] + s * (c4[1] - c2[1])
-                f2y = c2[2] + s * (c4[2] - c2[2])
+                f2x, f2y = c2 .+ (s * (c4 - c2))
             end
 
             if interp_idx3 != 0
-                f3x = interp(r, interp_r, faceinterpolation, interp_idx3, interpolation_degree, 1)
-                f3y = interp(r, interp_r, faceinterpolation, interp_idx3, interpolation_degree, 2)
+                f3x, f3y = interp(r, interp_r, faceinterpolation, interp_idx3, interpolation_degree,)
             else
-                f3x = c3[1] + r * (c4[1] - c3[1])
-                f3y = c3[2] + r * (c4[2] - c3[2])
+                f3x, f3y = c3 .+ (r * (c4 - c3))
             end
 
             if interp_idx4 != 0
-                f4x = interp(s, interp_s, faceinterpolation, interp_idx4, interpolation_degree, 1)
-                f4y = interp(s, interp_s, faceinterpolation, interp_idx4, interpolation_degree, 2)
+                f4x, f4y = interp(s, interp_s, faceinterpolation, interp_idx4, interpolation_degree,)
             else
-                f4x = c1[1] + s * (c3[1] - c1[1])
-                f4y = c1[2] + s * (c3[2] - c1[2])
+                f4x, f4y = c1 .+ (s * (c3 - c1))
             end
 
             x = (1 - s) * f1x + s * f3x + (1 - r) * f4x + r * f2x
@@ -549,54 +646,9 @@ end
             -(1 - s) * (1 - r) * c1[2] - (1 - s) * r * c3[2]
             -s * (1 - r) * c2[2] - s * r * c4[2]
 
-            points[i, j, q] = (x / 2, y / 2)
+            points[i, j, q] = (x, y)
         end
     end
-end
-
-function materializepoints(
-    referencecell::LobattoQuad,
-    coarsegridcells,
-    coarsegridvertices,
-    quadranttolevel,
-    quadranttotreeid,
-    quadranttocoordinate,
-    forest,
-    comm,
-)
-    r = vec.(points_1d(referencecell))
-    Q = max(512 ÷ prod(length.(r)), 1)
-
-    IntType = typeof(length(r))
-    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
-    points = GridArray{eltype(coarsegridvertices)}(
-        undef,
-        arraytype(referencecell),
-        (length.(r)..., num_local),
-        (length.(r)..., length(quadranttolevel)),
-        comm,
-        false,
-        length(r) + 1,
-    )
-
-    backend = get_backend(points)
-
-    kernel! = quadpoints!(backend, (length.(r)..., Q))
-    kernel!(
-        points,
-        r...,
-        coarsegridcells,
-        coarsegridvertices,
-        length(quadranttolevel),
-        quadranttolevel,
-        quadranttotreeid,
-        quadranttocoordinate,
-        Val.(length.(r))...,
-        Val(Q);
-        ndrange=size(points)
-    )
-
-    return points
 end
 
 @kernel function quadbrickpoints!(
@@ -841,6 +893,333 @@ function materializepoints(
         r...,
         coarsegridcells,
         coarsegridvertices,
+        length(quadranttolevel),
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        Val.(length.(r))...;
+        ndrange=size(points)
+    )
+
+    return points
+end
+
+@kernel function curvedhexpoints!(
+    points,
+    ri,
+    si,
+    ti,
+    interp_r,
+    interp_s,
+    interp_t,
+    coarsegridcells,
+    coarsegridvertices,
+    interpolation_degree,
+    faceinterpolation,
+    quadranttointerpolation,
+    numberofquadrants,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    ::Val{I},
+    ::Val{J},
+    ::Val{K},
+) where {I,J,K}
+    i, j, k = @index(Local, NTuple)
+    q = @index(Group, Linear)
+
+    @uniform T = eltype(eltype(points))
+
+    treecoords = @localmem eltype(points) (2, 2, 2)
+    rl = @localmem eltype(ri) (I,)
+    sl = @localmem eltype(si) (J,)
+    tl = @localmem eltype(ti) (K,)
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            if j == 1 && k == 1
+                rl[i] = ri[i]
+            end
+
+            if i == 1 && k == 1
+                sl[j] = si[j]
+            end
+
+            if i == 1 && j == 1
+                tl[k] = ti[k]
+            end
+
+            if i ≤ 2 && j ≤ 2 && k ≤ 2
+                treeid = quadranttotreeid[q]
+                vids = coarsegridcells[treeid]
+                id = i + 2 * (j - 1) + 4 * (k - 1)
+                treecoords[i, j, k] = coarsegridvertices[vids[id]]
+            end
+        end
+    end
+
+    @synchronize
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            treeid = quadranttotreeid[q]
+            level = quadranttolevel[q]
+            ix = quadranttocoordinate[q, 1]
+            iy = quadranttocoordinate[q, 2]
+            iz = quadranttocoordinate[q, 3]
+
+            P4EST_MAXLEVEL = 30
+            P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
+
+            cr = T(ix) / P4EST_ROOT_LEN
+            cs = T(iy) / P4EST_ROOT_LEN
+            ct = T(iz) / P4EST_ROOT_LEN
+
+            h = one(T) / (1 << (level))
+
+            r = (2 * cr - 1) + h * (rl[i] + 1)
+            s = (2 * cs - 1) + h * (sl[j] + 1)
+            t = (2 * ct - 1) + h * (tl[k] + 1)
+
+            p1 = treecoords[1]
+            p2 = treecoords[2]
+            p3 = treecoords[4]
+            p4 = treecoords[3]
+            p5 = treecoords[5]
+            p6 = treecoords[6]
+            p7 = treecoords[8]
+            p8 = treecoords[7]
+
+            interp_idx1 = quadranttointerpolation[treeid, 1]
+            interp_idx2 = quadranttointerpolation[treeid, 2]
+            interp_idx3 = quadranttointerpolation[treeid, 3]
+            interp_idx4 = quadranttointerpolation[treeid, 4]
+            interp_idx5 = quadranttointerpolation[treeid, 5]
+            interp_idx6 = quadranttointerpolation[treeid, 6]
+
+            # Below f1x corresponds to the x component of the interpolation onto the hex face 1. 
+            # f1e1x: face 1 edge 1 x coordinate
+            # HOHQMesh data is in rhr vertex order
+            #
+            #        8-----------7
+            #        |\           \
+            #        | \           \
+            #        |  \           \
+            #        |   5-----------6
+            #        |   |           |
+            #        4   |       3   |
+            #         \  |           |
+            #          \ |           |
+            #           \|           |
+            #            1-----------2
+            #  t  s
+            #  | /
+            #  |/
+            #  --->r
+
+
+            if interp_idx1 != 0
+                f1x, f1y, f1z = interp(r, t, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
+
+                # edge interpolation on face 1
+                f1e1x, f1e1y, f1e1z = interp(r, -1, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
+                f1e2x, f1e2y, f1e2z = interp(1, t, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
+                f1e3x, f1e3y, f1e3z = interp(r, 1, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
+                f1e4x, f1e4y, f1e4z = interp(-1, t, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
+            else
+                f1x, f1y, f1z = 0.25 * (p1 * (1 - r) * (1 - t) + p2 * (r + 1) * (1 - t) + p5 * (1 - r) * (t + 1) + p6 * (r + 1) * (t + 1))
+
+                f1e1x, f1e1y, f1e1z = 0.5 * (p1 * (1 - r) + p2 * (r + 1)) #edge 1
+                f1e2x, f1e2y, f1e2z = 0.5 * (p2 * (1 - t) + p6 * (t + 1)) #edge 2
+                f1e3x, f1e3y, f1e3z = 0.5 * (p5 * (1 - r) + p6 * (r + 1)) #edge 3
+                f1e4x, f1e4y, f1e4z = 0.5 * (p1 * (1 - t) + p5 * (t + 1)) #edge 4
+            end
+
+            # wrong
+            if interp_idx2 != 0
+                f2x, f2y, f2z = interp(r, t, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
+
+                # edge interpolation on face 2
+                f2e1x, f2e1y, f2e1z = interp(r, -1, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
+                f2e2x, f2e2y, f2e2z = interp(1, t, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
+                f2e3x, f2e3y, f2e3z = interp(r, 1, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
+                f2e4x, f2e4y, f2e4z = interp(-1, t, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
+            else
+                f2x, f2y, f2z = 0.25 * (p4 * (1 - r) * (1 - t) + p3 * (r + 1) * (1 - t) + p8 * (1 - r) * (t + 1) + p7 * (r + 1) * (t + 1))
+
+                f2e1x, f2e1y, f2e1z = 0.5 * (p4 * (1 - r) + p3 * (r + 1)) #edge 5
+                f2e2x, f2e2y, f2e2z = 0.5 * (p3 * (1 - t) + p7 * (t + 1)) #edge 6
+                f2e3x, f2e3y, f2e3z = 0.5 * (p8 * (1 - r) + p7 * (r + 1)) #edge 7
+                f2e4x, f2e4y, f2e4z = 0.5 * (p4 * (1 - t) + p8 * (t + 1)) #edge 8
+            end
+
+            if interp_idx3 != 0
+                f3x, f3y, f3z = interp(r, s, interp_r, interp_s, faceinterpolation, interp_idx3, interpolation_degree,)
+            else
+                f3x, f3y, f3z = 0.25 * (p2 * (1 - r) * (1 - s) + p1 * (r + 1) * (1 - s) + p3 * (1 - r) * (s + 1) + p4 * (r + 1) * (s + 1))
+            end
+
+            if interp_idx4 != 0
+                f4x, f4y, f4z = interp(s, t, interp_s, interp_t, faceinterpolation, interp_idx4, interpolation_degree,)
+
+                # edge interpolation on face 4 
+                f4e1x, f4e1y, f4e1z = interp(s, -1, interp_s, interp_t, faceinterpolation, interp_idx4, interpolation_degree,)
+                f4e2x, f4e2y, f4e2z = interp(s, 1, interp_s, interp_t, faceinterpolation, interp_idx4, interpolation_degree,)
+            else
+                f4x, f4y, f4z = 0.25 * (p2 * (1 - s) * (1 - t) + p3 * (s + 1) * (1 - t) + p6 * (1 - s) * (t + 1) + p7 * (s + 1) * (t + 1))
+
+                # edge interpolation on face 4 for linear face
+                f4e1x, f4e1y, f4e1z = 0.5 * (p2 * (1 - s) + p3 * (s + 1)) # edge 10
+                f4e2x, f4e2y, f4e2z = 0.5 * (p6 * (1 - s) + p7 * (s + 1)) # edge 11
+            end
+
+            if interp_idx5 != 0
+                f5x, f5y, f5z = interp(r, s, interp_r, interp_s, faceinterpolation, interp_idx5, interpolation_degree,)
+            else
+                f5x, f5y, f5z = 0.25 * (p8 * (1 - r) * (1 - s) + p5 * (r + 1) * (1 - s) + p7 * (1 - r) * (s + 1) + p6 * (r + 1) * (s + 1))
+            end
+
+            if interp_idx6 != 0
+                f6x, f6y, f6z = interp(s, t, interp_s, interp_t, faceinterpolation, interp_idx6, interpolation_degree,)
+
+                f6e1x, f6e1y, f6e1z = interp(s, -1, interp_s, interp_t, faceinterpolation, interp_idx6, interpolation_degree,)
+                f6e2x, f6e2y, f6e2z = interp(s, 1, interp_s, interp_t, faceinterpolation, interp_idx6, interpolation_degree,)
+            else
+                f6x, f6y, f6z = 0.25 * (p1 * (1 - s) * (1 - t) + p4 * (s + 1) * (1 - t) + p5 * (1 - s) * (t + 1) + p8 * (s + 1) * (t + 1))
+
+                f6e1x, f6e1y, f6e1z = 0.5 * (p1 * (1 - s) + p4 * (s + 1)) # edge 9
+                f6e2x, f6e2y, f6e2z = 0.5 * (p5 * (1 - s) + p8 * (s + 1)) # edge 12
+            end
+
+            x = 0.5 * ((1 - r) * f6x + (1 + r) * f4x + (1 - s) * f1x + (1 + s) * f2x + (1 - t) * f3x + (1 + t) * f5x)
+            y = 0.5 * ((1 - r) * f6y + (1 + r) * f4y + (1 - s) * f1y + (1 + s) * f2y + (1 - t) * f3y + (1 + t) * f5y)
+            z = 0.5 * ((1 - r) * f6z + (1 + r) * f4z + (1 - s) * f1z + (1 + s) * f2z + (1 - t) * f3z + (1 + t) * f5z)
+
+            x += 0.125 * (
+                p1[1] * (1 - r) * (1 - s) * (1 - t) +
+                p2[1] * (1 + r) * (1 - s) * (1 - t) +
+                p3[1] * (1 + r) * (1 + s) * (1 - t) +
+                p4[1] * (1 - r) * (1 + s) * (1 - t) +
+                p5[1] * (1 - r) * (1 - s) * (1 + t) +
+                p6[1] * (1 + r) * (1 - s) * (1 + t) +
+                p7[1] * (1 + r) * (1 + s) * (1 + t) +
+                p8[1] * (1 - r) * (1 + s) * (1 + t)
+            )
+
+            y += 0.125 * (
+                p1[2] * (1 - r) * (1 - s) * (1 - t) +
+                p2[2] * (1 + r) * (1 - s) * (1 - t) +
+                p3[2] * (1 + r) * (1 + s) * (1 - t) +
+                p4[2] * (1 - r) * (1 + s) * (1 - t) +
+                p5[2] * (1 - r) * (1 - s) * (1 + t) +
+                p6[2] * (1 + r) * (1 - s) * (1 + t) +
+                p7[2] * (1 + r) * (1 + s) * (1 + t) +
+                p8[2] * (1 - r) * (1 + s) * (1 + t)
+            )
+
+            z += 0.125 * (
+                p1[3] * (1 - r) * (1 - s) * (1 - t) +
+                p2[3] * (1 + r) * (1 - s) * (1 - t) +
+                p3[3] * (1 + r) * (1 + s) * (1 - t) +
+                p4[3] * (1 - r) * (1 + s) * (1 - t) +
+                p5[3] * (1 - r) * (1 - s) * (1 + t) +
+                p6[3] * (1 + r) * (1 - s) * (1 + t) +
+                p7[3] * (1 + r) * (1 + s) * (1 + t) +
+                p8[3] * (1 - r) * (1 + s) * (1 + t)
+            )
+
+            x -= 0.25 * (
+                (1 - s) * (1 - t) * f1e1x +
+                (1 + r) * (1 - s) * f1e2x +
+                (1 - s) * (1 + t) * f1e3x +
+                (1 - r) * (1 - s) * f1e4x +
+                (1 + s) * (1 - t) * f2e1x +
+                (1 + r) * (1 + s) * f2e2x +
+                (1 + s) * (1 + t) * f2e3x +
+                (1 - r) * (1 + s) * f2e4x +
+                (1 - r) * (1 - t) * f6e1x +
+                (1 + r) * (1 - t) * f4e1x +
+                (1 + r) * (1 + t) * f4e2x +
+                (1 - r) * (1 + t) * f6e2x
+            )
+
+            y -= 0.25 * (
+                (1 - s) * (1 - t) * f1e1y +
+                (1 + r) * (1 - s) * f1e2y +
+                (1 - s) * (1 + t) * f1e3y +
+                (1 - r) * (1 - s) * f1e4y +
+                (1 + s) * (1 - t) * f2e1y +
+                (1 + r) * (1 + s) * f2e2y +
+                (1 + s) * (1 + t) * f2e3y +
+                (1 - r) * (1 + s) * f2e4y +
+                (1 - r) * (1 - t) * f6e1y +
+                (1 + r) * (1 - t) * f4e1y +
+                (1 + r) * (1 + t) * f4e2y +
+                (1 - r) * (1 + t) * f6e2y
+            )
+
+            z -= 0.25 * (
+                (1 - s) * (1 - t) * f1e1z +
+                (1 + r) * (1 - s) * f1e2z +
+                (1 - s) * (1 + t) * f1e3z +
+                (1 - r) * (1 - s) * f1e4z +
+                (1 + s) * (1 - t) * f2e1z +
+                (1 + r) * (1 + s) * f2e2z +
+                (1 + s) * (1 + t) * f2e3z +
+                (1 - r) * (1 + s) * f2e4z +
+                (1 - r) * (1 - t) * f6e1z +
+                (1 + r) * (1 - t) * f4e1z +
+                (1 + r) * (1 + t) * f4e2z +
+                (1 - r) * (1 + t) * f6e2z
+            )
+
+            points[i, j, k, q] = (x, y, z)
+        end
+    end
+end
+
+function materializepoints(
+    referencecell::LobattoHex,
+    coarsegridcells,
+    coarsegridvertices,
+    interpolation_degree,
+    faceinterpolation,
+    quadranttointerpolation,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    forest,
+    comm,
+)
+    r = vec.(points_1d(referencecell))
+    FT = floattype(referencecell)
+    AT = arraytype(referencecell)
+    N = Tuple((interpolation_degree + 1) * ones(Int64, 3))
+    interp_r = vec.(points_1d(LobattoCell{Tuple{N...},FT,AT}()))
+
+    IntType = typeof(length(r))
+    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    points = GridArray{eltype(coarsegridvertices)}(
+        undef,
+        arraytype(referencecell),
+        (length.(r)..., num_local),
+        (length.(r)..., length(quadranttolevel)),
+        comm,
+        false,
+        length(r) + 1,
+    )
+
+    backend = get_backend(points)
+    kernel! = curvedhexpoints!(backend, length.(r))
+    kernel!(
+        points,
+        r...,
+        interp_r...,
+        coarsegridcells,
+        coarsegridvertices,
+        interpolation_degree,
+        faceinterpolation,
+        quadranttointerpolation,
         length(quadranttolevel),
         quadranttolevel,
         quadranttotreeid,
