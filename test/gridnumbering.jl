@@ -330,6 +330,9 @@
             @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
             @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
 
+            @test isapprox(pts[fm.avmapM], pts[fm.avmapP])
+            @test isapprox(pts[fm.avmapM[fm.amapM]], pts[fm.avmapM[fm.amapP]])
+
             for n in eachindex(fm.mapB, fm.vmapM)
                 # Test that faces in mapB are on the boundary
                 @test all(
@@ -514,6 +517,9 @@
             @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
             @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
             @test isapprox(pts[fm.vmapM[3]], pts[fm.vmapP[3]])
+
+            @test isapprox(pts[fm.avmapM], pts[fm.avmapP])
+            @test isapprox(pts[fm.avmapM[fm.amapM]], pts[fm.avmapM[fm.amapP]])
 
             for n in eachindex(fm.mapB, fm.vmapM)
                 # Test that faces in mapB are on the boundary

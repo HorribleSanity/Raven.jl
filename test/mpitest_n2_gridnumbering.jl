@@ -74,6 +74,15 @@ let
         @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
         @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
 
+        @test isapprox(
+            pts[fm.avmapM[:, 1:numcells(grid)]],
+            pts[fm.avmapP[:, 1:numcells(grid)]],
+        )
+        @test isapprox(
+            pts[fm.avmapM[fm.amapM[:, 1:numcells(grid)]]],
+            pts[fm.avmapM[fm.amapP[:, 1:numcells(grid)]]],
+        )
+
         for n in eachindex(fm.mapB, fm.vmapM)
             # Test that faces in mapB are on the boundary
             @test all(
@@ -297,6 +306,15 @@ let
         @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
         @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
         @test isapprox(pts[fm.vmapM[3]], pts[fm.vmapP[3]])
+
+        @test isapprox(
+            pts[fm.avmapM[:, 1:numcells(grid)]],
+            pts[fm.avmapP[:, 1:numcells(grid)]],
+        )
+        @test isapprox(
+            pts[fm.avmapM[fm.amapM[:, 1:numcells(grid)]]],
+            pts[fm.avmapM[fm.amapP[:, 1:numcells(grid)]]],
+        )
 
         @test all(
             isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[fm.vmapM[2][fm.mapB[2]]])),
