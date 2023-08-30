@@ -269,7 +269,7 @@ function materializedtoc(forest, ghost, nodes, quadrantcommpattern, comm)
 
     pattern = expand(quadrantcommpattern, prod(size(dtoc_owned)[1:end-1]))
 
-    cm = commmanager(eltype(dtoc_global), comm, pattern, 0)
+    cm = commmanager(eltype(dtoc_global), pattern; comm)
 
     share!(dtoc_global, cm)
 
@@ -377,7 +377,7 @@ function generate(warp::Function, gm::GridManager)
     points = warp.(coarsegrid_warp.(points))
 
     fillghosts!(points, fill(NaN, eltype(points)))
-    pcm = commmanager(eltype(points), comm(gm), nodecommpattern, 0)
+    pcm = commmanager(eltype(points), nodecommpattern; comm = comm(gm))
     share!(points, pcm)
 
     volumemetrics, surfacemetrics =

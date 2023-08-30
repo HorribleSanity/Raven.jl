@@ -118,13 +118,19 @@ end
 
 usetriplebuffer(::Type{Array}) = false
 
-function commmanager(T, comm, pattern, tag)
+function commmanager(T, pattern; kwargs...)
     AT = arraytype(pattern)
     triplebuffer = usetriplebuffer(AT)
-    commmanager(T, comm, pattern, tag, Val(triplebuffer))
+    commmanager(T, pattern, Val(triplebuffer); kwargs...)
 end
 
-function commmanager(T, comm, pattern, tag, ::Val{triplebuffer}) where {triplebuffer}
+function commmanager(
+    T,
+    pattern,
+    ::Val{triplebuffer};
+    comm = MPI.COMM_WORLD,
+    tag = 0,
+) where {triplebuffer}
     AT = arraytype(pattern)
 
     if tag < 0 || tag > 32767

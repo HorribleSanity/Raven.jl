@@ -89,8 +89,8 @@ let
         sendrankindices,
     )
 
-    cm1 = Raven.commmanager(eltype(data1), MPI.COMM_WORLD, pattern, 1, Val(false))
-    cm2 = Raven.commmanager(eltype(data2), MPI.COMM_WORLD, pattern, 2, Val(true))
+    cm1 = Raven.commmanager(eltype(data1), pattern, Val(false); tag = 1)
+    cm2 = Raven.commmanager(eltype(data2), pattern, Val(true); tag = 2)
 
     Raven.start!(data2, cm2)
 
@@ -114,8 +114,8 @@ let
             sendrankindices,
         )
 
-        cm3 = Raven.commmanager(eltype(data3), MPI.COMM_WORLD, pattern, 1)
-        cm4 = Raven.commmanager(eltype(data4), MPI.COMM_WORLD, pattern, 2, Val(true))
+        cm3 = Raven.commmanager(eltype(data3), pattern; tag = 1)
+        cm4 = Raven.commmanager(eltype(data4), pattern, Val(true); tag = 2)
 
         Raven.start!(data4, cm4)
 

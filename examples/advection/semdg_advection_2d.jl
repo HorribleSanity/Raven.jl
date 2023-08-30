@@ -344,7 +344,7 @@ function run(
     # precompute derivative transpose
     DT = transpose.(derivatives_1d(cell))
 
-    cm = commmanager(eltype(q), comm, nodecommpattern(grid), 0)
+    cm = commmanager(eltype(q), nodecommpattern(grid); comm)
 
     # initial output
     step = 0

@@ -18,7 +18,7 @@ function test(::Type{FT}, ::Type{AT}) where {FT,AT}
         grid = generate(gm)
 
         T = SVector{2,FT}
-        cm = Raven.commmanager(T, Raven.comm(grid), grid.nodecommpattern, 1)
+        cm = Raven.commmanager(T, nodecommpattern(grid); comm = Raven.comm(grid), tag = 1)
         A = GridArray{T}(undef, grid)
 
         nan = convert(FT, NaN)

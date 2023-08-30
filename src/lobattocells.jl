@@ -1203,7 +1203,7 @@ function materializemetrics(
         ndrange = size(points),
     )
 
-    fcm = commmanager(eltype(firstordermetrics), comm, nodecommpattern, 0)
+    fcm = commmanager(eltype(firstordermetrics), nodecommpattern; comm)
     share!(firstordermetrics, fcm)
 
     volumemetrics = (firstordermetrics, secondordermetrics)
@@ -1537,7 +1537,7 @@ function materializemetrics(
     # We need this to compute the normals and surface Jacobian on the
     # non-conforming faces.  Should we change the nonconforming surface
     # information to avoid this communication?
-    fcm = commmanager(eltype(firstordermetrics), comm, nodecommpattern, 0)
+    fcm = commmanager(eltype(firstordermetrics), nodecommpattern; comm)
     share!(firstordermetrics, fcm)
 
     volumemetrics = (firstordermetrics, secondordermetrics)
