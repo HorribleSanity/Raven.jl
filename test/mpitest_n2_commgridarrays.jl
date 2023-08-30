@@ -6,7 +6,7 @@ using Raven
 using Raven.StaticArrays
 using Raven.Adapt
 
-MPI.Init(; threadlevel = MPI.THREAD_MULTIPLE)
+MPI.Init()
 
 function test(::Type{FT}, ::Type{AT}) where {FT,AT}
     @testset "Communicate GridArray ($AT, $FT)" begin

@@ -148,16 +148,6 @@ function commmanager(
     recvrequests = MPI.UnsafeMultiRequest(length(pattern.recvranks))
     sendrequests = MPI.UnsafeMultiRequest(length(pattern.sendranks))
 
-    if triplebuffer &&
-       (!isempty(recvrequests) || !isempty(sendrequests)) &&
-       MPI.Query_thread() < MPI.THREAD_MULTIPLE
-        throw(
-            ErrorException(
-                "CommManagerTripleBuffered calls MPI functions from multiple threads and thus MPI needs to be initialized with MPI.Init(; threadlevel = MPI.THREAD_MULTIPLE).",
-            ),
-        )
-    end
-
     if triplebuffer
         recvbufferhost = Array{T}(undef, recvsize)
         sendbufferhost = Array{T}(undef, sendsize)

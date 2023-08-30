@@ -6,7 +6,7 @@ using Raven
 using Raven.StaticArrays
 using Raven.P4estTypes
 
-MPI.Init(; threadlevel = MPI.THREAD_MULTIPLE)
+MPI.Init()
 
 function isisomorphic(a, b)
     f = Dict{eltype(a),eltype(b)}()

@@ -35,8 +35,7 @@ function GridManager(
     fill_uniform = true,
 )
     if !MPI.Initialized()
-        threadlevel = usetriplebuffer(arraytype(referencecell)) ? :multiple : :serialized
-        MPI.Init(; threadlevel)
+        MPI.Init()
     end
 
     comm = MPI.Comm_dup(comm)

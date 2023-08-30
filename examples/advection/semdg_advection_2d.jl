@@ -384,7 +384,7 @@ end
 
 let
     if !MPI.Initialized()
-        MPI.Init(; threadlevel = :multiple)
+        MPI.Init()
     end
 
     comm = MPI.COMM_WORLD

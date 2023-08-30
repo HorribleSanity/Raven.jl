@@ -7,7 +7,7 @@ using Raven.StaticArrays
 using Raven.P4estTypes
 using Raven.SparseArrays
 
-MPI.Init(; threadlevel = MPI.THREAD_MULTIPLE)
+MPI.Init()
 
 let
     FT = Float64

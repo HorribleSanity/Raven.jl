@@ -7,7 +7,7 @@ using Raven.StaticArrays
 using LinearAlgebra
 using Raven.Adapt
 
-MPI.Init(; threadlevel = MPI.THREAD_MULTIPLE)
+MPI.Init()
 
 struct Stiffness <: FieldArray{Tuple{2,2},Float64,2}
     xx::Float64
