@@ -40,6 +40,7 @@ export adapt!
 include("orientation.jl")
 include("arrays.jl")
 include("sparsearrays.jl")
+include("streams.jl")
 include("eye.jl")
 include("facecode.jl")
 include("flatten.jl")

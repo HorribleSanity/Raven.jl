@@ -34,6 +34,10 @@ function Raven.adaptsparse(::Type{T}, S) where {T<:CuArray}
     return Adapt.adapt(T, Raven.GeneralSparseMatrixCSC(S))
 end
 
+Raven.Stream(::CUDABackend) = CuStream()
+Raven.synchronize(::CUDABackend, a) = synchronize(a)
+Raven.stream!(f::Function, ::CUDABackend, stream::CuStream) = stream!(f, stream)
+
 Adapt.adapt_storage(::CUDA.Adaptor, ::MPI.Comm) = nothing
 
 end # module RavenCUDAExt
