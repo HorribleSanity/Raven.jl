@@ -24,6 +24,7 @@ export continuoustodiscontinuous, nodecommpattern
 export communicatingcells, noncommunicatingcells
 export facemaps
 export decode
+export commmanager, share!, start!, finish!, progress
 
 export volumemetrics, surfacemetrics
 

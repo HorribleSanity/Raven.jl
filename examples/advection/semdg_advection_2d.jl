@@ -232,7 +232,7 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
     n, wsJ = components(surfacemetrics(grid)[3])
     fm = facemaps(grid)
 
-    Raven.start!(q, cm)
+    start!(q, cm)
 
     C = max(512 ÷ prod(size(cell)), 1)
     rhs_volume_kernel!(backend, (size(cell)..., C))(
@@ -248,7 +248,7 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
         ndrange = size(dq),
     )
 
-    Raven.finish!(q, cm)
+    finish!(q, cm)
 
     J = maximum(size(cell))
     C = max(512 ÷ J, 1)
@@ -344,7 +344,7 @@ function run(
     # precompute derivative transpose
     DT = transpose.(derivatives_1d(cell))
 
-    cm = Raven.commmanager(eltype(q), comm, nodecommpattern(grid), 0)
+    cm = commmanager(eltype(q), comm, nodecommpattern(grid), 0)
 
     # initial output
     step = 0
