@@ -590,6 +590,7 @@ function materializefacemaps(
     cellindices = LinearIndices(size(cell))
 
     if cell isa LobattoQuad
+        numfaces = 4
         degree3faceindices = ((1, 2:3), (4, 2:3), (2:3, 1), (2:3, 4))
         degree3facelinearindices = ((5, 9), (8, 12), (2, 3), (14, 15))
         cellfacedims = ((size(cell, 2),), (size(cell, 1),))
@@ -602,6 +603,7 @@ function materializefacemaps(
             cellindices[1:end, end],
         )
     elseif cell isa LobattoHex
+        numfaces = 6
         degree3faceindices = (
             (1, 2:3, 2:3),
             (4, 2:3, 2:3),
@@ -656,28 +658,11 @@ function materializefacemaps(
         end
     end
 
-    vmapM = ntuple(length(cellfacedims)) do n
-        zeros(Int, cellfacedims[n]..., 2, numcells_local)
-    end
-
-    for q = 1:numcells_local,
-        fg = 1:length(cellfacedims),
-        fn = 1:2,
-        j in CartesianIndices(cellfacedims[fg])
-
-        f = 2 * (fg - 1) + fn
-        vmapM[fg][j, fn, q] = cellfaceindices[f][j] + (q - 1) * length(cell)
-    end
-
-    vmapP = ntuple(length(cellfacedims)) do n
-        zeros(Int, cellfacedims[n]..., 2, numcells_local)
-    end
-
     # Note that ghost faces will be connected to themselves
-    amapM = reshape(collect(1:(last(faceoffsets)*numcells)), (last(faceoffsets), numcells))
-    amapP = reshape(collect(1:(last(faceoffsets)*numcells)), (last(faceoffsets), numcells))
+    mapM = reshape(collect(1:(last(faceoffsets)*numcells)), (last(faceoffsets), numcells))
+    mapP = reshape(collect(1:(last(faceoffsets)*numcells)), (last(faceoffsets), numcells))
 
-    numberofboundayfaces = zeros(Int, length(cellfacedims))
+    quadranttoboundary = zeros(Int, numfaces, numcells_local)
     numberofnonconfaces = zeros(Int, length(cellfacedims))
     uniquenonconnfaces = zeros(Int, length(cellfacedims))
     noncongfacedict = ntuple(length(cellfacedims)) do _
@@ -685,14 +670,14 @@ function materializefacemaps(
     end
     for q = 1:numcells_local
         for (f, faceindices) in enumerate(degree3faceindices)
-            fg, _ = fldmod1(f, 2)
             face = dtoc_degree3_local[faceindices..., q]
             kind = length(nzrange(ctod_degree3_local, face[1]))
 
             if kind == 1
-                numberofboundayfaces[fg] += 1
+                quadranttoboundary[f, q] = 1
             elseif kind == 1 + numchildfaces
                 # Get the canonical orientation of the global face indices
+                fg, _ = fldmod1(f, 2)
                 gface = dtoc_degree3_global[faceindices..., q]
                 o = faceorientations[f, q]
                 oindices = orientindices(o, size(gface))
@@ -705,10 +690,6 @@ function materializefacemaps(
                 numberofnonconfaces[fg] += 1
             end
         end
-    end
-
-    mapB = ntuple(length(cellfacedims)) do n
-        zeros(Int, cellfacedims[n]..., numberofboundayfaces[n])
     end
 
     vmapNC = ntuple(length(cellfacedims)) do n
@@ -727,7 +708,6 @@ function materializefacemaps(
         zeros(Int8, 2, uniquenonconnfaces[n])
     end
 
-    boundayface = zeros(Int, length(cellfacedims))
     nonconface = zeros(Int, length(cellfacedims))
     rows = rowvals(ctod_degree3_local)
     for q = 1:numcells_local
@@ -738,16 +718,8 @@ function materializefacemaps(
             kind = length(neighborsrange)
 
             if kind == 1
-                li = LinearIndices(vmapM[fg])
-                # boundary cell
-                for j in CartesianIndices(cellfacedims[fg])
-                    vmapP[fg][j, fn, q] = vmapM[fg][j, fn, q]
-                end
+                # boundary face
 
-                boundayface[fg] += 1
-                for j in CartesianIndices(cellfacedims[fg])
-                    mapB[fg][j, boundayface[fg]] = li[j, fn, q]
-                end
             elseif kind == 2
                 # conforming face
                 nf = 0
@@ -774,26 +746,15 @@ function materializefacemaps(
                 faceindices = orientindices(no, cellfacedims[fg])
 
                 for j in CartesianIndices(cellfacedims[fg])
-                    vmapP[fg][j, fn, q] =
-                        cellfaceindices[nf][faceindices[j]] + (nq - 1) * length(cell)
-
                     nfg = fld1(nf, 2)
-                    amapP[faceoffsets[end]*(q-1)+faceoffsets[f]+facefaceindices[fg][j]] =
-                        amapM[faceoffsets[end]*(nq-1)+faceoffsets[nf]+facefaceindices[nfg][faceindices[j]]]
+                    mapP[faceoffsets[end]*(q-1)+faceoffsets[f]+facefaceindices[fg][j]] =
+                        mapM[faceoffsets[end]*(nq-1)+faceoffsets[nf]+facefaceindices[nfg][faceindices[j]]]
                 end
             else
                 # non-conforming face
                 @assert kind == 1 + numchildfaces
 
                 nonconface[fg] += 1
-
-                # For now just mark the neighbor as the face itself.  This is the same
-                # as for the boundary cells.  Should we do something different?
-                for j in CartesianIndices(cellfacedims[fg])
-                    vmapP[fg][j, fn, q] = vmapM[fg][j, fn, q]
-                end
-
-                # TODO figure out how we should set amapNC for non-conforming interfaces
 
                 o = faceorientations[f, q]
                 gface = dtoc_degree3_global[degree3faceindices..., q]
@@ -859,7 +820,7 @@ function materializefacemaps(
         end
     end
 
-    avmapM = zeros(Int, size(amapM))
+    vmapM = zeros(Int, size(mapM))
     for q = 1:numcells,
         fg = 1:length(cellfacedims),
         fn = 1:2,
@@ -867,26 +828,15 @@ function materializefacemaps(
 
         f = 2 * (fg - 1) + fn
         idx = faceoffsets[end] * (q - 1) + faceoffsets[f] + facefaceindices[fg][j]
-        avmapM[idx] = cellfaceindices[f][j] + (q - 1) * length(cell)
+        vmapM[idx] = cellfaceindices[f][j] + (q - 1) * length(cell)
     end
-    avmapP = zeros(Int, size(amapM))
-    for n in eachindex(avmapP, avmapM, amapP)
-        avmapP[n] = avmapM[amapP[n]]
+    vmapP = zeros(Int, size(mapM))
+    for n in eachindex(vmapP, vmapM, mapP)
+        vmapP[n] = vmapM[mapP[n]]
     end
 
-    return (;
-        vmapM,
-        vmapP,
-        mapB,
-        vmapNC,
-        nctoface,
-        nctypes,
-        ncids,
-        avmapM,
-        avmapP,
-        amapM,
-        amapP,
-    )
+    return (; vmapM, vmapP, mapM, mapP, vmapNC, nctoface, nctypes, ncids),
+    quadranttoboundary
 end
 
 function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern)
@@ -1093,31 +1043,11 @@ end
     end
 end
 
-@kernel function quadsurfacemetrics!(surfacemetrics, dRdXs, wJs, vmapM, wnormal, fg)
-    j, fn, _ = @index(Local, NTuple)
-    _, _, q = @index(Global, NTuple)
-
-    @inbounds begin
-        i = vmapM[j, fn, q]
-        dRdX = dRdXs[i]
-        wJ = wJs[i]
-
-        wn = fn == 1 ? wnormal[1] : wnormal[end]
-        sn = fn == 1 ? -1 : 1
-
-        n = (sn * wJ / wn) * dRdX[fg, :]
-        wsJ = norm(n)
-        n = n / wsJ
-
-        surfacemetrics[j, fn, q] = (; n, wsJ)
-    end
-end
-
-@kernel function quadasurfacemetrics!(
-    asurfacemetrics,
+@kernel function quadsurfacemetrics!(
+    surfacemetrics,
     dRdXs,
     wJs,
-    avmapM,
+    vmapM,
     wnormal,
     fg,
     facegroupsize,
@@ -1132,7 +1062,7 @@ end
             facegroupoffsets[fg] +
             (fn - 1) * facegroupsize[1] +
             j
-        i = avmapM[si]
+        i = vmapM[si]
         dRdX = dRdXs[i]
         wJ = wJs[i]
 
@@ -1143,7 +1073,7 @@ end
         wsJ = norm(n)
         n = n / wsJ
 
-        asurfacemetrics[si] = (; n, wsJ)
+        surfacemetrics[si] = (; n, wsJ)
     end
 end
 
@@ -1215,10 +1145,7 @@ function materializemetrics(
     facegroupsize = cellfacedims
     facegroupoffsets = (0, cumsum(2 .* prod.(cellfacedims))...)
 
-    allsurfacemetrics =
-        ntuple(n -> similar(points, TS, size(facemaps.vmapM[n])), Val(length(cellfacedims)))
-
-    asurfacemetrics = GridArray{TS}(
+    surfacemetrics = GridArray{TS}(
         undef,
         arraytype(points),
         (facegroupoffsets[end], sizewithoutghosts(points)[end]),
@@ -1239,24 +1166,14 @@ function materializemetrics(
 
         kernel! = quadsurfacemetrics!(backend, (J..., 2, Q))
         kernel!(
-            allsurfacemetrics[n],
-            components(firstordermetrics)...,
-            facemaps.vmapM[n],
-            w[n],
-            n,
-            ndrange = size(allsurfacemetrics[n]),
-        )
-
-        kernel! = quadasurfacemetrics!(backend, (J..., 2, Q))
-        kernel!(
-            asurfacemetrics,
+            surfacemetrics,
             components(viewwithghosts(firstordermetrics))...,
-            facemaps.avmapM,
+            facemaps.vmapM,
             w[n],
             n,
             facegroupsize[n],
             facegroupoffsets,
-            ndrange = (J..., 2, last(size(asurfacemetrics))),
+            ndrange = (J..., 2, last(size(surfacemetrics))),
         )
 
         M = 1 + 2^(ndims(cell) - 1)
@@ -1272,8 +1189,7 @@ function materializemetrics(
         )
     end
 
-    surfacemetrics =
-        (allsurfacemetrics, ncsurfacemetrics, viewwithoutghosts(asurfacemetrics))
+    surfacemetrics = (viewwithoutghosts(surfacemetrics), ncsurfacemetrics)
 
     return (volumemetrics, surfacemetrics)
 end
@@ -1422,32 +1338,11 @@ end
     end
 end
 
-@kernel function hexsurfacemetrics!(surfacemetrics, dRdXs, wJs, vmapM, wnormal, fg)
-    i, j, fn, _ = @index(Local, NTuple)
-    _, _, _, q = @index(Global, NTuple)
-
-    @inbounds begin
-        k = vmapM[i, j, fn, q]
-        dRdX = dRdXs[k]
-        wJ = wJs[k]
-
-        wn = fn == 1 ? wnormal[1] : wnormal[end]
-        sn = fn == 1 ? -1 : 1
-
-        n = (sn * wJ / wn) * dRdX[fg, :]
-
-        wsJ = norm(n)
-        n = n / wsJ
-
-        surfacemetrics[i, j, fn, q] = (; n, wsJ)
-    end
-end
-
-@kernel function hexasurfacemetrics!(
-    asurfacemetrics,
+@kernel function hexsurfacemetrics!(
+    surfacemetrics,
     dRdXs,
     wJs,
-    avmapM,
+    vmapM,
     wnormal,
     fg,
     facegroupsize,
@@ -1463,7 +1358,7 @@ end
             (fn - 1) * facegroupsize[1] * facegroupsize[2] +
             (j - 1) * facegroupsize[1] +
             i
-        k = avmapM[sk]
+        k = vmapM[sk]
         dRdX = dRdXs[k]
         wJ = wJs[k]
 
@@ -1475,7 +1370,7 @@ end
         wsJ = norm(n)
         n = n / wsJ
 
-        asurfacemetrics[sk] = (; n, wsJ)
+        surfacemetrics[sk] = (; n, wsJ)
     end
 end
 
@@ -1553,10 +1448,7 @@ function materializemetrics(
     facegroupsize = cellfacedims
     facegroupoffsets = (0, cumsum(2 .* prod.(cellfacedims))...)
 
-    allsurfacemetrics =
-        ntuple(n -> similar(points, TS, size(facemaps.vmapM[n])), Val(length(cellfacedims)))
-
-    asurfacemetrics = GridArray{TS}(
+    surfacemetrics = GridArray{TS}(
         undef,
         arraytype(points),
         (facegroupoffsets[end], sizewithoutghosts(points)[end]),
@@ -1577,24 +1469,14 @@ function materializemetrics(
 
         kernel! = hexsurfacemetrics!(backend, (J..., 2, Q))
         kernel!(
-            allsurfacemetrics[n],
-            components(firstordermetrics)...,
-            facemaps.vmapM[n],
-            w[n],
-            n,
-            ndrange = size(allsurfacemetrics[n]),
-        )
-
-        kernel! = hexasurfacemetrics!(backend, (J..., 2, Q))
-        kernel!(
-            asurfacemetrics,
+            surfacemetrics,
             components(viewwithghosts(firstordermetrics))...,
-            facemaps.avmapM,
+            facemaps.vmapM,
             w[n],
             n,
             facegroupsize[n],
             facegroupoffsets,
-            ndrange = (J..., 2, last(size(asurfacemetrics))),
+            ndrange = (J..., 2, last(size(surfacemetrics))),
         )
 
         M = 1 + 2^(ndims(cell) - 1)
@@ -1610,7 +1492,7 @@ function materializemetrics(
         )
     end
 
-    surfacemetrics = (allsurfacemetrics, ncsurfacemetrics, asurfacemetrics)
+    surfacemetrics = (viewwithoutghosts(surfacemetrics), ncsurfacemetrics)
 
     return (volumemetrics, surfacemetrics)
 end

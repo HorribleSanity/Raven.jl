@@ -318,7 +318,7 @@ function generate(warp::Function, gm::GridManager)
 
     ctod_degree3_local = materializectod(dtoc_degree3_local)
 
-    facemaps = materializefacemaps(
+    facemaps, quadranttoboundary = materializefacemaps(
         referencecell(gm),
         P4estTypes.lengthoflocalquadrants(forest(gm)),
         ctod_degree3_local,
@@ -353,6 +353,7 @@ function generate(warp::Function, gm::GridManager)
     quadranttotreeid = A(pin(A, quadranttotreeid))
     quadranttocoordinate = A(pin(A, quadranttocoordinate))
     quadranttofacecode = A(pin(A, quadranttofacecode))
+    quadranttoboundary = A(pin(A, quadranttoboundary))
     parentnodes = A(pin(A, parentnodes))
     nodecommpattern = Adapt.adapt(A, nodecommpattern)
     continuoustodiscontinuous = adaptsparse(A, continuoustodiscontinuous)
@@ -402,6 +403,7 @@ function generate(warp::Function, gm::GridManager)
         quadranttolevel,
         quadranttotreeid,
         quadranttofacecode,
+        quadranttoboundary,
         parentnodes,
         nodecommpattern,
         continuoustodiscontinuous,

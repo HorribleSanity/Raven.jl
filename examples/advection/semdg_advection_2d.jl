@@ -229,7 +229,7 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
     cell = referencecell(grid)
 
     dRdX, wJ = components(first(volumemetrics(grid)))
-    n, wsJ = components(surfacemetrics(grid)[3])
+    n, wsJ = components(first(surfacemetrics(grid)))
     fm = facemaps(grid)
 
     start!(q, cm)
@@ -255,8 +255,8 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
     rhs_surface_kernel!(backend, (J, C))(
         dq,
         viewwithghosts(q),
-        fm.avmapM,
-        fm.avmapP,
+        fm.vmapM,
+        fm.vmapP,
         n,
         wsJ,
         invwJ,

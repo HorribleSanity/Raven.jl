@@ -327,29 +327,28 @@
             pts = Adapt.adapt(Array, pts)
             fm = Adapt.adapt(Array, facemaps(grid))
 
-            @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
-            @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
+            @test isapprox(pts[fm.vmapM], pts[fm.vmapP])
+            @test isapprox(pts[fm.vmapM[fm.mapM]], pts[fm.vmapM[fm.mapP]])
 
-            @test isapprox(pts[fm.avmapM], pts[fm.avmapP])
-            @test isapprox(pts[fm.avmapM[fm.amapM]], pts[fm.avmapM[fm.amapP]])
-
-            for n in eachindex(fm.mapB, fm.vmapM)
-                # Test that faces in mapB are on the boundary
-                @test all(
-                    isapprox.(
-                        one(FT),
-                        map(x -> maximum(abs.(x)), pts[fm.vmapM[n][fm.mapB[n]]]),
-                    ),
-                )
-
-                # Test that faces not in mapB are not on the boundary
-                Nf = N^(ndims(cell) - 1)
-                mapBn = reshape(fm.mapB[n], (Nf, :))
-                vmapMn = reshape(fm.vmapM[n], (Nf, :))
-                boundaryfaces = fld1.(mapBn, Nf)[1, :]
-                nonboundaryfaces = setdiff(1:size(vmapMn, 2), boundaryfaces)
-                for f in nonboundaryfaces
-                    @test !all(isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapMn])))
+            bc = boundarycodes(grid)
+            vmapM = reshape(fm.vmapM, (N, 4, :))
+            for q = 1:numcells(grid)
+                for f = 1:4
+                    if bc[f, q] == 1
+                        @test all(
+                            isapprox.(
+                                one(FT),
+                                map(x -> maximum(abs.(x)), pts[vmapM[:, f, q]]),
+                            ),
+                        )
+                    else
+                        @test !all(
+                            isapprox.(
+                                one(FT),
+                                map(x -> maximum(abs.(x)), pts[vmapM[:, f, q]]),
+                            ),
+                        )
+                    end
                 end
             end
         end
@@ -514,30 +513,29 @@
 
             pts = Adapt.adapt(Array, pts)
             fm = Adapt.adapt(Array, facemaps(grid))
-            @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
-            @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
-            @test isapprox(pts[fm.vmapM[3]], pts[fm.vmapP[3]])
 
-            @test isapprox(pts[fm.avmapM], pts[fm.avmapP])
-            @test isapprox(pts[fm.avmapM[fm.amapM]], pts[fm.avmapM[fm.amapP]])
+            @test isapprox(pts[fm.vmapM], pts[fm.vmapP])
+            @test isapprox(pts[fm.vmapM[fm.mapM]], pts[fm.vmapM[fm.mapP]])
 
-            for n in eachindex(fm.mapB, fm.vmapM)
-                # Test that faces in mapB are on the boundary
-                @test all(
-                    isapprox.(
-                        one(FT),
-                        map(x -> maximum(abs.(x)), pts[fm.vmapM[n][fm.mapB[n]]]),
-                    ),
-                )
-
-                # Test that faces not in mapB are not on the boundary
-                Nf = N^(ndims(cell) - 1)
-                mapBn = reshape(fm.mapB[n], (Nf, :))
-                vmapMn = reshape(fm.vmapM[n], (Nf, :))
-                boundaryfaces = fld1.(mapBn, Nf)[1, :]
-                nonboundaryfaces = setdiff(1:size(vmapMn, 2), boundaryfaces)
-                for f in nonboundaryfaces
-                    @test !all(isapprox.(one(FT), map(x -> maximum(abs.(x)), pts[vmapMn])))
+            bc = boundarycodes(grid)
+            vmapM = reshape(fm.vmapM, (N, N, 6, :))
+            for q = 1:numcells(grid)
+                for f = 1:6
+                    if bc[f, q] == 1
+                        @test all(
+                            isapprox.(
+                                one(FT),
+                                map(x -> maximum(abs.(x)), pts[vmapM[:, :, f, q]]),
+                            ),
+                        )
+                    else
+                        @test !all(
+                            isapprox.(
+                                one(FT),
+                                map(x -> maximum(abs.(x)), pts[vmapM[:, :, f, q]]),
+                            ),
+                        )
+                    end
                 end
             end
         end

@@ -8,7 +8,7 @@ floattype(grid::AbstractGrid) = floattype(typeof(grid))
 arraytype(grid::AbstractGrid) = arraytype(typeof(grid))
 celltype(grid::AbstractGrid) = celltype(typeof(grid))
 
-struct Grid{C<:AbstractCell,P,V,S,L,T,F,PN,N,CTOD,DTOC,CC,FM} <: AbstractGrid{C}
+struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CTOD,DTOC,CC,FM} <: AbstractGrid{C}
     comm::MPI.Comm
     part::Int
     nparts::Int
@@ -21,6 +21,7 @@ struct Grid{C<:AbstractCell,P,V,S,L,T,F,PN,N,CTOD,DTOC,CC,FM} <: AbstractGrid{C}
     levels::L
     trees::T
     facecodes::F
+    boundarycodes::B
     parentnodes::PN
     nodecommpattern::N
     continuoustodiscontinuous::CTOD
@@ -50,6 +51,11 @@ facecodes(grid::Grid) = facecodes(grid, Val(false))
 facecodes(grid::Grid, ::Val{false}) = grid.facecodes
 facecodes(::Grid, ::Val{true}) =
     throw(error("Face codes are currently stored for local quadrants."))
+
+boundarycodes(grid::Grid) = boundarycodes(grid, Val(false))
+boundarycodes(grid::Grid, ::Val{false}) = grid.boundarycodes
+boundarycodes(::Grid, ::Val{true}) =
+    throw(error("Boundary codes are currently stored for local quadrants."))
 
 nodecommpattern(grid::Grid) = grid.nodecommpattern
 continuoustodiscontinuous(grid::Grid) = grid.continuoustodiscontinuous

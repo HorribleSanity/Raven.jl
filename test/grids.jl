@@ -77,9 +77,7 @@ function grids_testsuite(AT, FT)
         cell = LobattoCell{Tuple{N...},FT,AT}()
         gm = GridManager(cell, brick(coordinates, (true, true)))
         grid = generate(gm)
-        fm = facemaps(grid)
-        @test length(fm.mapB[1]) == 0
-        @test length(fm.mapB[2]) == 0
+        @test all(boundarycodes(grid) .== 0)
     end
 
     let
@@ -242,21 +240,10 @@ function grids_testsuite(AT, FT)
         uJ = adapt(Array, uJ)
         wr = adapt(Array, wr)
         ws = adapt(Array, ws)
-        sm, _, asm = surfacemetrics(grid)
+        sm, _ = surfacemetrics(grid)
         sm = adapt(Array, sm)
-        asm = adapt(Array, asm)
 
-        n, wsJ = components(sm[1])
-        a = n ./ vec(ws) .* wsJ
-        @test all(a[:, 1, :] .≈ map(g -> SA[-g[2, 2], g[1, 2]], uJ[1, :, :]))
-        @test all(a[:, 2, :] .≈ map(g -> SA[g[2, 2], -g[1, 2]], uJ[end, :, :]))
-
-        n, wsJ = components(sm[2])
-        a = n ./ vec(wr) .* wsJ
-        @test all(a[:, 1, :] .≈ map(g -> SA[g[2, 1], -g[1, 1]], uJ[:, 1, :]))
-        @test all(a[:, 2, :] .≈ map(g -> SA[-g[2, 1], g[1, 1]], uJ[:, end, :]))
-
-        n, wsJ = components(asm)
+        n, wsJ = components(sm)
         a = n .* wsJ
         @test all(
             a[1:M, 1:numcells(grid)] ./ vec(ws) .≈
@@ -303,11 +290,9 @@ function grids_testsuite(AT, FT)
 
         pts = Adapt.adapt(Array, pts)
         fm = Adapt.adapt(Array, fm)
-        @test isapprox(pts[fm.vmapM[1]], pts[fm.vmapP[1]])
-        @test isapprox(pts[fm.vmapM[2]], pts[fm.vmapP[2]])
 
-        @test isapprox(pts[fm.avmapM], pts[fm.avmapP])
-        @test isapprox(pts[fm.avmapM[fm.amapM]], pts[fm.avmapM[fm.amapP]])
+        @test isapprox(pts[fm.vmapM], pts[fm.vmapP])
+        @test isapprox(pts[fm.vmapM[fm.mapM]], pts[fm.vmapM[fm.mapP]])
     end
 
     @testset "2D constant preserving" begin
@@ -412,27 +397,11 @@ function grids_testsuite(AT, FT)
         wr = adapt(Array, wr)
         ws = adapt(Array, ws)
         wt = adapt(Array, wt)
-        sm, _, asm = surfacemetrics(grid)
+        sm, _ = surfacemetrics(grid)
         sm = adapt(Array, sm)
-        asm = adapt(Array, asm)
         b = det.(uJ) .* uinvJ
 
-        n, wsJ = components(sm[1])
-        a = n ./ (vec(ws) .* vec(wt)') .* wsJ
-        @test all(a[:, :, 1, :] .≈ map(g -> -g[1, :], b[1, :, :, :]))
-        @test all(a[:, :, 2, :] .≈ map(g -> g[1, :], b[end, :, :, :]))
-
-        n, wsJ = components(sm[2])
-        a = n ./ (vec(wr) .* vec(wt)') .* wsJ
-        @test all(a[:, :, 1, :] .≈ map(g -> -g[2, :], b[:, 1, :, :]))
-        @test all(a[:, :, 2, :] .≈ map(g -> g[2, :], b[:, end, :, :]))
-
-        n, wsJ = components(sm[3])
-        a = n ./ (vec(wr) .* vec(ws)') .* wsJ
-        @test all(a[:, :, 1, :] .≈ map(g -> -g[3, :], b[:, :, 1, :]))
-        @test all(a[:, :, 2, :] .≈ map(g -> g[3, :], b[:, :, end, :]))
-
-        n, wsJ = components(asm)
+        n, wsJ = components(sm)
         a = n .* wsJ
         @test all(
             reshape(a[1:M*N, 1:numcells(grid)], (M, N, numcells(grid))) ./
