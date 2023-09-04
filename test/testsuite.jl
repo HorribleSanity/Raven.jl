@@ -16,6 +16,7 @@ using WriteVTK
 include("cells.jl")
 include("flatten.jl")
 include("grids.jl")
+include("gridarrays.jl")
 include("kron.jl")
 
 function testsuite(AT, FT)
@@ -32,6 +33,10 @@ function testsuite(AT, FT)
     if isbitstype(FT)
         @testset "Grid generation ($AT, $FT)" begin
             grids_testsuite(AT, FT)
+        end
+
+        @testset "Grid arrays ($AT, $FT)" begin
+            gridarrays_testsuite(AT, FT)
         end
 
         @testset "Kronecker operators (GridArray 2D) ($AT, $FT)" begin
