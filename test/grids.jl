@@ -1,5 +1,22 @@
 using ReadVTK
 
+function min_node_dist_warpfun(x⃗::SVector{2})
+    FT = eltype(x⃗)
+    ξ1, ξ2 = x⃗
+    ξ1 ≥ FT(1 / 2) && (ξ1 = FT(1 / 2) + 2 * (ξ1 - FT(1 / 2)))
+    ξ2 ≥ FT(3 / 2) && (ξ2 = FT(3 / 2) + 2 * (ξ2 - FT(3 / 2)))
+    return SVector(ξ1, ξ2)
+end
+function min_node_dist_warpfun(x⃗::SVector{3})
+    FT = eltype(x⃗)
+    ξ1, ξ2, ξ3 = x⃗
+    ξ1 ≥ FT(1 / 2) && (ξ1 = FT(1 / 2) + 2 * (ξ1 - FT(1 / 2)))
+    ξ2 ≥ FT(1 / 2) && (ξ2 = FT(1 / 2) + 2 * (ξ2 - FT(1 / 2)))
+    ξ3 ≥ FT(3 / 2) && (ξ3 = FT(3 / 2) + 2 * (ξ3 - FT(3 / 2)))
+    return SVector(ξ1, ξ2, ξ3)
+end
+
+
 function grids_testsuite(AT, FT)
     rng = StableRNG(37)
 
@@ -478,4 +495,42 @@ function grids_testsuite(AT, FT)
 
     end
 
+    @testset "min_node_distance" begin
+        Kh = 10
+        Kv = 4
+        Nqs = (((5, 5), (5, 4), (3, 4)), ((5, 5, 5), (3, 4, 5), (5, 4, 3), (5, 3, 4)))
+
+        for dim in (2, 3)
+            for Nq in Nqs[dim-1]
+                if dim == 2
+                    brickrange = (
+                        range(FT(0); length = Kh + 1, stop = FT(1)),
+                        range(FT(1); length = Kv + 1, stop = FT(2)),
+                    )
+                elseif dim == 3
+                    brickrange = (
+                        range(FT(0); length = Kh + 1, stop = FT(1)),
+                        range(FT(0); length = Kh + 1, stop = FT(1)),
+                        range(FT(1); length = Kv + 1, stop = FT(2)),
+                    )
+                end
+
+                gm = GridManager(
+                    LobattoCell{Tuple{Nq...},FT,AT}(),
+                    Raven.brick(brickrange, ntuple(_ -> true, dim)),
+                )
+                grid = generate(min_node_dist_warpfun, gm)
+
+                ξ = Array.(points_1d(referencecell(grid)))
+                Δξ = ntuple(d -> ξ[d][2] - ξ[d][1], dim)
+
+                hmnd = minimum(Δξ[1:(dim-1)]) / (2Kh)
+                vmnd = Δξ[end] / (2Kv)
+
+                @test hmnd ≈ min_node_distance(grid)
+                @test vmnd ≈ min_node_distance(grid, dims = (dim,))
+                @test hmnd ≈ min_node_distance(grid, dims = 1:(dim-1))
+            end
+        end
+    end
 end

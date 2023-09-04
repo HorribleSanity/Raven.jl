@@ -28,6 +28,7 @@ export commmanager, share!, start!, finish!, progress
 export faceoffsets
 
 export volumemetrics, surfacemetrics
+export min_node_distance
 
 export flatten, unflatten
 
