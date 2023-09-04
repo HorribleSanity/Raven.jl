@@ -25,6 +25,7 @@ export communicatingcells, noncommunicatingcells
 export facemaps, boundarycodes
 export decode
 export commmanager, share!, start!, finish!, progress
+export faceoffsets
 
 export volumemetrics, surfacemetrics
 

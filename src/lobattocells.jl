@@ -179,6 +179,24 @@ toequallyspaced(cell::LobattoCell) = cell.toequallyspaced
 tohalves_1d(cell::LobattoCell) = cell.tohalves_1d
 degrees(cell::LobattoCell) = size(cell) .- 1
 
+faceoffsets(::LobattoLine) = (0, 1, 2)
+function faceoffsets(cell::LobattoQuad)
+    Nf = (size(cell, 2), size(cell, 2), size(cell, 1), size(cell, 1))
+    return cumsum((0, Nf...))
+end
+
+function faceoffsets(cell::LobattoHex)
+    Nf = (
+        size(cell, 2) * size(cell, 3),
+        size(cell, 2) * size(cell, 3),
+        size(cell, 1) * size(cell, 3),
+        size(cell, 1) * size(cell, 3),
+        size(cell, 1) * size(cell, 2),
+        size(cell, 1) * size(cell, 2),
+    )
+    return cumsum((0, Nf...))
+end
+
 @kernel function quadpoints!(
     points,
     ri,
