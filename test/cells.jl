@@ -17,6 +17,7 @@ function cells_testsuite(AT, FT)
     @test sum(facemass(cell)) .≈ 8
     @test facemass(cell) isa Diagonal
     @test faceoffsets(cell) == (0, 3, 6, 9, 12)
+    @test strides(cell) == (1, 3)
     D = derivatives(cell)
     @test Array(D[1] * points(cell)) ≈ fill(SVector(one(FT), zero(FT)), 9)
     @test Array(D[2] * points(cell)) ≈ fill(SVector(zero(FT), one(FT)), 9)
@@ -56,6 +57,7 @@ function cells_testsuite(AT, FT)
     @test sum(facemass(cell)) .≈ 24
     @test facemass(cell) isa Diagonal
     @test faceoffsets(cell) == (0, 8, 16, 22, 28, 40, 52)
+    @test strides(cell) == (1, 3, 12)
     D = derivatives(cell)
     @test Array(D[1] * points(cell)) ≈
           fill(SVector(one(FT), zero(FT), zero(FT)), prod(size_to_tuple(S)))
@@ -95,6 +97,7 @@ function cells_testsuite(AT, FT)
     @test sum(facemass(cell)) .≈ 2
     @test facemass(cell) isa Diagonal
     @test faceoffsets(cell) == (0, 1, 2)
+    @test strides(cell) == (1,)
     D = derivatives(cell)
     @test Array(D[1] * points(cell)) ≈ fill(SVector(one(FT)), 5)
     D1d = derivatives_1d(cell)
