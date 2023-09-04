@@ -34,6 +34,12 @@ function Raven.adaptsparse(::Type{T}, S) where {T<:CuArray}
     return Adapt.adapt(T, Raven.GeneralSparseMatrixCSC(S))
 end
 
+function CuArray(a::Raven.GridArray)
+    acu = CuArray{eltype(a)}(undef, size(a))
+    acu .= a
+    return acu
+end
+
 Raven.Stream(::CUDABackend) = CuStream()
 Raven.synchronize(::CUDABackend, a) = synchronize(a)
 Raven.stream!(f::Function, ::CUDABackend, stream::CuStream) = stream!(f, stream)
