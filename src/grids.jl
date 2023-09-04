@@ -79,3 +79,56 @@ numcells(grid::Grid, ::Val{true}) = length(grid.levels)
 Base.length(grid::Grid) = grid.locallength
 partitionnumber(grid::Grid) = grid.part
 numberofpartitions(grid::Grid) = grid.nparts
+
+@kernel function min_neighbour_distance_kernel(
+    min_neighbour_distance,
+    points,
+    ::Val{S},
+    ::Val{Np},
+    ::Val{dims},
+) where {S,Np,dims}
+    I = @index(Global, Linear)
+
+    @inbounds begin
+        e = (I - 1) ÷ Np + 1
+        ijk = (I - 1) % Np + 1
+
+        md = typemax(eltype(min_neighbour_distance))
+        x⃗ = points[ijk, e]
+        for d in dims
+            for m in (-1, 1)
+                ijknb = ijk + S[d] * m
+                if 1 <= ijknb <= Np
+                    x⃗nb = points[ijknb, e]
+                    md = min(norm(x⃗ - x⃗nb), md)
+                end
+            end
+        end
+        min_neighbour_distance[ijk, e] = md
+    end
+end
+
+function min_node_distance(grid::Grid; dims = 1:ndims(referencecell(grid)))
+    A = arraytype(grid)
+    T = floattype(grid)
+    cell = referencecell(grid)
+
+    if maximum(dims) > ndims(cell) || minimum(dims) < 1
+        throw(ArgumentError("dims are not valid"))
+    end
+
+    Np = length(cell)
+    x = reshape(points(grid), (Np, :))
+    min_neighbour_distance = A{T}(undef, size(x))
+
+    min_neighbour_distance_kernel(get_backend(A), 256)(
+        min_neighbour_distance,
+        x,
+        Val(strides(cell)),
+        Val(Np),
+        Val(dims);
+        ndrange = length(grid) * length(cell),
+    )
+
+    return MPI.Allreduce(minimum(min_neighbour_distance), min, comm(grid))
+end
