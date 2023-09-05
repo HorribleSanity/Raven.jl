@@ -318,6 +318,124 @@ function materializepoints(
     return points
 end
 
+@kernel function quadbrickpoints!(
+    points,
+    ri,
+    si,
+    coarsegridcells,
+    coarsegridvertices,
+    numberofquadrants,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    ::Val{I},
+    ::Val{J},
+    ::Val{Q},
+) where {I,J,Q}
+    i, j, q1 = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(eltype(points))
+
+    treecoords = @localmem eltype(points) (2, 2, Q)
+    rl = @localmem eltype(ri) (I,)
+    sl = @localmem eltype(si) (J,)
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            if j == 1 && q1 == 1
+                rl[i] = ri[i]
+            end
+
+            if i == 1 && q1 == 1
+                sl[j] = si[j]
+            end
+
+            if i ≤ 2 && j ≤ 2
+                treeid = quadranttotreeid[q]
+                vids = coarsegridcells[treeid]
+                treecoords[i, j, q1] = coarsegridvertices[vids[i+2*(j-1)]]
+            end
+        end
+    end
+
+    @synchronize
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            treeid = quadranttotreeid[q]
+            level = quadranttolevel[q]
+            ix = quadranttocoordinate[q, 1]
+            iy = quadranttocoordinate[q, 2]
+
+            P4EST_MAXLEVEL = 30
+            P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
+
+            cr = T(ix) / P4EST_ROOT_LEN
+            cs = T(iy) / P4EST_ROOT_LEN
+
+            h = one(T) / (1 << (level + 1))
+
+            r = muladd(h, (rl[i] + 1), cr)
+            s = muladd(h, (sl[j] + 1), cs)
+
+            c1 = treecoords[1, 1, q1]
+            c2 = treecoords[2, 1, q1]
+            c3 = treecoords[1, 2, q1]
+
+            dx = c2[1] - c1[1]
+            dy = c3[2] - c1[2]
+
+            points[i, j, q] = SVector(muladd(dx, r, c1[1]), muladd(dy, s, c1[2]))
+        end
+    end
+end
+
+function materializebrickpoints(
+    referencecell::LobattoQuad,
+    coarsegridcells,
+    coarsegridvertices,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    forest,
+    comm,
+)
+    r = vec.(points_1d(referencecell))
+    Q = max(512 ÷ prod(length.(r)), 1)
+
+    IntType = typeof(length(r))
+    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    points = GridArray{eltype(coarsegridvertices)}(
+        undef,
+        arraytype(referencecell),
+        (length.(r)..., num_local),
+        (length.(r)..., length(quadranttolevel)),
+        comm,
+        false,
+        length(r) + 1,
+    )
+
+    backend = get_backend(points)
+
+    kernel! = quadbrickpoints!(backend, (length.(r)..., Q))
+    kernel!(
+        points,
+        r...,
+        coarsegridcells,
+        coarsegridvertices,
+        length(quadranttolevel),
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        Val.(length.(r))...,
+        Val(Q);
+        ndrange = size(points),
+    )
+
+    return points
+end
+
 @kernel function hexpoints!(
     points,
     ri,
@@ -437,6 +555,134 @@ function materializepoints(
 
     backend = get_backend(points)
     kernel! = hexpoints!(backend, length.(r))
+    kernel!(
+        points,
+        r...,
+        coarsegridcells,
+        coarsegridvertices,
+        length(quadranttolevel),
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        Val.(length.(r))...;
+        ndrange = size(points),
+    )
+
+    return points
+end
+
+@kernel function hexbrickpoints!(
+    points,
+    ri,
+    si,
+    ti,
+    coarsegridcells,
+    coarsegridvertices,
+    numberofquadrants,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    ::Val{I},
+    ::Val{J},
+    ::Val{K},
+) where {I,J,K}
+    i, j, k = @index(Local, NTuple)
+    q = @index(Group, Linear)
+
+    @uniform T = eltype(eltype(points))
+
+    treecoords = @localmem eltype(points) (2, 2, 2)
+    rl = @localmem eltype(ri) (I,)
+    sl = @localmem eltype(si) (J,)
+    tl = @localmem eltype(ti) (K,)
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            if j == 1 && k == 1
+                rl[i] = ri[i]
+            end
+
+            if i == 1 && k == 1
+                sl[j] = si[j]
+            end
+
+            if i == 1 && j == 1
+                tl[k] = ti[k]
+            end
+
+            if i ≤ 2 && j ≤ 2 && k ≤ 2
+                treeid = quadranttotreeid[q]
+                vids = coarsegridcells[treeid]
+                id = i + 2 * (j - 1) + 4 * (k - 1)
+                treecoords[i, j, k] = coarsegridvertices[vids[id]]
+            end
+        end
+    end
+
+    @synchronize
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            treeid = quadranttotreeid[q]
+            level = quadranttolevel[q]
+            ix = quadranttocoordinate[q, 1]
+            iy = quadranttocoordinate[q, 2]
+            iz = quadranttocoordinate[q, 3]
+
+            P4EST_MAXLEVEL = 30
+            P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
+
+            cr = T(ix) / P4EST_ROOT_LEN
+            cs = T(iy) / P4EST_ROOT_LEN
+            ct = T(iz) / P4EST_ROOT_LEN
+
+            h = one(T) / (1 << (level + 1))
+
+            r = muladd(h, (rl[i] + 1), cr)
+            s = muladd(h, (sl[j] + 1), cs)
+            t = muladd(h, (tl[k] + 1), ct)
+
+            c1 = treecoords[1]
+            c2 = treecoords[2]
+            c3 = treecoords[3]
+            c5 = treecoords[5]
+
+            dx = c2[1] - c1[1]
+            dy = c3[2] - c1[2]
+            dz = c5[3] - c1[3]
+
+            points[i, j, k, q] =
+                SVector(muladd(dx, r, c1[1]), muladd(dy, s, c1[2]), muladd(dz, t, c1[3]))
+        end
+    end
+end
+
+function materializebrickpoints(
+    referencecell::LobattoHex,
+    coarsegridcells,
+    coarsegridvertices,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    forest,
+    comm,
+)
+    r = vec.(points_1d(referencecell))
+
+    IntType = typeof(length(r))
+    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    points = GridArray{eltype(coarsegridvertices)}(
+        undef,
+        arraytype(referencecell),
+        (length.(r)..., num_local),
+        (length.(r)..., length(quadranttolevel)),
+        comm,
+        false,
+        length(r) + 1,
+    )
+
+    backend = get_backend(points)
+    kernel! = hexbrickpoints!(backend, length.(r))
     kernel!(
         points,
         r...,

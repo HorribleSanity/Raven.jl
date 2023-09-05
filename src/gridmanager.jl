@@ -362,16 +362,29 @@ function generate(warp::Function, gm::GridManager)
     noncommunicatingquadrants = Adapt.adapt(A, noncommunicatingquadrants)
     facemaps = Adapt.adapt(A, facemaps)
 
-    points = materializepoints(
-        referencecell(gm),
-        coarsegridcells(gm),
-        coarsegridvertices(gm),
-        quadranttolevel,
-        quadranttotreeid,
-        quadranttocoordinate,
-        forest(gm),
-        comm(gm),
-    )
+    if coarsegrid(gm) isa BrickGrid
+        points = materializebrickpoints(
+            referencecell(gm),
+            coarsegridcells(gm),
+            coarsegridvertices(gm),
+            quadranttolevel,
+            quadranttotreeid,
+            quadranttocoordinate,
+            forest(gm),
+            comm(gm),
+        )
+    else
+        points = materializepoints(
+            referencecell(gm),
+            coarsegridcells(gm),
+            coarsegridvertices(gm),
+            quadranttolevel,
+            quadranttotreeid,
+            quadranttocoordinate,
+            forest(gm),
+            comm(gm),
+        )
+    end
 
     coarsegrid_warp = Raven.warp(coarsegrid(gm))
     points = warp.(coarsegrid_warp.(points))
