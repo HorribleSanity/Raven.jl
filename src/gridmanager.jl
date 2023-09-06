@@ -393,8 +393,16 @@ function generate(warp::Function, gm::GridManager)
     pcm = commmanager(eltype(points), nodecommpattern; comm = comm(gm))
     share!(points, pcm)
 
-    volumemetrics, surfacemetrics =
-        materializemetrics(referencecell(gm), points, facemaps, comm(gm), nodecommpattern)
+    isunwarpedbrick = coarsegrid(gm) isa BrickGrid && warp == identity
+
+    volumemetrics, surfacemetrics = materializemetrics(
+        referencecell(gm),
+        points,
+        facemaps,
+        comm(gm),
+        nodecommpattern,
+        isunwarpedbrick,
+    )
 
     part = MPI.Comm_rank(comm(gm)) + 1
     nparts = MPI.Comm_size(comm(gm))

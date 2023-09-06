@@ -1319,6 +1319,51 @@ end
     end
 end
 
+@kernel function quadvolumebrickmetrics!(
+    firstordermetrics,
+    secondordermetrics,
+    points,
+    wr,
+    ws,
+    ::Val{IR},
+    ::Val{IS},
+    ::Val{Q},
+) where {IR,IS,Q}
+    i, j, p = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(points)
+
+    X = @localmem T (IR, IS, Q)
+
+    @inbounds begin
+        X[i, j, p] = points[i, j, q]
+
+        @synchronize
+
+        dx = X[end, 1, p][1] - X[1, 1, p][1]
+        dy = X[1, end, p][2] - X[1, 1, p][2]
+        dr = 2
+        ds = 2
+
+        drdx = dr / dx
+        dsdy = ds / dy
+
+        dRdX = SMatrix{2,2,typeof(dx),4}(drdx, -zero(dx), -zero(dx), dsdy)
+
+        J = (dx / dr) * (dy / ds)
+
+        wJ = wr[i] * ws[j] * J
+
+        # invwJ = inv(wJ)
+
+        wJinvG = SHermitianCompact(SVector(wJ * (drdx)^2, -zero(dx), wJ * (dsdy)^2))
+
+        firstordermetrics[i, j, q] = (; dRdX, wJ)
+        secondordermetrics[i, j, q] = (; wJinvG, wJ)
+    end
+end
+
 @kernel function quadsurfacemetrics!(
     surfacemetrics,
     dRdXs,
@@ -1383,6 +1428,7 @@ function materializemetrics(
     facemaps,
     comm,
     nodecommpattern,
+    isunwarpedbrick,
 ) where {N,FT}
     Q = max(512 ÷ prod(size(cell)), 1)
 
@@ -1397,17 +1443,30 @@ function materializemetrics(
 
     backend = get_backend(points)
 
-    kernel! = quadvolumemetrics!(backend, (size(cell)..., Q))
-    kernel!(
-        firstordermetrics,
-        secondordermetrics,
-        points,
-        D...,
-        w...,
-        Val.(size(cell))...,
-        Val(Q);
-        ndrange = size(points),
-    )
+    if isunwarpedbrick
+        kernel! = quadvolumebrickmetrics!(backend, (size(cell)..., Q))
+        kernel!(
+            firstordermetrics,
+            secondordermetrics,
+            points,
+            w...,
+            Val.(size(cell))...,
+            Val(Q);
+            ndrange = size(points),
+        )
+    else
+        kernel! = quadvolumemetrics!(backend, (size(cell)..., Q))
+        kernel!(
+            firstordermetrics,
+            secondordermetrics,
+            points,
+            D...,
+            w...,
+            Val.(size(cell))...,
+            Val(Q);
+            ndrange = size(points),
+        )
+    end
 
     fcm = commmanager(eltype(firstordermetrics), nodecommpattern; comm)
     share!(firstordermetrics, fcm)
@@ -1614,6 +1673,76 @@ end
     end
 end
 
+@kernel function hexvolumebrickmetrics!(
+    firstordermetrics,
+    secondordermetrics,
+    points,
+    wr,
+    ws,
+    wt,
+    ::Val{IR},
+    ::Val{IS},
+    ::Val{IT},
+    ::Val{Q},
+) where {IR,IS,IT,Q}
+    i, j, p = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(points)
+    @uniform FT = eltype(eltype(points))
+
+
+    @inbounds begin
+        x = points[1, 1, 1, p]
+
+        dx = points[end, 1, 1, p][1] - x[1]
+        dy = points[1, end, 1, p][2] - x[2]
+        dz = points[1, 1, end, p][3] - x[3]
+
+        dr = 2
+        ds = 2
+        dt = 2
+
+        drdx = dr / dx
+        dsdy = ds / dy
+        dtdz = dt / dz
+
+        dRdX = SMatrix{3,3,typeof(dx),9}(
+            drdx,
+            -zero(dx),
+            -zero(dx),
+            -zero(dx),
+            dsdy,
+            -zero(dx),
+            -zero(dx),
+            -zero(dx),
+            dtdz,
+        )
+
+        J = (dx / dr) * (dy / ds) * (dz / dt)
+
+        @unroll for k = 1:IT
+            wJ = wr[i] * ws[j] * wt[k] * J
+
+            # invwJ = inv(wJ)
+
+            wJinvG = SHermitianCompact(
+                SVector(
+                    wJ * (drdx)^2,
+                    -zero(dx),
+                    -zero(dx),
+                    wJ * (dsdy)^2,
+                    -zero(dx),
+                    wJ * (dtdz)^2,
+                ),
+            )
+
+            firstordermetrics[i, j, k, q] = (; dRdX, wJ)
+            secondordermetrics[i, j, k, q] = (; wJinvG, wJ)
+        end
+    end
+end
+
 @kernel function hexsurfacemetrics!(
     surfacemetrics,
     dRdXs,
@@ -1679,6 +1808,7 @@ function materializemetrics(
     facemaps,
     comm,
     nodecommpattern,
+    isunwarpedbrick,
 ) where {FT}
     Q = max(512 ÷ (size(cell, 1) * size(cell, 2)), 1)
 
@@ -1693,17 +1823,30 @@ function materializemetrics(
 
     backend = get_backend(points)
 
-    kernel! = hexvolumemetrics!(backend, (size(cell, 1), size(cell, 2), Q))
-    kernel!(
-        firstordermetrics,
-        secondordermetrics,
-        points,
-        D...,
-        w...,
-        Val.(size(cell))...,
-        Val(Q);
-        ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
-    )
+    if isunwarpedbrick
+        kernel! = hexvolumebrickmetrics!(backend, (size(cell, 1), size(cell, 2), Q))
+        kernel!(
+            firstordermetrics,
+            secondordermetrics,
+            points,
+            w...,
+            Val.(size(cell))...,
+            Val(Q);
+            ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
+        )
+    else
+        kernel! = hexvolumemetrics!(backend, (size(cell, 1), size(cell, 2), Q))
+        kernel!(
+            firstordermetrics,
+            secondordermetrics,
+            points,
+            D...,
+            w...,
+            Val.(size(cell))...,
+            Val(Q);
+            ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
+        )
+    end
 
     # We need this to compute the normals and surface Jacobian on the
     # non-conforming faces.  Should we change the nonconforming surface

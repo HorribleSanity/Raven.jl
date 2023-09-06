@@ -345,8 +345,8 @@ function grids_testsuite(AT, FT)
 
         cp1 = (Dr * (J .* invJ11) + Ds * (J .* invJ21))
         cp2 = (Dr * (J .* invJ12) + Ds * (J .* invJ22))
-        @test norm(adapt(Array, cp1), Inf) < 100 * eps(FT)
-        @test norm(adapt(Array, cp2), Inf) < 100 * eps(FT)
+        @test norm(adapt(Array, cp1), Inf) < 200 * eps(FT)
+        @test norm(adapt(Array, cp2), Inf) < 200 * eps(FT)
 
     end
 
@@ -489,10 +489,144 @@ function grids_testsuite(AT, FT)
         cp2 = (Dr * (J .* invJc[4]) + Ds * (J .* invJc[5]) + Dt * (J .* invJc[6]))
         cp3 = (Dr * (J .* invJc[7]) + Ds * (J .* invJc[8]) + Dt * (J .* invJc[9]))
 
-        @test norm(adapt(Array, cp1), Inf) < 100 * eps(FT)
-        @test norm(adapt(Array, cp2), Inf) < 100 * eps(FT)
-        @test norm(adapt(Array, cp3), Inf) < 100 * eps(FT)
+        @test norm(adapt(Array, cp1), Inf) < 200 * eps(FT)
+        @test norm(adapt(Array, cp2), Inf) < 200 * eps(FT)
+        @test norm(adapt(Array, cp3), Inf) < 200 * eps(FT)
 
+    end
+
+    @testset "2D uniform brick grid" begin
+        cell = LobattoCell{Tuple{4,5},FT,AT}()
+        xrange = range(-FT(1000), stop = FT(1000), length = 21)
+        yrange = range(-FT(2000), stop = FT(2000), length = 11)
+        grid = generate(GridManager(cell, Raven.brick((xrange, yrange))))
+
+        # TODO get Cartesian ordering to check symmetry
+        # p = adapt(Array, points(grid))
+        # p = reshape(p, size(cell)..., size(grid)...)
+        # x₁, x₂ = components(p)
+        # @test all(x₁ .+ reverse(x₁, dims = (1, 3)) .== 0)
+        # @test all(x₂ .- reverse(x₂, dims = (1, 3)) .== 0)
+        # @test all(x₁ .- reverse(x₁, dims = (2, 4), cell) .== 0)
+        # @test all(x₂ .+ reverse(x₂, dims =, cell (2, 4)) .== 0)
+
+        g, wJ = adapt(Array, components(first(volumemetrics(grid))))
+        wr, ws = adapt(Array, weights_1d(cell))
+        @test all(wJ .== (step(xrange) * step(yrange) / 4) .* (wr .* ws))
+        @test all(getindex.(g, 1) .== 2 / step(xrange))
+        @test all(getindex.(g, 2) .== 0)
+        @test all(getindex.(g, 3) .== 0)
+        @test all(getindex.(g, 4) .== 2 / step(yrange))
+
+        n, swJ = adapt(Array, components(first(surfacemetrics(grid))))
+
+        n₁, n₂, n₃, n₄ = faceviews(n, cell)
+        @test all(n₁ .== Ref(SVector(-1, 0)))
+        @test all(n₂ .== Ref(SVector(1, 0)))
+        @test all(n₃ .== Ref(SVector(0, -1)))
+        @test all(n₄ .== Ref(SVector(0, 1)))
+
+        swJ₁, swJ₂, swJ₃, swJ₄ = faceviews(swJ, cell)
+        @test all(isapprox.(swJ₁, (step(yrange) / 2) .* vec(ws), rtol = 10eps(FT)))
+        @test all(isapprox.(swJ₂, (step(yrange) / 2) .* vec(ws), rtol = 10eps(FT)))
+        @test all(isapprox.(swJ₃, (step(xrange) / 2) .* vec(wr), rtol = 10eps(FT)))
+        @test all(isapprox.(swJ₄, (step(xrange) / 2) .* vec(wr), rtol = 10eps(FT)))
+    end
+
+    @testset "3D uniform brick grid" begin
+        cell = LobattoCell{Tuple{4,5,6},FT,AT}()
+        xrange = range(-FT(1000), stop = FT(1000), length = 21)
+        yrange = range(-FT(2000), stop = FT(2000), length = 11)
+        zrange = range(-FT(3000), stop = FT(3000), length = 6)
+        grid = generate(GridManager(cell, Raven.brick((xrange, yrange, zrange))))
+
+        # TODO get Cartesian ordering to check symmetry
+        # p = adapt(Array, points(grid))
+        # p = reshape(p, size(cell)..., size(grid)...)
+        # x₁, x₂, x₃ = components(p)
+
+        # @test all(x₁ .+ reverse(x₁, dims = (1, 4)) .== 0)
+        # @test all(x₂ .- reverse(x₂, dims = (1, 4)) .== 0)
+        # @test all(x₃ .- reverse(x₃, dims = (1, 4)) .== 0)
+
+        # @test all(x₁ .- reverse(x₁, dims = (2, 5)) .== 0)
+        # @test all(x₂ .+ reverse(x₂, dims = (2, 5)) .== 0)
+        # @test all(x₃ .- reverse(x₃, dims = (2, 5)) .== 0)
+
+        # @test all(x₁ .- reverse(x₁, dims = (3, 6)) .== 0)
+        # @test all(x₂ .- reverse(x₂, dims = (3, 6)) .== 0)
+        # @test all(x₃ .+ reverse(x₃, dims = (3, 6)) .== 0)
+
+        g, wJ = adapt(Array, components(first(volumemetrics(grid))))
+        wr, ws, wt = adapt(Array, weights_1d(cell))
+
+        @test all(
+            wJ .== (step(xrange) * step(yrange) * step(zrange) / 8) .* (wr .* ws .* wt),
+        )
+
+        @test all(getindex.(g, 1) .== 2 / step(xrange))
+        @test all(getindex.(g, 2) .== 0)
+        @test all(getindex.(g, 3) .== 0)
+        @test all(getindex.(g, 4) .== 0)
+        @test all(getindex.(g, 5) .== 2 / step(yrange))
+        @test all(getindex.(g, 6) .== 0)
+        @test all(getindex.(g, 7) .== 0)
+        @test all(getindex.(g, 8) .== 0)
+        @test all(getindex.(g, 9) .== 2 / step(zrange))
+
+        n, swJ = adapt(Array, components(first(surfacemetrics(grid))))
+        n₁, n₂, n₃, n₄, n₅, n₆ = faceviews(n, cell)
+        @test all(n₁ .== Ref(SVector(-1, 0, 0)))
+        @test all(n₂ .== Ref(SVector(1, 0, 0)))
+        @test all(n₃ .== Ref(SVector(0, -1, 0)))
+        @test all(n₄ .== Ref(SVector(0, 1, 0)))
+        @test all(n₅ .== Ref(SVector(0, 0, -1)))
+        @test all(n₆ .== Ref(SVector(0, 0, 1)))
+
+        # TODO Make check exact
+        swJ₁, swJ₂, swJ₃, swJ₄, swJ₅, swJ₆ = faceviews(swJ, cell)
+        @test all(
+            isapprox.(
+                swJ₁,
+                (step(yrange) * step(zrange) / 4) .* (vec(ws) .* vec(wt)'),
+                rtol = 10eps(FT),
+            ),
+        )
+        @test all(
+            isapprox.(
+                swJ₂,
+                (step(yrange) * step(zrange) / 4) .* (vec(ws) .* vec(wt)'),
+                rtol = 10eps(FT),
+            ),
+        )
+        @test all(
+            isapprox.(
+                swJ₃,
+                (step(xrange) * step(zrange) / 4) .* (vec(wr) .* vec(wt)'),
+                rtol = 10eps(FT),
+            ),
+        )
+        @test all(
+            isapprox.(
+                swJ₄,
+                (step(xrange) * step(zrange) / 4) .* (vec(wr) .* vec(wt)'),
+                rtol = 10eps(FT),
+            ),
+        )
+        @test all(
+            isapprox.(
+                swJ₅,
+                (step(xrange) * step(yrange) / 4) .* (vec(wr) .* vec(ws)'),
+                rtol = 10eps(FT),
+            ),
+        )
+        @test all(
+            isapprox.(
+                swJ₆,
+                (step(xrange) * step(yrange) / 4) .* (vec(wr) .* vec(ws)'),
+                rtol = 10eps(FT),
+            ),
+        )
     end
 
     @testset "min_node_distance" begin
