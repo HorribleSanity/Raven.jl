@@ -841,6 +841,18 @@ function _indextoface(i, degree3facelinearindices)
 end
 
 
+@inline facedims(cell::LobattoQuad) =
+    ((size(cell, 2),), (size(cell, 2),), (size(cell, 1),), (size(cell, 1),))
+
+@inline facedims(cell::LobattoHex) = (
+    (size(cell, 2), size(cell, 3)),
+    (size(cell, 2), size(cell, 3)),
+    (size(cell, 1), size(cell, 3)),
+    (size(cell, 1), size(cell, 3)),
+    (size(cell, 1), size(cell, 2)),
+    (size(cell, 1), size(cell, 2)),
+)
+
 function materializefacemaps(
     cell::LobattoCell,
     numcells_local,
