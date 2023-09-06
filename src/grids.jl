@@ -132,3 +132,21 @@ function min_node_distance(grid::Grid; dims = 1:ndims(referencecell(grid)))
 
     return MPI.Allreduce(minimum(min_neighbour_distance), min, comm(grid))
 end
+
+function faceviews(A::AbstractMatrix, cell::AbstractCell)
+    offsets = faceoffsets(cell)
+    facesizes = facedims(cell)
+    num_faces = length(facesizes)
+
+    if last(offsets) != size(A, 1)
+        throw(
+            ArgumentError(
+                "The first dimension of A needs to contain the face degrees of freedom.",
+            ),
+        )
+    end
+
+    return ntuple(Val(num_faces)) do f
+        reshape(view(A, (1+offsets[f]):offsets[f+1], :), facesizes[f]..., :)
+    end
+end
