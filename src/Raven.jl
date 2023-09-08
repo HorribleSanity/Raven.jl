@@ -14,7 +14,7 @@ using StaticArrays
 using StaticArrays: tuple_prod, tuple_length, size_to_tuple
 using SparseArrays
 
-export LobattoCell
+export LobattoCell, GaussCell
 
 export arraytype, floattype
 export derivatives, facemass, mass, points, toequallyspaced
