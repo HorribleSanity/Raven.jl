@@ -7,32 +7,59 @@ function lobattooperators_1d(::Type{T}, M) where {T}
     setprecision(BigFloat, 2^(max(8, ceil(Int, log2(precision(T))) + 2)))
 
     points, weights = legendregausslobatto(BigFloat, M)
+    gausspoints, _ = legendregauss(BigFloat, M)
     derivative = spectralderivative(points)
+    weightedderivative = diagm(weights) * derivative
+    skewweightedderivative = (weightedderivative - weightedderivative') / 2
     equallyspacedpoints = range(-one(BigFloat), stop = one(BigFloat), length = M)
     toequallyspaced = spectralinterpolation(points, equallyspacedpoints)
     tolowerhalf = spectralinterpolation(points, (points .- 1) ./ 2)
     toupperhalf = spectralinterpolation(points, (points .+ 1) ./ 2)
+    togauss = spectralinterpolation(points, gausspoints)
+    tolobatto = spectralinterpolation(points, points)
+    toboundary = spectralinterpolation(points, [-1, 1])
 
     setprecision(oldprecision)
 
     points = Array{T}(points)
     weights = Array{T}(weights)
     derivative = Array{T}(derivative)
+    weightedderivative = Array{T}(weightedderivative)
+    skewweightedderivative = Array{T}(skewweightedderivative)
     toequallyspaced = Array{T}(toequallyspaced)
     tohalves = (Array{T}(tolowerhalf), Array{T}(toupperhalf))
+    togauss = Array{T}(togauss)
+    tolobatto = Array{T}(tolobatto)
+    toboundary = Array{T}(toboundary)
 
-    return (; points, weights, derivative, toequallyspaced, tohalves)
+    return (;
+        points,
+        weights,
+        derivative,
+        weightedderivative,
+        skewweightedderivative,
+        toequallyspaced,
+        tohalves,
+        togauss,
+        tolobatto,
+        toboundary,
+    )
 end
 
-struct LobattoCell{S,T,A,N,O,P,D,M,FM,E,H} <: AbstractCell{S,T,A,N}
+struct LobattoCell{S,T,A,N,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{S,T,A,N}
     points_1d::O
     weights_1d::O
     points::P
     derivatives::D
+    weightedderivatives::WD
+    skewweightedderivatives::SWD
     mass::M
     facemass::FM
     toequallyspaced::E
     tohalves_1d::H
+    togauss::TG
+    tolobatto::TL
+    toboundary::TB
 end
 
 function Base.show(io::IO, ::LobattoCell{S,T,A}) where {S,T,A}
@@ -52,20 +79,30 @@ function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
 
     points = vec(SVector.(points_1d...))
     derivatives = (Kron((o.derivative,)),)
+    weightedderivatives = (Kron((o.weightedderivative,)),)
+    skewweightedderivatives = (Kron((o.skewweightedderivative,)),)
     mass = Diagonal(vec(.*(weights_1d...)))
     facemass = adapt(A, Diagonal([T(1), T(1)]))
     toequallyspaced = Kron((o.toequallyspaced,))
     tohalves_1d = ((o.tohalves[1], o.tohalves[2]),)
+    togauss = Kron((o.togauss,))
+    tolobatto = Kron((o.tolobatto,))
+    toboundary = Kron((o.toboundary,))
 
     args = (
         points_1d,
         weights_1d,
         points,
         derivatives,
+        weightedderivatives,
+        skewweightedderivatives,
         mass,
         facemass,
         toequallyspaced,
         tohalves_1d,
+        togauss,
+        tolobatto,
+        toboundary,
     )
     LobattoCell{Tuple{S1},T,A,1,typeof.(args[2:end])...}(args...)
 end
@@ -78,22 +115,39 @@ function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
     points = vec(SVector.(points_1d...))
     derivatives =
         (Kron((Eye{T,S2}(), o[1].derivative)), Kron((o[2].derivative, Eye{T,S1}())))
+    weightedderivatives = (
+        Kron((Eye{T,S2}(), o[1].weightedderivative)),
+        Kron((o[2].weightedderivative, Eye{T,S1}())),
+    )
+    skewweightedderivatives = (
+        Kron((Eye{T,S2}(), o[1].skewweightedderivative)),
+        Kron((o[2].skewweightedderivative, Eye{T,S1}())),
+    )
     mass = Diagonal(vec(.*(weights_1d...)))
     ω1, ω2 = weights_1d
     facemass = Diagonal(vcat(repeat(vec(ω2), 2), repeat(vec(ω1), 2)))
     toequallyspaced = Kron((o[2].toequallyspaced, o[1].toequallyspaced))
     tohalves_1d =
         ((o[1].tohalves[1], o[1].tohalves[2]), (o[2].tohalves[1], o[2].tohalves[2]))
+    togauss = Kron((o[2].togauss, o[1].togauss))
+    tolobatto = Kron((o[2].tolobatto, o[1].tolobatto))
+    toboundary = Kron((o[2].toboundary, o[1].toboundary))
+
 
     args = (
         points_1d,
         weights_1d,
         points,
         derivatives,
+        weightedderivatives,
+        skewweightedderivatives,
         mass,
         facemass,
         toequallyspaced,
         tohalves_1d,
+        togauss,
+        tolobatto,
+        toboundary,
     )
     LobattoCell{Tuple{S1,S2},T,A,2,typeof.(args[2:end])...}(args...)
 end
@@ -124,6 +178,16 @@ function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
         Kron((Eye{T,S3}(), o[2].derivative, Eye{T,S1}())),
         Kron((o[3].derivative, Eye{T,S2}(), Eye{T,S1}())),
     )
+    weightedderivatives = (
+        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].weightedderivative)),
+        Kron((Eye{T,S3}(), o[2].weightedderivative, Eye{T,S1}())),
+        Kron((o[3].weightedderivative, Eye{T,S2}(), Eye{T,S1}())),
+    )
+    skewweightedderivatives = (
+        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].skewweightedderivative)),
+        Kron((Eye{T,S3}(), o[2].skewweightedderivative, Eye{T,S1}())),
+        Kron((o[3].skewweightedderivative, Eye{T,S2}(), Eye{T,S1}())),
+    )
     mass = Diagonal(vec(.*(weights_1d...)))
     ω1, ω2, ω3 = weights_1d
     facemass = Diagonal(
@@ -136,16 +200,24 @@ function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
         (o[2].tohalves[1], o[2].tohalves[2]),
         (o[3].tohalves[1], o[3].tohalves[2]),
     )
+    togauss = Kron((o[3].togauss, o[2].togauss, o[1].togauss))
+    tolobatto = Kron((o[3].tolobatto, o[2].tolobatto, o[1].tolobatto))
+    toboundary = Kron((o[3].toboundary, o[2].toboundary, o[1].toboundary))
 
     args = (
         points_1d,
         weights_1d,
         points,
         derivatives,
+        weightedderivatives,
+        skewweightedderivatives,
         mass,
         facemass,
         toequallyspaced,
         tohalves_1d,
+        togauss,
+        tolobatto,
+        toboundary,
     )
     LobattoCell{Tuple{S1,S2,S3},T,A,3,typeof.(args[2:end])...}(args...)
 end
@@ -169,15 +241,31 @@ points_1d(cell::LobattoCell) = cell.points_1d
 weights_1d(cell::LobattoCell) = cell.weights_1d
 points(cell::LobattoCell) = cell.points
 derivatives(cell::LobattoCell) = cell.derivatives
+weightedderivatives(cell::LobattoCell) = cell.weightedderivatives
+skewweightedderivatives(cell::LobattoCell) = cell.skewweightedderivatives
 function derivatives_1d(cell::LobattoCell)
     N = ndims(cell)
     ntuple(i -> cell.derivatives[i].args[N-i+1], Val(N))
+end
+function weightedderivatives_1d(cell::LobattoCell)
+    N = ndims(cell)
+    ntuple(i -> cell.weightedderivatives[i].args[N-i+1], Val(N))
+end
+function skewweightedderivatives_1d(cell::LobattoCell)
+    N = ndims(cell)
+    ntuple(i -> cell.skewweightedderivatives[i].args[N-i+1], Val(N))
 end
 mass(cell::LobattoCell) = cell.mass
 facemass(cell::LobattoCell) = cell.facemass
 toequallyspaced(cell::LobattoCell) = cell.toequallyspaced
 tohalves_1d(cell::LobattoCell) = cell.tohalves_1d
 degrees(cell::LobattoCell) = size(cell) .- 1
+togauss(cell::LobattoCell) = cell.togauss
+tolobatto(cell::LobattoCell) = cell.tolobatto
+toboundary(cell::LobattoCell) = cell.toboundary
+togauss_1d(cell::LobattoCell) = reverse(cell.togauss.args)
+tolobatto_1d(cell::LobattoCell) = reverse(cell.tolobatto.args)
+toboundary_1d(cell::LobattoCell) = reverse(cell.toboundary.args)
 
 faceoffsets(::LobattoLine) = (0, 1, 2)
 function faceoffsets(cell::LobattoQuad)

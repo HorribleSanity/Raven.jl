@@ -18,7 +18,11 @@ export LobattoCell, GaussCell
 
 export arraytype, floattype
 export derivatives, facemass, mass, points, toequallyspaced
+export togauss, tolobatto, toboundary
+export weightedderivatives, skewweightedderivatives
 export derivatives_1d, points_1d, weights_1d, tohalves_1d
+export togauss_1d, tolobatto_1d, toboundary_1d
+export weightedderivatives_1d, skewweightedderivatives_1d
 export referencecell, levels, trees, offset, numcells, facecodes
 export continuoustodiscontinuous, nodecommpattern
 export communicatingcells, noncommunicatingcells
