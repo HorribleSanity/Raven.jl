@@ -1300,11 +1300,14 @@ end
             dXds[] += Ds[j, n] * X[i, n, p]
         end
 
-        G = SHermitianCompact(
-            SVector(dot(dXdr[], dXdr[]), dot(dXdr[], dXds[]), dot(dXds[], dXds[])),
+        G = SMatrix{2,2,eltype(Dr),4}(
+            dot(dXdr[], dXdr[]),
+            dot(dXdr[], dXds[]),
+            dot(dXdr[], dXds[]),
+            dot(dXds[], dXds[]),
         )
 
-        invG = SHermitianCompact(inv(G))
+        invG = inv(G)
 
         dRdX = invG * [dXdr[] dXds[]]'
 
@@ -1357,7 +1360,9 @@ end
 
         # invwJ = inv(wJ)
 
-        wJinvG = SHermitianCompact(SVector(wJ * (drdx)^2, -zero(dx), wJ * (dsdy)^2))
+        wJinvG = SMatrix{2,2,typeof(dx),4}(
+            SVector(wJ * (drdx)^2, -zero(dx), -zero(dx), wJ * (dsdy)^2),
+        )
 
         firstordermetrics[i, j, q] = (; dRdX, wJ)
         secondordermetrics[i, j, q] = (; wJinvG, wJ)
@@ -1726,15 +1731,16 @@ end
 
             # invwJ = inv(wJ)
 
-            wJinvG = SHermitianCompact(
-                SVector(
-                    wJ * (drdx)^2,
-                    -zero(dx),
-                    -zero(dx),
-                    wJ * (dsdy)^2,
-                    -zero(dx),
-                    wJ * (dtdz)^2,
-                ),
+            wJinvG = SMatrix{3,3,typeof(dx),9}(
+                wJ * (drdx)^2,
+                -zero(dx),
+                -zero(dx),
+                -zero(dx),
+                wJ * (dsdy)^2,
+                -zero(dx),
+                -zero(dx),
+                -zero(dx),
+                wJ * (dtdz)^2,
             )
 
             firstordermetrics[i, j, k, q] = (; dRdX, wJ)
