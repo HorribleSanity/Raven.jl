@@ -80,10 +80,9 @@ struct CommManagerBuffered{CP,RBD,RB,SBD,SB} <: AbstractCommManager
     tag::Cint
     recvbufferdevice::RBD
     recvbuffers::RB
-    recvrequests::MPI.UnsafeMultiRequest
     sendbufferdevice::SBD
     sendbuffers::SB
-    sendrequests::MPI.UnsafeMultiRequest
+    requests::MPI.UnsafeMultiRequest
 end
 
 struct CommManagerTripleBuffered{CP,RBC,RBH,RBD,RB,RS,SBC,SBH,SBD,SB,SS} <:
@@ -103,6 +102,7 @@ struct CommManagerTripleBuffered{CP,RBC,RBH,RBD,RB,RS,SBC,SBH,SBD,SB,SS} <:
     sendbuffers::SB
     sendrequests::MPI.UnsafeMultiRequest
     sendstream::SS
+    requests::MPI.UnsafeMultiRequest
 end
 
 function _get_mpi_buffers(buffer, rankindices)
@@ -145,8 +145,18 @@ function commmanager(
     recvbufferdevice = AT{T}(undef, recvsize)
     sendbufferdevice = AT{T}(undef, sendsize)
 
-    recvrequests = MPI.UnsafeMultiRequest(length(pattern.recvranks))
-    sendrequests = MPI.UnsafeMultiRequest(length(pattern.sendranks))
+    numrecv = length(pattern.recvranks)
+    numsend = length(pattern.sendranks)
+
+    numrequests = numrecv + numsend
+
+    requestsvec = MPI.MPI_Request[MPI.API.MPI_REQUEST_NULL[] for _ = 1:numrequests]
+    requests = MPI.UnsafeMultiRequest(requestsvec)
+    recvrequests =
+        MPI.UnsafeMultiRequest(unsafe_wrap(Array, pointer(requestsvec, 1), numrecv))
+    sendrequests = MPI.UnsafeMultiRequest(
+        unsafe_wrap(Array, pointer(requestsvec, numrecv + 1), numsend),
+    )
 
     if triplebuffer
         recvbufferhost = Array{T}(undef, recvsize)
@@ -204,6 +214,7 @@ function commmanager(
             sendbuffers,
             sendrequests,
             sendstream,
+            requests,
         )
     else
         CommManagerBuffered(
@@ -212,10 +223,9 @@ function commmanager(
             ctag,
             recvbufferdevice,
             recvbuffers,
-            recvrequests,
             sendbufferdevice,
             sendbuffers,
-            sendrequests,
+            requests,
         )
     end
 end
@@ -260,15 +270,13 @@ function start!(A, cm::CommManagerBuffered)
     setbuffer!(cm.sendbufferdevice, A, cm.pattern.sendindices)
     KernelAbstractions.synchronize(get_backend(cm))
 
-    MPI.Startall(cm.recvrequests)
-    MPI.Startall(cm.sendrequests)
+    MPI.Startall(cm.requests)
 
     return
 end
 
 function finish!(A, cm::CommManagerBuffered)
-    MPI.Waitall(cm.recvrequests)
-    MPI.Waitall(cm.sendrequests)
+    MPI.Waitall(cm.requests)
 
     A = viewwithghosts(A)
     getbuffer!(A, cm.recvbufferdevice, cm.pattern.recvindices)
@@ -311,18 +319,17 @@ function finish!(A, cm::CommManagerTripleBuffered)
         MPI.Startall(cm.sendrequests)
     end
 
+    if !isempty(cm.requests)
+        MPI.Waitall(cm.requests)
+    end
+
     if !isempty(cm.recvrequests)
-        MPI.Waitall(cm.recvrequests)
         copyto!(cm.recvbufferhost, cm.recvbuffercomm)
         stream!(backend, cm.recvstream) do
             KernelAbstractions.copyto!(backend, cm.recvbufferdevice, cm.recvbufferhost)
             getbuffer!(viewwithghosts(A), cm.recvbufferdevice, cm.pattern.recvindices)
             KernelAbstractions.synchronize(backend)
         end
-    end
-
-    if !isempty(cm.sendrequests)
-        MPI.Waitall(cm.sendrequests)
     end
 
     return
