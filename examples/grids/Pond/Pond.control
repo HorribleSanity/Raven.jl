@@ -1,0 +1,45 @@
+\begin{MODEL}
+   \begin{OUTER_BOUNDARY}
+      \begin{CIRCULAR_ARC}
+         units = degrees
+         name = circle
+         radius = 4.0
+         start angle = 0.0
+         center = [0.0, 0,0,0.0]
+         end angle = 360.0
+      \end{CIRCULAR_ARC}
+   \end{OUTER_BOUNDARY}
+   \begin{TOPOGRAPHY}
+      eqn = f(x,y) = 1.5/exp(0.5*((x-1.0)^2 + (y-1.0)^2)) + 0.75/exp(0.5*((x+1.0)^2 + (y+1.0)^2))
+      sizing = OFF
+   \end{TOPOGRAPHY}
+\end{MODEL}
+\begin{CONTROL_INPUT}
+   \begin{SPRING_SMOOTHER}
+      smoothing type = LinearAndCrossBarSpring
+      smoothing = ON
+      number of iterations = 25
+   \end{SPRING_SMOOTHER}
+   \begin{BACKGROUND_GRID}
+      background grid size = [0.75,0.75,0.75]
+   \end{BACKGROUND_GRID}
+   \begin{RUN_PARAMETERS}
+      mesh file name = examples/grids/Pond/Pond.inp
+      plot file format = skeleton
+      plot file name = examples/grids/Pond/Pond.tec
+      stats file name = examples/grids/Pond/Pond.txt
+      mesh file format = ABAQUS
+      polynomial order = 3
+   \end{RUN_PARAMETERS}
+   \begin{MESH_PARAMETERS}
+      element type = hex
+   \end{MESH_PARAMETERS}
+   \begin{SIMPLE_EXTRUSION}
+      start surface name = bottom
+      height = 3.0
+      direction = 3
+      subdivisions = 4
+      end surface name = top
+   \end{SIMPLE_EXTRUSION}
+\end{CONTROL_INPUT}
+\end{FILE}
