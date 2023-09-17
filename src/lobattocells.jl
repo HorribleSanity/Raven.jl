@@ -400,7 +400,7 @@ function materializepoints(
         quadranttocoordinate,
         Val.(length.(r))...,
         Val(Q);
-        ndrange=size(points)
+        ndrange = size(points),
     )
 
     return points
@@ -458,7 +458,7 @@ function materializepoints(
         quadranttocoordinate,
         Val.(length.(r))...,
         Val(Q);
-        ndrange=size(points)
+        ndrange = size(points),
     )
 
     return points
@@ -763,7 +763,7 @@ function materializebrickpoints(
         quadranttocoordinate,
         Val.(length.(r))...,
         Val(Q);
-        ndrange=size(points)
+        ndrange = size(points),
     )
 
     return points
@@ -898,7 +898,7 @@ function materializepoints(
         quadranttotreeid,
         quadranttocoordinate,
         Val.(length.(r))...;
-        ndrange=size(points)
+        ndrange = size(points),
     )
 
     return points
@@ -1225,7 +1225,7 @@ function materializepoints(
         quadranttotreeid,
         quadranttocoordinate,
         Val.(length.(r))...;
-        ndrange=size(points)
+        ndrange = size(points),
     )
 
     return points
@@ -1353,7 +1353,7 @@ function materializebrickpoints(
         quadranttotreeid,
         quadranttocoordinate,
         Val.(length.(r))...;
-        ndrange=size(points)
+        ndrange = size(points),
     )
 
     return points
@@ -2117,7 +2117,7 @@ function materializemetrics(
             w...,
             Val.(size(cell))...,
             Val(Q);
-            ndrange=size(points)
+            ndrange = size(points),
         )
     else
         kernel! = quadvolumemetrics!(backend, (size(cell)..., Q))
@@ -2129,7 +2129,7 @@ function materializemetrics(
             w...,
             Val.(size(cell))...,
             Val(Q);
-            ndrange=size(points)
+            ndrange = size(points),
         )
     end
 
@@ -2173,7 +2173,7 @@ function materializemetrics(
             n,
             facegroupsize[n],
             facegroupoffsets,
-            ndrange=(J..., 2, last(size(surfacemetrics))),
+            ndrange = (J..., 2, last(size(surfacemetrics))),
         )
 
         M = 1 + 2^(ndims(cell) - 1)
@@ -2185,7 +2185,7 @@ function materializemetrics(
             facemaps.vmapNC[n],
             facemaps.nctoface[n],
             w,
-            ndrange=size(ncsurfacemetrics[n]),
+            ndrange = size(ncsurfacemetrics[n]),
         )
     end
 
@@ -2332,7 +2332,7 @@ end
             wJ = wr[i] * ws[j] * wt[k] * detJ
             wJinvG = wJ * invG
 
-            firstordermetrics[i, j, k, q] = (; dRdX=invJ, wJ)
+            firstordermetrics[i, j, k, q] = (; dRdX = invJ, wJ)
             secondordermetrics[i, j, k, q] = (; wJinvG, wJ)
         end
     end
@@ -2498,7 +2498,7 @@ function materializemetrics(
             w...,
             Val.(size(cell))...,
             Val(Q);
-            ndrange=(size(cell, 1), size(cell, 2), size(points, 4))
+            ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
         )
     else
         kernel! = hexvolumemetrics!(backend, (size(cell, 1), size(cell, 2), Q))
@@ -2510,7 +2510,7 @@ function materializemetrics(
             w...,
             Val.(size(cell))...,
             Val(Q);
-            ndrange=(size(cell, 1), size(cell, 2), size(points, 4))
+            ndrange = (size(cell, 1), size(cell, 2), size(points, 4)),
         )
     end
 
@@ -2561,7 +2561,7 @@ function materializemetrics(
             n,
             facegroupsize[n],
             facegroupoffsets,
-            ndrange=(J..., 2, last(size(surfacemetrics))),
+            ndrange = (J..., 2, last(size(surfacemetrics))),
         )
 
         M = 1 + 2^(ndims(cell) - 1)
@@ -2573,7 +2573,7 @@ function materializemetrics(
             facemaps.vmapNC[n],
             facemaps.nctoface[n],
             w,
-            ndrange=size(ncsurfacemetrics[n]),
+            ndrange = size(ncsurfacemetrics[n]),
         )
     end
 

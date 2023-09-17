@@ -125,7 +125,6 @@ function adapt!(gm::GridManager, flags)
 end
 
 generate(gm::GridManager) = generate(identity, gm)
-generate(gm::GridManager, abaqus::AbaqusMeshImport) = generate(identity, gm, abaqus)
 
 function _offsets_to_ranges(offsets; by = identity)
     indices = Cint[]
@@ -362,7 +361,6 @@ function generate(warp::Function, gm::GridManager)
     communicatingquadrants = Adapt.adapt(A, communicatingquadrants)
     noncommunicatingquadrants = Adapt.adapt(A, noncommunicatingquadrants)
     facemaps = Adapt.adapt(A, facemaps)
-
 
     if coarsegrid(gm) isa BrickGrid
         points = materializebrickpoints(
