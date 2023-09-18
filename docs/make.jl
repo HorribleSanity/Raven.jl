@@ -6,11 +6,11 @@ DocMeta.setdocmeta!(Raven, :DocTestSetup, :(using Raven); recursive = true)
 makedocs(;
     modules = [Raven],
     authors = "Raven contributors",
-    repo = "https://github.com/lcw/Raven.jl/blob/{commit}{path}#{line}",
+    repo = "https://github.com/HorribleSanity/Raven.jl/blob/{commit}{path}#{line}",
     sitename = "Raven.jl",
     format = Documenter.HTML(;
         prettyurls = get(ENV, "CI", "false") == "true",
-        canonical = "https://lcw.github.io/Raven.jl",
+        canonical = "https://HorribleSanity.github.io/Raven.jl",
         edit_link = "master",
         assets = String[],
     ),
@@ -24,4 +24,8 @@ makedocs(;
     strict = true,
 )
 
-deploydocs(; repo = "github.com/lcw/Raven.jl", devbranch = "master", push_preview = true)
+deploydocs(;
+    repo = "github.com/HorribleSanity/Raven.jl",
+    devbranch = "master",
+    push_preview = true,
+)

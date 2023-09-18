@@ -1,10 +1,10 @@
 # Raven 𓅂
 <p align="center">
-  <a href="https://lcw.github.io/Raven.jl/dev/">Documentation</a> •
+  <a href="https://HorribleSanity.github.io/Raven.jl/dev/">Documentation</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
-[Raven](https://github.com/lcw/Raven.jl)
+[Raven](https://github.com/HorribleSanity/Raven.jl)
 is a toolbox for adapted discontinuous spectral element discretizations of
 partial differential equations that supports execution on distributed manycore
 devices (via
@@ -19,7 +19,7 @@ Some of our previous efforts in this area resulted in
 ## Contributing
 
 Contributions are encouraged. If there are additional features you would like
-to use, please open an [issue](https://github.com/lcw/Raven.jl/issues) or [pull
-request](https://github.com/lcw/Raven.jl/pulls).
+to use, please open an [issue](https://github.com/HorribleSanity/Raven.jl/issues) or [pull
+request](https://github.com/HorribleSanity/Raven.jl/pulls).
 
 Additional examples and documentation improvements are also welcome.
