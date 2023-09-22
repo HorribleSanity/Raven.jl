@@ -38,8 +38,6 @@ export flatten, unflatten
 
 export brick, coarsegrid
 
-export AbaqusMeshImport
-
 export GridManager, generate
 export GridArray, components, sizewithghosts, viewwithghosts, parentwithghosts
 
