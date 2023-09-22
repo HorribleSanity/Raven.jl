@@ -52,7 +52,7 @@ generate_mesh(p)
 # import from ABAQUS file
 coarse_grid = coarsegrid("out/IceCreamCone.inp")
 
-# Alternativly one could import directly from an existing control file.
+# Alternatively one could import directly from an existing control file.
 # p = openProject("Pond.control", "examples/grids/Pond")
 # setMeshFileFormat!(p, "ABAQUS")
 # generate_mesh(p)

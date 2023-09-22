@@ -57,7 +57,7 @@ function coarsegrid(
 end
 
 function cubeshellgrid(R::Real, r::Real)
-    @assert R > r "R (outter radius) must be greater that r (inner radius)"
+    @assert R > r "R (outer radius) must be greater that r (inner radius)"
     vertices = zeros(SVector{3,Float64}, 16)
 
     vertices[1] = SVector(+R, +R, -R)
