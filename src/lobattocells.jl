@@ -1035,7 +1035,6 @@ end
               f1e4x, f1e4y, f1e4z = (p1 * (1 - t) + p5 * (t + 1))/2 #edge 4
             end
 
-            # wrong
             if interp_idx2 != 0
                 f2x, f2y, f2z = interp(r, t, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
 

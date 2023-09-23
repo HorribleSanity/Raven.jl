@@ -457,7 +457,7 @@ end
 
 
 function materializequadranttointerpolation(abaqus::AbaqusMeshImport)
-    dims = length(abaqus.face_interpolation[1])
+    dims = length(abaqus.connectivity[1]) == 4 ? 2 : 3
     nodesperface = (abaqus.face_degree + 1)^(dims-1)
     numberofelements = length(abaqus.face_iscurved)
     facesperelement = length(abaqus.face_iscurved[1])
