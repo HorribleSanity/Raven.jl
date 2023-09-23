@@ -646,7 +646,7 @@ end
             -(1 - s) * (1 - r) * c1[2] - (1 - s) * r * c3[2]
             -s * (1 - r) * c2[2] - s * r * c4[2]
 
-            points[i, j, q] = (x, y)
+            points[i, j, q] = (x/2, y/2)
         end
     end
 end
@@ -1055,7 +1055,7 @@ end
             if interp_idx3 != 0
                 f3x, f3y, f3z = interp(r, s, interp_r, interp_s, faceinterpolation, interp_idx3, interpolation_degree,)
             else
-              f3x, f3y, f3z = (p2 * (1 - r) * (1 - s) + p1 * (r + 1) * (1 - s) + p3 * (1 - r) * (s + 1) + p4 * (r + 1) * (s + 1))/4
+              f3x, f3y, f3z = (p1 * (1 - r) * (1 - s) + p2 * (r + 1) * (1 - s) + p4 * (1 - r) * (s + 1) + p3 * (r + 1) * (s + 1))/4
             end
 
             if interp_idx4 != 0
@@ -1075,7 +1075,7 @@ end
             if interp_idx5 != 0
                 f5x, f5y, f5z = interp(r, s, interp_r, interp_s, faceinterpolation, interp_idx5, interpolation_degree,)
             else
-                f5x, f5y, f5z = (p8 * (1 - r) * (1 - s) + p5 * (r + 1) * (1 - s) + p7 * (1 - r) * (s + 1) + p6 * (r + 1) * (s + 1))/4
+                f5x, f5y, f5z = (p5 * (1 - r) * (1 - s) + p6 * (r + 1) * (1 - s) + p8 * (1 - r) * (s + 1) + p7 * (r + 1) * (s + 1))/4
             end
 
             if interp_idx6 != 0
