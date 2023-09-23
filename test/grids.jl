@@ -697,4 +697,75 @@ function grids_testsuite(AT, FT)
             end
         end
     end
+
+    @testset "curvedquadpoints" begin
+      N = (2, 2)
+      vertices = [
+        SVector{2,FT}(1.0, -1.0), #1
+        SVector{2,FT}(1.0, 1.0),  #2
+        SVector{2,FT}(2.0, 0.0),  #3
+        SVector{2,FT}(0.0, 0.0),  #4
+      ]
+      cells = [(4, 1, 2, 3)]
+
+      cg = coarsegrid(vertices, cells)
+      coarse_grid = coarsegrid("curvedboxmesh2d.inp")
+
+      gm = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg, min_level=1)
+      gmcurved = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), coarse_grid, min_level=1)
+      grid = generate(gm)
+      gridcurved = generate(gmcurved)
+      @test coarse_grid.vertices ≈ cg.vertices
+
+      cg1 = coarsegrid("flatGingerbreadMan.inp")
+      gm1 = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg1, min_level=1)
+      grid = generate(gm1)
+
+      cg2 = coarsegrid("GingerbreadMan.inp")
+      gm2 = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg2, min_level=1)
+      grid2 = generate(gm2)
+
+      @test cg1.vertices ≈ cg2.vertices
+      err = maximum([maximum(grid.points[:,:,i] - grid2.points[:,:,i]) for i in size(grid.points)[end]])
+      @test maximum(err) < 1/10
+    end
+
+
+
+    @testset "curvedHexpoints" begin
+      N = (2, 2, 2)
+      vertices = [
+        SVector{3,FT}(-0.4350800364851,   -0.7033148310153,    0.0000000000000), #1
+        SVector{3,FT}(-0.2553059615836,   -0.7194290918162,    0.0000000000000), #2
+        SVector{3,FT}(-0.5200431460828,   -0.5200432080034,    0.0000000000000), #3
+        SVector{3,FT}(-0.2494272390808,   -0.4937247409923,    0.0000000000000), #4
+        SVector{3,FT}(-0.4350800364851,   -0.7033148310153,    0.3750000000000), #5
+        SVector{3,FT}(-0.2553059615836,   -0.7194290918162,    0.3750000000000), #6
+        SVector{3,FT}(-0.5200431460828,   -0.5200432080034,    0.3750000000000), #7
+        SVector{3,FT}(-0.2494272390808,   -0.4937247409923,    0.3750000000000), #8
+      ]
+      cells = [(1, 2, 3, 4, 5, 6, 7, 8)]
+
+      cg = coarsegrid(vertices, cells)
+      coarse_grid = coarsegrid("curvedboxmesh3d.inp")
+
+      gm = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg, min_level=1)
+      gmcurved = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), coarse_grid, min_level=1)
+      grid = generate(gm)
+      gridcurved = generate(gmcurved)
+
+      @test coarse_grid.vertices ≈ cg.vertices
+
+      cg1 = coarsegrid("flatHalfCircle3DRot.inp")
+      gm1 = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg1, min_level=1)
+      grid = generate(gm1)
+
+      cg2 = coarsegrid("HalfCircle3DRot.inp")
+      gm2 = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg2, min_level=1)
+      grid2 = generate(gm2)
+
+      @test cg1.vertices ≈ cg2.vertices
+      err = maximum([maximum(grid.points[:,:,:,i] - grid2.points[:,:,:,i]) for i in size(grid.points)[end]])
+      @test maximum(err) < 1/10
+    end
 end
