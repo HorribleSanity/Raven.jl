@@ -11,7 +11,13 @@ Raven.get_backend(::Type{T}) where {T<:CuArray} = CUDABackend(; always_inline = 
 Raven.arraytype(::Type{T}) where {T<:CuArray} = CuArray
 Raven.arraytype(::Type{T}) where {T<:CuDeviceArray} = CuArray
 
-Raven.pin(::Type{T}, A::Array) where {T<:CuArray} = CUDA.Mem.pin(A)
+function Raven.pin(::Type{T}, A::Array) where {T<:CuArray}
+    if length(A) > 0
+        A = CUDA.Mem.pin(A)
+    end
+
+    return A
+end
 
 Raven.usetriplebuffer(::Type{T}) where {T<:CuArray} = !MPI.has_cuda()
 
