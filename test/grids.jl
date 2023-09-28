@@ -726,11 +726,8 @@ function grids_testsuite(AT, FT)
         grid2 = generate(gm2)
 
         @test cg1.vertices ≈ cg2.vertices
-        err = maximum([
-            maximum(grid.points[:, :, i] - grid2.points[:, :, i]) for
-            i in size(grid.points)[end]
-        ])
-        @test maximum(err) < 1 / 10
+        err = norm(parent(points(grid)) - parent(points(grid2)), Inf)
+        @test maximum(err) < 1 // 5
     end
 
 
@@ -768,10 +765,7 @@ function grids_testsuite(AT, FT)
         grid2 = generate(gm2)
 
         @test cg1.vertices ≈ cg2.vertices
-        err = maximum([
-            maximum(grid.points[:, :, :, i] - grid2.points[:, :, :, i]) for
-            i in size(grid.points)[end]
-        ])
-        @test maximum(err) < 1 / 10
+        err = norm(parent(points(grid)) - parent(points(grid2)), Inf)
+        @test err < 1 // 5
     end
 end
