@@ -488,8 +488,8 @@ end
     t = 2 * t - 1
     w = ones(typeof(t), degree + 1)
 
-    for i in 1:degree+1
-        for j in 1:degree+1
+    for i = 1:degree+1
+        for j = 1:degree+1
             if i ≠ j
                 w[i] *= (n[i] - n[j])
             end
@@ -497,7 +497,7 @@ end
         w[i] = 1 / w[i]
     end
 
-    for i in 1:degree+1
+    for i = 1:degree+1
         if i != 1 || i != degree + 1
             x += w[i] * data[offset+i-1, 1] / (t - n[i])
             y += w[i] * data[offset+i-1, 2] / (t - n[i])
@@ -615,25 +615,49 @@ end
             c4 = treecoords[2, 2, q1]
 
             if interp_idx1 != 0
-                f1x, f1y = interp(r, interp_r, faceinterpolation, interp_idx1, interpolation_degree,)
+                f1x, f1y = interp(
+                    r,
+                    interp_r,
+                    faceinterpolation,
+                    interp_idx1,
+                    interpolation_degree,
+                )
             else
                 f1x, f1y = c1 .+ (r * (c2 - c1))
             end
 
             if interp_idx2 != 0
-                f2x, f2y = interp(s, interp_s, faceinterpolation, interp_idx2, interpolation_degree,)
+                f2x, f2y = interp(
+                    s,
+                    interp_s,
+                    faceinterpolation,
+                    interp_idx2,
+                    interpolation_degree,
+                )
             else
                 f2x, f2y = c2 .+ (s * (c4 - c2))
             end
 
             if interp_idx3 != 0
-                f3x, f3y = interp(r, interp_r, faceinterpolation, interp_idx3, interpolation_degree,)
+                f3x, f3y = interp(
+                    r,
+                    interp_r,
+                    faceinterpolation,
+                    interp_idx3,
+                    interpolation_degree,
+                )
             else
                 f3x, f3y = c3 .+ (r * (c4 - c3))
             end
 
             if interp_idx4 != 0
-                f4x, f4y = interp(s, interp_s, faceinterpolation, interp_idx4, interpolation_degree,)
+                f4x, f4y = interp(
+                    s,
+                    interp_s,
+                    faceinterpolation,
+                    interp_idx4,
+                    interpolation_degree,
+                )
             else
                 f4x, f4y = c1 .+ (s * (c3 - c1))
             end
@@ -646,7 +670,7 @@ end
             -(1 - s) * (1 - r) * c1[2] - (1 - s) * r * c3[2]
             -s * (1 - r) * c2[2] - s * r * c4[2]
 
-            points[i, j, q] = (x/2, y/2)
+            points[i, j, q] = (x / 2, y / 2)
         end
     end
 end
@@ -1019,158 +1043,368 @@ end
 
 
             if interp_idx1 != 0
-                f1x, f1y, f1z = interp(r, t, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
+                f1x, f1y, f1z = interp(
+                    r,
+                    t,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx1,
+                    interpolation_degree,
+                )
 
                 # edge interpolation on face 1
-                f1e1x, f1e1y, f1e1z = interp(r, -1, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
-                f1e2x, f1e2y, f1e2z = interp(1, t, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
-                f1e3x, f1e3y, f1e3z = interp(r, 1, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
-                f1e4x, f1e4y, f1e4z = interp(-1, t, interp_r, interp_t, faceinterpolation, interp_idx1, interpolation_degree,)
+                f1e1x, f1e1y, f1e1z = interp(
+                    r,
+                    -1,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx1,
+                    interpolation_degree,
+                )
+                f1e2x, f1e2y, f1e2z = interp(
+                    1,
+                    t,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx1,
+                    interpolation_degree,
+                )
+                f1e3x, f1e3y, f1e3z = interp(
+                    r,
+                    1,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx1,
+                    interpolation_degree,
+                )
+                f1e4x, f1e4y, f1e4z = interp(
+                    -1,
+                    t,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx1,
+                    interpolation_degree,
+                )
             else
-              f1x, f1y, f1z = (p1 * (1 - r) * (1 - t) + p2 * (r + 1) * (1 - t) + p5 * (1 - r) * (t + 1) + p6 * (r + 1) * (t + 1))/4
+                f1x, f1y, f1z =
+                    (
+                        p1 * (1 - r) * (1 - t) +
+                        p2 * (r + 1) * (1 - t) +
+                        p5 * (1 - r) * (t + 1) +
+                        p6 * (r + 1) * (t + 1)
+                    ) / 4
 
-              f1e1x, f1e1y, f1e1z = (p1 * (1 - r) + p2 * (r + 1))/2 #edge 1
-              f1e2x, f1e2y, f1e2z = (p2 * (1 - t) + p6 * (t + 1))/2 #edge 2
-              f1e3x, f1e3y, f1e3z = (p5 * (1 - r) + p6 * (r + 1))/2 #edge 3
-              f1e4x, f1e4y, f1e4z = (p1 * (1 - t) + p5 * (t + 1))/2 #edge 4
+                f1e1x, f1e1y, f1e1z = (p1 * (1 - r) + p2 * (r + 1)) / 2 #edge 1
+                f1e2x, f1e2y, f1e2z = (p2 * (1 - t) + p6 * (t + 1)) / 2 #edge 2
+                f1e3x, f1e3y, f1e3z = (p5 * (1 - r) + p6 * (r + 1)) / 2 #edge 3
+                f1e4x, f1e4y, f1e4z = (p1 * (1 - t) + p5 * (t + 1)) / 2 #edge 4
             end
 
             if interp_idx2 != 0
-                f2x, f2y, f2z = interp(r, t, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
+                f2x, f2y, f2z = interp(
+                    r,
+                    t,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx2,
+                    interpolation_degree,
+                )
 
                 # edge interpolation on face 2
-                f2e1x, f2e1y, f2e1z = interp(r, -1, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
-                f2e2x, f2e2y, f2e2z = interp(1, t, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
-                f2e3x, f2e3y, f2e3z = interp(r, 1, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
-                f2e4x, f2e4y, f2e4z = interp(-1, t, interp_r, interp_t, faceinterpolation, interp_idx2, interpolation_degree,)
+                f2e1x, f2e1y, f2e1z = interp(
+                    r,
+                    -1,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx2,
+                    interpolation_degree,
+                )
+                f2e2x, f2e2y, f2e2z = interp(
+                    1,
+                    t,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx2,
+                    interpolation_degree,
+                )
+                f2e3x, f2e3y, f2e3z = interp(
+                    r,
+                    1,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx2,
+                    interpolation_degree,
+                )
+                f2e4x, f2e4y, f2e4z = interp(
+                    -1,
+                    t,
+                    interp_r,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx2,
+                    interpolation_degree,
+                )
             else
-              f2x, f2y, f2z = (p4 * (1 - r) * (1 - t) + p3 * (r + 1) * (1 - t) + p8 * (1 - r) * (t + 1) + p7 * (r + 1) * (t + 1))/4
+                f2x, f2y, f2z =
+                    (
+                        p4 * (1 - r) * (1 - t) +
+                        p3 * (r + 1) * (1 - t) +
+                        p8 * (1 - r) * (t + 1) +
+                        p7 * (r + 1) * (t + 1)
+                    ) / 4
 
-              f2e1x, f2e1y, f2e1z = (p4 * (1 - r) + p3 * (r + 1))/2 #edge 5
-              f2e2x, f2e2y, f2e2z = (p3 * (1 - t) + p7 * (t + 1))/2 #edge 6
-              f2e3x, f2e3y, f2e3z = (p8 * (1 - r) + p7 * (r + 1))/2 #edge 7
-              f2e4x, f2e4y, f2e4z = (p4 * (1 - t) + p8 * (t + 1))/2 #edge 8
+                f2e1x, f2e1y, f2e1z = (p4 * (1 - r) + p3 * (r + 1)) / 2 #edge 5
+                f2e2x, f2e2y, f2e2z = (p3 * (1 - t) + p7 * (t + 1)) / 2 #edge 6
+                f2e3x, f2e3y, f2e3z = (p8 * (1 - r) + p7 * (r + 1)) / 2 #edge 7
+                f2e4x, f2e4y, f2e4z = (p4 * (1 - t) + p8 * (t + 1)) / 2 #edge 8
             end
 
             if interp_idx3 != 0
-                f3x, f3y, f3z = interp(r, s, interp_r, interp_s, faceinterpolation, interp_idx3, interpolation_degree,)
+                f3x, f3y, f3z = interp(
+                    r,
+                    s,
+                    interp_r,
+                    interp_s,
+                    faceinterpolation,
+                    interp_idx3,
+                    interpolation_degree,
+                )
             else
-              f3x, f3y, f3z = (p1 * (1 - r) * (1 - s) + p2 * (r + 1) * (1 - s) + p4 * (1 - r) * (s + 1) + p3 * (r + 1) * (s + 1))/4
+                f3x, f3y, f3z =
+                    (
+                        p1 * (1 - r) * (1 - s) +
+                        p2 * (r + 1) * (1 - s) +
+                        p4 * (1 - r) * (s + 1) +
+                        p3 * (r + 1) * (s + 1)
+                    ) / 4
             end
 
             if interp_idx4 != 0
-                f4x, f4y, f4z = interp(s, t, interp_s, interp_t, faceinterpolation, interp_idx4, interpolation_degree,)
+                f4x, f4y, f4z = interp(
+                    s,
+                    t,
+                    interp_s,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx4,
+                    interpolation_degree,
+                )
 
                 # edge interpolation on face 4 
-                f4e1x, f4e1y, f4e1z = interp(s, -1, interp_s, interp_t, faceinterpolation, interp_idx4, interpolation_degree,)
-                f4e2x, f4e2y, f4e2z = interp(s, 1, interp_s, interp_t, faceinterpolation, interp_idx4, interpolation_degree,)
+                f4e1x, f4e1y, f4e1z = interp(
+                    s,
+                    -1,
+                    interp_s,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx4,
+                    interpolation_degree,
+                )
+                f4e2x, f4e2y, f4e2z = interp(
+                    s,
+                    1,
+                    interp_s,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx4,
+                    interpolation_degree,
+                )
             else
-                f4x, f4y, f4z = (p2 * (1 - s) * (1 - t) + p3 * (s + 1) * (1 - t) + p6 * (1 - s) * (t + 1) + p7 * (s + 1) * (t + 1))/4
+                f4x, f4y, f4z =
+                    (
+                        p2 * (1 - s) * (1 - t) +
+                        p3 * (s + 1) * (1 - t) +
+                        p6 * (1 - s) * (t + 1) +
+                        p7 * (s + 1) * (t + 1)
+                    ) / 4
 
                 # edge interpolation on face 4 for linear face
-                f4e1x, f4e1y, f4e1z = (p2 * (1 - s) + p3 * (s + 1))/2 # edge 10
-                f4e2x, f4e2y, f4e2z = (p6 * (1 - s) + p7 * (s + 1))/2 # edge 11
+                f4e1x, f4e1y, f4e1z = (p2 * (1 - s) + p3 * (s + 1)) / 2 # edge 10
+                f4e2x, f4e2y, f4e2z = (p6 * (1 - s) + p7 * (s + 1)) / 2 # edge 11
             end
 
             if interp_idx5 != 0
-                f5x, f5y, f5z = interp(r, s, interp_r, interp_s, faceinterpolation, interp_idx5, interpolation_degree,)
+                f5x, f5y, f5z = interp(
+                    r,
+                    s,
+                    interp_r,
+                    interp_s,
+                    faceinterpolation,
+                    interp_idx5,
+                    interpolation_degree,
+                )
             else
-                f5x, f5y, f5z = (p5 * (1 - r) * (1 - s) + p6 * (r + 1) * (1 - s) + p8 * (1 - r) * (s + 1) + p7 * (r + 1) * (s + 1))/4
+                f5x, f5y, f5z =
+                    (
+                        p5 * (1 - r) * (1 - s) +
+                        p6 * (r + 1) * (1 - s) +
+                        p8 * (1 - r) * (s + 1) +
+                        p7 * (r + 1) * (s + 1)
+                    ) / 4
             end
 
             if interp_idx6 != 0
-                f6x, f6y, f6z = interp(s, t, interp_s, interp_t, faceinterpolation, interp_idx6, interpolation_degree,)
+                f6x, f6y, f6z = interp(
+                    s,
+                    t,
+                    interp_s,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx6,
+                    interpolation_degree,
+                )
 
-                f6e1x, f6e1y, f6e1z = interp(s, -1, interp_s, interp_t, faceinterpolation, interp_idx6, interpolation_degree,)
-                f6e2x, f6e2y, f6e2z = interp(s, 1, interp_s, interp_t, faceinterpolation, interp_idx6, interpolation_degree,)
+                f6e1x, f6e1y, f6e1z = interp(
+                    s,
+                    -1,
+                    interp_s,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx6,
+                    interpolation_degree,
+                )
+                f6e2x, f6e2y, f6e2z = interp(
+                    s,
+                    1,
+                    interp_s,
+                    interp_t,
+                    faceinterpolation,
+                    interp_idx6,
+                    interpolation_degree,
+                )
             else
-                f6x, f6y, f6z = (p1 * (1 - s) * (1 - t) + p4 * (s + 1) * (1 - t) + p5 * (1 - s) * (t + 1) + p8 * (s + 1) * (t + 1))/4
+                f6x, f6y, f6z =
+                    (
+                        p1 * (1 - s) * (1 - t) +
+                        p4 * (s + 1) * (1 - t) +
+                        p5 * (1 - s) * (t + 1) +
+                        p8 * (s + 1) * (t + 1)
+                    ) / 4
 
-                f6e1x, f6e1y, f6e1z = (p1 * (1 - s) + p4 * (s + 1))/2 # edge 9
-                f6e2x, f6e2y, f6e2z = (p5 * (1 - s) + p8 * (s + 1))/2 # edge 12
+                f6e1x, f6e1y, f6e1z = (p1 * (1 - s) + p4 * (s + 1)) / 2 # edge 9
+                f6e2x, f6e2y, f6e2z = (p5 * (1 - s) + p8 * (s + 1)) / 2 # edge 12
             end
 
-            x = ((1 - r) * f6x + (1 + r) * f4x + (1 - s) * f1x + (1 + s) * f2x + (1 - t) * f3x + (1 + t) * f5x)/2
-            y = ((1 - r) * f6y + (1 + r) * f4y + (1 - s) * f1y + (1 + s) * f2y + (1 - t) * f3y + (1 + t) * f5y)/2
-            z = ((1 - r) * f6z + (1 + r) * f4z + (1 - s) * f1z + (1 + s) * f2z + (1 - t) * f3z + (1 + t) * f5z)/2
+            x =
+                (
+                    (1 - r) * f6x +
+                    (1 + r) * f4x +
+                    (1 - s) * f1x +
+                    (1 + s) * f2x +
+                    (1 - t) * f3x +
+                    (1 + t) * f5x
+                ) / 2
+            y =
+                (
+                    (1 - r) * f6y +
+                    (1 + r) * f4y +
+                    (1 - s) * f1y +
+                    (1 + s) * f2y +
+                    (1 - t) * f3y +
+                    (1 + t) * f5y
+                ) / 2
+            z =
+                (
+                    (1 - r) * f6z +
+                    (1 + r) * f4z +
+                    (1 - s) * f1z +
+                    (1 + s) * f2z +
+                    (1 - t) * f3z +
+                    (1 + t) * f5z
+                ) / 2
 
-            x += (
-                p1[1] * (1 - r) * (1 - s) * (1 - t) +
-                p2[1] * (1 + r) * (1 - s) * (1 - t) +
-                p3[1] * (1 + r) * (1 + s) * (1 - t) +
-                p4[1] * (1 - r) * (1 + s) * (1 - t) +
-                p5[1] * (1 - r) * (1 - s) * (1 + t) +
-                p6[1] * (1 + r) * (1 - s) * (1 + t) +
-                p7[1] * (1 + r) * (1 + s) * (1 + t) +
-                p8[1] * (1 - r) * (1 + s) * (1 + t)
-            )/8
+            x +=
+                (
+                    p1[1] * (1 - r) * (1 - s) * (1 - t) +
+                    p2[1] * (1 + r) * (1 - s) * (1 - t) +
+                    p3[1] * (1 + r) * (1 + s) * (1 - t) +
+                    p4[1] * (1 - r) * (1 + s) * (1 - t) +
+                    p5[1] * (1 - r) * (1 - s) * (1 + t) +
+                    p6[1] * (1 + r) * (1 - s) * (1 + t) +
+                    p7[1] * (1 + r) * (1 + s) * (1 + t) +
+                    p8[1] * (1 - r) * (1 + s) * (1 + t)
+                ) / 8
 
-            y += (
-                p1[2] * (1 - r) * (1 - s) * (1 - t) +
-                p2[2] * (1 + r) * (1 - s) * (1 - t) +
-                p3[2] * (1 + r) * (1 + s) * (1 - t) +
-                p4[2] * (1 - r) * (1 + s) * (1 - t) +
-                p5[2] * (1 - r) * (1 - s) * (1 + t) +
-                p6[2] * (1 + r) * (1 - s) * (1 + t) +
-                p7[2] * (1 + r) * (1 + s) * (1 + t) +
-                p8[2] * (1 - r) * (1 + s) * (1 + t)
-            )/8
+            y +=
+                (
+                    p1[2] * (1 - r) * (1 - s) * (1 - t) +
+                    p2[2] * (1 + r) * (1 - s) * (1 - t) +
+                    p3[2] * (1 + r) * (1 + s) * (1 - t) +
+                    p4[2] * (1 - r) * (1 + s) * (1 - t) +
+                    p5[2] * (1 - r) * (1 - s) * (1 + t) +
+                    p6[2] * (1 + r) * (1 - s) * (1 + t) +
+                    p7[2] * (1 + r) * (1 + s) * (1 + t) +
+                    p8[2] * (1 - r) * (1 + s) * (1 + t)
+                ) / 8
 
-            z += (
-                p1[3] * (1 - r) * (1 - s) * (1 - t) +
-                p2[3] * (1 + r) * (1 - s) * (1 - t) +
-                p3[3] * (1 + r) * (1 + s) * (1 - t) +
-                p4[3] * (1 - r) * (1 + s) * (1 - t) +
-                p5[3] * (1 - r) * (1 - s) * (1 + t) +
-                p6[3] * (1 + r) * (1 - s) * (1 + t) +
-                p7[3] * (1 + r) * (1 + s) * (1 + t) +
-                p8[3] * (1 - r) * (1 + s) * (1 + t)
-            )/8
+            z +=
+                (
+                    p1[3] * (1 - r) * (1 - s) * (1 - t) +
+                    p2[3] * (1 + r) * (1 - s) * (1 - t) +
+                    p3[3] * (1 + r) * (1 + s) * (1 - t) +
+                    p4[3] * (1 - r) * (1 + s) * (1 - t) +
+                    p5[3] * (1 - r) * (1 - s) * (1 + t) +
+                    p6[3] * (1 + r) * (1 - s) * (1 + t) +
+                    p7[3] * (1 + r) * (1 + s) * (1 + t) +
+                    p8[3] * (1 - r) * (1 + s) * (1 + t)
+                ) / 8
 
-            x -= (
-                (1 - s) * (1 - t) * f1e1x +
-                (1 + r) * (1 - s) * f1e2x +
-                (1 - s) * (1 + t) * f1e3x +
-                (1 - r) * (1 - s) * f1e4x +
-                (1 + s) * (1 - t) * f2e1x +
-                (1 + r) * (1 + s) * f2e2x +
-                (1 + s) * (1 + t) * f2e3x +
-                (1 - r) * (1 + s) * f2e4x +
-                (1 - r) * (1 - t) * f6e1x +
-                (1 + r) * (1 - t) * f4e1x +
-                (1 + r) * (1 + t) * f4e2x +
-                (1 - r) * (1 + t) * f6e2x
-            )/4
+            x -=
+                (
+                    (1 - s) * (1 - t) * f1e1x +
+                    (1 + r) * (1 - s) * f1e2x +
+                    (1 - s) * (1 + t) * f1e3x +
+                    (1 - r) * (1 - s) * f1e4x +
+                    (1 + s) * (1 - t) * f2e1x +
+                    (1 + r) * (1 + s) * f2e2x +
+                    (1 + s) * (1 + t) * f2e3x +
+                    (1 - r) * (1 + s) * f2e4x +
+                    (1 - r) * (1 - t) * f6e1x +
+                    (1 + r) * (1 - t) * f4e1x +
+                    (1 + r) * (1 + t) * f4e2x +
+                    (1 - r) * (1 + t) * f6e2x
+                ) / 4
 
-            y -= (
-                (1 - s) * (1 - t) * f1e1y +
-                (1 + r) * (1 - s) * f1e2y +
-                (1 - s) * (1 + t) * f1e3y +
-                (1 - r) * (1 - s) * f1e4y +
-                (1 + s) * (1 - t) * f2e1y +
-                (1 + r) * (1 + s) * f2e2y +
-                (1 + s) * (1 + t) * f2e3y +
-                (1 - r) * (1 + s) * f2e4y +
-                (1 - r) * (1 - t) * f6e1y +
-                (1 + r) * (1 - t) * f4e1y +
-                (1 + r) * (1 + t) * f4e2y +
-                (1 - r) * (1 + t) * f6e2y
-            )/4
+            y -=
+                (
+                    (1 - s) * (1 - t) * f1e1y +
+                    (1 + r) * (1 - s) * f1e2y +
+                    (1 - s) * (1 + t) * f1e3y +
+                    (1 - r) * (1 - s) * f1e4y +
+                    (1 + s) * (1 - t) * f2e1y +
+                    (1 + r) * (1 + s) * f2e2y +
+                    (1 + s) * (1 + t) * f2e3y +
+                    (1 - r) * (1 + s) * f2e4y +
+                    (1 - r) * (1 - t) * f6e1y +
+                    (1 + r) * (1 - t) * f4e1y +
+                    (1 + r) * (1 + t) * f4e2y +
+                    (1 - r) * (1 + t) * f6e2y
+                ) / 4
 
-            z -= (
-                (1 - s) * (1 - t) * f1e1z +
-                (1 + r) * (1 - s) * f1e2z +
-                (1 - s) * (1 + t) * f1e3z +
-                (1 - r) * (1 - s) * f1e4z +
-                (1 + s) * (1 - t) * f2e1z +
-                (1 + r) * (1 + s) * f2e2z +
-                (1 + s) * (1 + t) * f2e3z +
-                (1 - r) * (1 + s) * f2e4z +
-                (1 - r) * (1 - t) * f6e1z +
-                (1 + r) * (1 - t) * f4e1z +
-                (1 + r) * (1 + t) * f4e2z +
-                (1 - r) * (1 + t) * f6e2z
-            )/4
+            z -=
+                (
+                    (1 - s) * (1 - t) * f1e1z +
+                    (1 + r) * (1 - s) * f1e2z +
+                    (1 - s) * (1 + t) * f1e3z +
+                    (1 - r) * (1 - s) * f1e4z +
+                    (1 + s) * (1 - t) * f2e1z +
+                    (1 + r) * (1 + s) * f2e2z +
+                    (1 + s) * (1 + t) * f2e3z +
+                    (1 - r) * (1 + s) * f2e4z +
+                    (1 - r) * (1 - t) * f6e1z +
+                    (1 + r) * (1 - t) * f4e1z +
+                    (1 + r) * (1 + t) * f4e2z +
+                    (1 - r) * (1 + t) * f6e2z
+                ) / 4
 
             points[i, j, k, q] = (x, y, z)
         end

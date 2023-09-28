@@ -4,7 +4,7 @@ MPI.Initialized() || MPI.Init()
 
 const comm = MPI.COMM_WORLD
 
-if false 
+if false
     using CUDA
     using CUDA.CUDAKernels
 
