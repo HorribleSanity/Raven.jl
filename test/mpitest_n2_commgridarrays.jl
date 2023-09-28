@@ -1,4 +1,3 @@
-using CUDA: BackToCPU
 using CUDA
 using MPI
 using Test
