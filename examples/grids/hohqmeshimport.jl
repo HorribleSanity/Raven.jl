@@ -29,9 +29,9 @@ using HOHQMesh
 p = newProject("IceCreamCone", "out")
 circ = newCircularArcCurve("outerCircle", [0.0, -1.0, 0.0], 4.0, 0.0, 360.0, "degrees")
 addCurveToOuterBoundary!(p, circ)
-cone1    = newEndPointsLineCurve("cone1", [0.0, -3.0, 0.0], [1.0, 0.0, 0.0])
+cone1 = newEndPointsLineCurve("cone1", [0.0, -3.0, 0.0], [1.0, 0.0, 0.0])
 iceCream = newCircularArcCurve("iceCream", [0.0, 0.0, 0.0], 1.0, 0.0, 180.0, "degrees")
-cone2    = newEndPointsLineCurve("cone2", [-1.0, 0.0, 0.0], [0.0, -3.0, 0.0])
+cone2 = newEndPointsLineCurve("cone2", [-1.0, 0.0, 0.0], [0.0, -3.0, 0.0])
 addCurveToInnerBoundary!(p, cone1, "IceCreamCone")
 addCurveToInnerBoundary!(p, iceCream, "IceCreamCone")
 addCurveToInnerBoundary!(p, cone2, "IceCreamCone")
@@ -60,7 +60,7 @@ coarse_grid = coarsegrid("out/IceCreamCone.inp")
 # coarse_grid = coarsegrid("examples/grids/Pond/Pond.inp")
 
 N = (4, 4)
-gm = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), coarse_grid, min_level=1)
+gm = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), coarse_grid, min_level = 1)
 
 grid = generate(gm)
 

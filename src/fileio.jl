@@ -87,7 +87,7 @@ function abaqusmeshimport(filename::String)
     # Extract element coords
     # HOHQMesh uses right hand rule for node numbering. We need Z order perm will reorder
     nodes_per_element = (dims == 2) ? 4 : 8
-    perm = (dims == 2) ? [1, 2, 4, 3] : [1,2,4,3,5,6,8,7]
+    perm = (dims == 2) ? [1, 2, 4, 3] : [1, 2, 4, 3, 5, 6, 8, 7]
     connectivity = Vector{NTuple{nodes_per_element,IT}}(undef, element_count)
     for elementline in filelines[elements_linenum+1:curvature_linenum-1]
         temp_data = split(elementline, ", ")

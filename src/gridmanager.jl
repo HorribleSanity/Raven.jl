@@ -378,7 +378,11 @@ function generate(warp::Function, gm::GridManager)
         quadranttointerpolation = materializequadranttointerpolation(meshimport)
         quadranttointerpolation = A(pin(A, quadranttointerpolation))
         faceinterpolation = interpolation(meshimport)
-        faceinterpolation = collect(transpose(reinterpret(reshape, eltype(eltype(faceinterpolation)), faceinterpolation)))
+        faceinterpolation = collect(
+            transpose(
+                reinterpret(reshape, eltype(eltype(faceinterpolation)), faceinterpolation),
+            ),
+        )
         faceinterpolation = A(pin(A, faceinterpolation))
         points = materializepoints(
             referencecell(gm),
@@ -458,13 +462,13 @@ end
 
 function materializequadranttointerpolation(abaqus::AbaqusMeshImport)
     dims = length(abaqus.connectivity[1]) == 4 ? 2 : 3
-    nodesperface = (abaqus.face_degree + 1)^(dims-1)
+    nodesperface = (abaqus.face_degree + 1)^(dims - 1)
     numberofelements = length(abaqus.face_iscurved)
     facesperelement = length(abaqus.face_iscurved[1])
     quadranttointerpolation = Array{Int32}(undef, numberofelements, facesperelement)
     idx = 1
-    for element in 1:numberofelements
-        for face in 1:facesperelement
+    for element = 1:numberofelements
+        for face = 1:facesperelement
             if abaqus.face_iscurved[element][face] == 1
                 quadranttointerpolation[element, face] = idx
                 idx += nodesperface

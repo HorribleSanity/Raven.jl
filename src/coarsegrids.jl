@@ -13,7 +13,7 @@ vertices(g::MeshImportCoarseGrid) = g.vertices
 cells(g::MeshImportCoarseGrid) = g.cells
 meshimport(g::MeshImportCoarseGrid) = g.MeshImport
 
-function coarsegrid(meshfilename::String, warp=identity, unwarp=identity)
+function coarsegrid(meshfilename::String, warp = identity, unwarp = identity)
     meshimport = abaqusmeshimport(meshfilename)
     cg_temp = coarsegrid(meshimport.nodes, meshimport.connectivity)
     vertices = Raven.vertices(cg_temp)
@@ -24,7 +24,14 @@ function coarsegrid(meshfilename::String, warp=identity, unwarp=identity)
         conn = P4estTypes.Connectivity{8}(vertices, cells)
     end
     C, V, L, W, U, M = typeof.([conn, vertices, cells, warp, unwarp, meshimport])
-    return MeshImportCoarseGrid{C,V,L,W,U,M}(conn, vertices, cells, warp, unwarp, meshimport)
+    return MeshImportCoarseGrid{C,V,L,W,U,M}(
+        conn,
+        vertices,
+        cells,
+        warp,
+        unwarp,
+        meshimport,
+    )
 end
 
 struct CoarseGrid{C,V,L,W,U} <: AbstractCoarseGrid
