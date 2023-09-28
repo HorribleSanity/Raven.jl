@@ -711,19 +711,18 @@ function grids_testsuite(AT, FT)
         cg = coarsegrid(vertices, cells)
         coarse_grid = coarsegrid("curvedboxmesh2d.inp")
 
-        gm = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg, min_level = 1)
-        gmcurved =
-            GridManager(LobattoCell{Tuple{N...},Float64,AT}(), coarse_grid, min_level = 1)
+        gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg, min_level = 1)
+        gmcurved = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 1)
         grid = generate(gm)
         gridcurved = generate(gmcurved)
         @test coarse_grid.vertices ≈ cg.vertices
 
         cg1 = coarsegrid("flatGingerbreadMan.inp")
-        gm1 = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg1, min_level = 1)
+        gm1 = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg1, min_level = 1)
         grid = generate(gm1)
 
         cg2 = coarsegrid("GingerbreadMan.inp")
-        gm2 = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg2, min_level = 1)
+        gm2 = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg2, min_level = 1)
         grid2 = generate(gm2)
 
         @test cg1.vertices ≈ cg2.vertices
@@ -753,20 +752,19 @@ function grids_testsuite(AT, FT)
         cg = coarsegrid(vertices, cells)
         coarse_grid = coarsegrid("curvedboxmesh3d.inp")
 
-        gm = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg, min_level = 1)
-        gmcurved =
-            GridManager(LobattoCell{Tuple{N...},Float64,AT}(), coarse_grid, min_level = 1)
+        gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg, min_level = 1)
+        gmcurved = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 1)
         grid = generate(gm)
         gridcurved = generate(gmcurved)
 
         @test coarse_grid.vertices ≈ cg.vertices
 
         cg1 = coarsegrid("flatHalfCircle3DRot.inp")
-        gm1 = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg1, min_level = 1)
+        gm1 = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg1, min_level = 1)
         grid = generate(gm1)
 
         cg2 = coarsegrid("HalfCircle3DRot.inp")
-        gm2 = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), cg2, min_level = 1)
+        gm2 = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg2, min_level = 1)
         grid2 = generate(gm2)
 
         @test cg1.vertices ≈ cg2.vertices
