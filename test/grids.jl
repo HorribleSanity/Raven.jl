@@ -274,8 +274,9 @@ function grids_testsuite(AT, FT)
         uJ = fJ.(ux, step.(coordinates)..., level)
         uwJ = wr .* ws .* det.(uJ)
         uinvJ = inv.(uJ)
-        invJ, wJ = components(first(volumemetrics(grid)))
+        invJ, J, wJ = components(first(volumemetrics(grid)))
 
+        @test all(adapt(Array, J .≈ det.(uJ)))
         @test all(adapt(Array, wJ .≈ uwJ))
         @test all(adapt(Array, invJ .≈ uinvJ))
 
@@ -290,7 +291,7 @@ function grids_testsuite(AT, FT)
         sm, _ = surfacemetrics(grid)
         sm = adapt(Array, sm)
 
-        n, wsJ = components(sm)
+        n, sJ, wsJ = components(sm)
         a = n .* wsJ
         @test all(
             a[1:M, 1:numcells(grid)] ./ vec(ws) .≈
@@ -305,6 +306,17 @@ function grids_testsuite(AT, FT)
         )
         @test all(
             a[2M.+L.+(1:L), 1:numcells(grid)] ./ vec(wr) .≈
+            map(g -> SA[-g[2, 1], g[1, 1]], uJ[:, end, :]),
+        )
+
+        a = n .* sJ
+        @test all(a[1:M, 1:numcells(grid)] .≈ map(g -> SA[-g[2, 2], g[1, 2]], uJ[1, :, :]))
+        @test all(a[M.+(1:M), :] .≈ map(g -> SA[g[2, 2], -g[1, 2]], uJ[end, :, :]))
+        @test all(
+            a[2M.+(1:L), 1:numcells(grid)] .≈ map(g -> SA[g[2, 1], -g[1, 1]], uJ[:, 1, :]),
+        )
+        @test all(
+            a[2M.+L.+(1:L), 1:numcells(grid)] .≈
             map(g -> SA[-g[2, 1], g[1, 1]], uJ[:, end, :]),
         )
 
@@ -328,7 +340,7 @@ function grids_testsuite(AT, FT)
         )
 
         grid = generate(gm)
-        _, wJ = components(first(volumemetrics(grid)))
+        _, _, wJ = components(first(volumemetrics(grid)))
 
         @test sum(adapt(Array, wJ)) ≈ pi * R^2 * 4
 
@@ -365,11 +377,8 @@ function grids_testsuite(AT, FT)
         )
 
         grid = generate(f, gm)
-        invJ, wJ = components(first(volumemetrics(grid)))
+        invJ, J, _ = components(first(volumemetrics(grid)))
         invJ11, invJ21, invJ12, invJ22 = components(invJ)
-
-        wr, ws = weights_1d(referencecell(gm))
-        J = wJ ./ (wr .* ws)
 
         Dr, Ds = derivatives(referencecell(grid))
 
@@ -428,8 +437,9 @@ function grids_testsuite(AT, FT)
         uJ = fJ.(ux, step.(coordinates)..., level)
         uwJ = wr .* ws .* wt .* det.(uJ)
         uinvJ = inv.(uJ)
-        invJ, wJ = components(first(volumemetrics(grid)))
+        invJ, J, wJ = components(first(volumemetrics(grid)))
 
+        @test all(adapt(Array, J .≈ det.(uJ)))
         @test all(adapt(Array, wJ .≈ uwJ))
         @test all(adapt(Array, invJ .≈ uinvJ))
 
@@ -448,7 +458,8 @@ function grids_testsuite(AT, FT)
         sm = adapt(Array, sm)
         b = det.(uJ) .* uinvJ
 
-        n, wsJ = components(sm)
+        n, sJ, wsJ = components(sm)
+
         a = n .* wsJ
         @test all(
             reshape(a[1:M*N, 1:numcells(grid)], (M, N, numcells(grid))) ./
@@ -475,6 +486,34 @@ function grids_testsuite(AT, FT)
                 a[2*L*N+2*M*N.+L*M.+(1:L*M), 1:numcells(grid)],
                 (L, M, numcells(grid)),
             ) ./ (vec(wr) .* vec(ws)') .≈ map(g -> g[3, :], b[:, :, end, :]),
+        )
+
+        a = n .* sJ
+        @test all(
+            reshape(a[1:M*N, 1:numcells(grid)], (M, N, numcells(grid))) .≈
+            map(g -> -g[1, :], b[1, :, :, :]),
+        )
+        @test all(
+            reshape(a[M*N.+(1:M*N), 1:numcells(grid)], (M, N, numcells(grid))) .≈
+            map(g -> g[1, :], b[end, :, :, :]),
+        )
+        @test all(
+            reshape(a[2*M*N.+(1:L*N), 1:numcells(grid)], (L, N, numcells(grid))) .≈
+            map(g -> -g[2, :], b[:, 1, :, :]),
+        )
+        @test all(
+            reshape(a[2*M*N.+L*N.+(1:L*N), 1:numcells(grid)], (L, N, numcells(grid))) .≈
+            map(g -> g[2, :], b[:, end, :, :]),
+        )
+        @test all(
+            reshape(a[2*L*N+2*M*N.+(1:L*M), 1:numcells(grid)], (L, M, numcells(grid))) .≈
+            map(g -> -g[3, :], b[:, :, 1, :]),
+        )
+        @test all(
+            reshape(
+                a[2*L*N+2*M*N.+L*M.+(1:L*M), 1:numcells(grid)],
+                (L, M, numcells(grid)),
+            ) .≈ map(g -> g[3, :], b[:, :, end, :]),
         )
 
         @test all(norm.(n) .≈ 1)
@@ -507,11 +546,8 @@ function grids_testsuite(AT, FT)
         )
 
         grid = generate(f, gm)
-        invJ, wJ = components(first(volumemetrics(grid)))
+        invJ, J, _ = components(first(volumemetrics(grid)))
         invJc = components(invJ)
-
-        wr, ws, wt = weights_1d(referencecell(gm))
-        J = wJ ./ (wr .* ws .* wt)
 
         Dr, Ds, Dt = derivatives(referencecell(grid))
 
@@ -540,15 +576,16 @@ function grids_testsuite(AT, FT)
         # @test all(x₁ .- reverse(x₁, dims = (2, 4), cell) .== 0)
         # @test all(x₂ .+ reverse(x₂, dims =, cell (2, 4)) .== 0)
 
-        g, wJ = adapt(Array, components(first(volumemetrics(grid))))
+        g, J, wJ = adapt(Array, components(first(volumemetrics(grid))))
         wr, ws = adapt(Array, weights_1d(cell))
+        @test all(J .== (step(xrange) * step(yrange) / 4))
         @test all(wJ .== (step(xrange) * step(yrange) / 4) .* (wr .* ws))
         @test all(getindex.(g, 1) .== 2 / step(xrange))
         @test all(getindex.(g, 2) .== 0)
         @test all(getindex.(g, 3) .== 0)
         @test all(getindex.(g, 4) .== 2 / step(yrange))
 
-        n, swJ = adapt(Array, components(first(surfacemetrics(grid))))
+        n, sJ, swJ = adapt(Array, components(first(surfacemetrics(grid))))
 
         n₁, n₂, n₃, n₄ = faceviews(n, cell)
         @test all(n₁ .== Ref(SVector(-1, 0)))
@@ -561,6 +598,12 @@ function grids_testsuite(AT, FT)
         @test all(isapprox.(swJ₂, (step(yrange) / 2) .* vec(ws), rtol = 10eps(FT)))
         @test all(isapprox.(swJ₃, (step(xrange) / 2) .* vec(wr), rtol = 10eps(FT)))
         @test all(isapprox.(swJ₄, (step(xrange) / 2) .* vec(wr), rtol = 10eps(FT)))
+
+        sJ₁, sJ₂, sJ₃, sJ₄ = faceviews(sJ, cell)
+        @test all(isapprox.(sJ₁, (step(yrange) / 2), rtol = 10eps(FT)))
+        @test all(isapprox.(sJ₂, (step(yrange) / 2), rtol = 10eps(FT)))
+        @test all(isapprox.(sJ₃, (step(xrange) / 2), rtol = 10eps(FT)))
+        @test all(isapprox.(sJ₄, (step(xrange) / 2), rtol = 10eps(FT)))
     end
 
     @testset "3D uniform brick grid" begin
@@ -587,9 +630,10 @@ function grids_testsuite(AT, FT)
         # @test all(x₂ .- reverse(x₂, dims = (3, 6)) .== 0)
         # @test all(x₃ .+ reverse(x₃, dims = (3, 6)) .== 0)
 
-        g, wJ = adapt(Array, components(first(volumemetrics(grid))))
+        g, J, wJ = adapt(Array, components(first(volumemetrics(grid))))
         wr, ws, wt = adapt(Array, weights_1d(cell))
 
+        @test all(J .== (step(xrange) * step(yrange) * step(zrange) / 8))
         @test all(
             wJ .== (step(xrange) * step(yrange) * step(zrange) / 8) .* (wr .* ws .* wt),
         )
@@ -604,7 +648,7 @@ function grids_testsuite(AT, FT)
         @test all(getindex.(g, 8) .== 0)
         @test all(getindex.(g, 9) .== 2 / step(zrange))
 
-        n, swJ = adapt(Array, components(first(surfacemetrics(grid))))
+        n, sJ, swJ = adapt(Array, components(first(surfacemetrics(grid))))
         n₁, n₂, n₃, n₄, n₅, n₆ = faceviews(n, cell)
         @test all(n₁ .== Ref(SVector(-1, 0, 0)))
         @test all(n₂ .== Ref(SVector(1, 0, 0)))
@@ -657,6 +701,14 @@ function grids_testsuite(AT, FT)
                 rtol = 10eps(FT),
             ),
         )
+
+        sJ₁, sJ₂, sJ₃, sJ₄, sJ₅, sJ₆ = faceviews(sJ, cell)
+        @test all(isapprox.(sJ₁, (step(yrange) * step(zrange) / 4), rtol = 10eps(FT)))
+        @test all(isapprox.(sJ₂, (step(yrange) * step(zrange) / 4), rtol = 10eps(FT)))
+        @test all(isapprox.(sJ₃, (step(xrange) * step(zrange) / 4), rtol = 10eps(FT)))
+        @test all(isapprox.(sJ₄, (step(xrange) * step(zrange) / 4), rtol = 10eps(FT)))
+        @test all(isapprox.(sJ₅, (step(xrange) * step(yrange) / 4), rtol = 10eps(FT)))
+        @test all(isapprox.(sJ₆, (step(xrange) * step(yrange) / 4), rtol = 10eps(FT)))
     end
 
     @testset "min_node_distance" begin

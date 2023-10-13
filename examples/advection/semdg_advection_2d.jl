@@ -228,8 +228,8 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
     backend = Raven.get_backend(dq)
     cell = referencecell(grid)
 
-    dRdX, wJ = components(first(volumemetrics(grid)))
-    n, wsJ = components(first(surfacemetrics(grid)))
+    dRdX, _, wJ = components(first(volumemetrics(grid)))
+    n, _, wsJ = components(first(surfacemetrics(grid)))
     fm = facemaps(grid)
 
     start!(q, cm)
@@ -339,7 +339,7 @@ function run(
     dq .= 0
 
     # precompute inverse of weights × Jacobian
-    _, wJ = components(first(volumemetrics(grid)))
+    _, _, wJ = components(first(volumemetrics(grid)))
     invwJ = inv.(wJ)
     # precompute derivative transpose
     DT = transpose.(derivatives_1d(cell))
@@ -374,7 +374,7 @@ function run(
     end
 
     # compute error
-    _, wJ = components(first(volumemetrics(grid)))
+    _, _, wJ = components(first(volumemetrics(grid)))
     qexact = solution.(points(grid), timeend)
     # TODO add sum to GridArray so the following reduction is on the device
     errf = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* (q .- qexact) .^ 2)), +, comm))
