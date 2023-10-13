@@ -2210,7 +2210,7 @@ end
 
         wJinvG = wJ * invG
 
-        firstordermetrics[i, j, q] = (; dRdX, wJ)
+        firstordermetrics[i, j, q] = (; dRdX, J, wJ)
         secondordermetrics[i, j, q] = (; wJinvG, wJ)
     end
 end
@@ -2257,7 +2257,7 @@ end
             SVector(wJ * (drdx)^2, -zero(dx), -zero(dx), wJ * (dsdy)^2),
         )
 
-        firstordermetrics[i, j, q] = (; dRdX, wJ)
+        firstordermetrics[i, j, q] = (; dRdX, J, wJ)
         secondordermetrics[i, j, q] = (; wJinvG, wJ)
     end
 end
@@ -2265,9 +2265,10 @@ end
 @kernel function quadsurfacemetrics!(
     surfacemetrics,
     dRdXs,
-    wJs,
+    Js,
+    _,
     vmapM,
-    wnormal,
+    w,
     fg,
     facegroupsize,
     facegroupoffsets,
@@ -2283,39 +2284,49 @@ end
             j
         i = vmapM[si]
         dRdX = dRdXs[i]
-        wJ = wJs[i]
+        J = Js[i]
 
-        wn = fn == 1 ? wnormal[1] : wnormal[end]
         sn = fn == 1 ? -1 : 1
 
-        n = (sn * wJ / wn) * dRdX[fg, :]
-        wsJ = norm(n)
-        n = n / wsJ
+        n = sn * J * dRdX[fg, :]
+        sJ = norm(n)
+        n = n / sJ
 
-        surfacemetrics[si] = (; n, wsJ)
+        if fg == 1
+            wsJ = sJ * w[2][j]
+        elseif fg == 2
+            wsJ = sJ * w[1][j]
+        end
+
+        surfacemetrics[si] = (; n, sJ, wsJ)
     end
 end
 
-@kernel function quadncsurfacemetrics!(surfacemetrics, dRdXs, wJs, vmapNC, nctoface, w)
+@kernel function quadncsurfacemetrics!(surfacemetrics, dRdXs, Js, _, vmapNC, nctoface, w)
     j, ft, _ = @index(Local, NTuple)
     _, _, q = @index(Global, NTuple)
 
     @inbounds begin
         i = vmapNC[j, ft, q]
         dRdX = dRdXs[i]
-        wJ = wJs[i]
+        J = Js[i]
 
         f = ft == 1 ? nctoface[1, q] : nctoface[2, q]
         fg, fn = fldmod1(f, 2)
 
-        wn = fn == 1 ? w[fg][1] : w[fg][end]
         sn = fn == 1 ? -1 : 1
 
-        n = (sn * wJ / wn) * dRdX[fg, :]
-        wsJ = norm(n)
-        n = n / wsJ
+        n = sn * J * dRdX[fg, :]
+        sJ = norm(n)
+        n = n / sJ
 
-        surfacemetrics[j, ft, q] = (; n, wsJ)
+        if fg == 1
+            wsJ = sJ * w[2][j]
+        elseif fg == 2
+            wsJ = sJ * w[1][j]
+        end
+
+        surfacemetrics[j, ft, q] = (; n, sJ, wsJ)
     end
 end
 
@@ -2333,7 +2344,7 @@ function materializemetrics(
     D = derivatives_1d(cell)
     w = vec.(weights_1d(cell))
 
-    T1 = NamedTuple{(:dRdX, :wJ),Tuple{SMatrix{2,N,FT,2 * N},FT}}
+    T1 = NamedTuple{(:dRdX, :J, :wJ),Tuple{SMatrix{2,N,FT,2 * N},FT,FT}}
     firstordermetrics = similar(points, T1)
 
     T2 = NamedTuple{(:wJinvG, :wJ),Tuple{SHermitianCompact{2,FT,3},FT}}
@@ -2371,7 +2382,7 @@ function materializemetrics(
 
     volumemetrics = (firstordermetrics, secondordermetrics)
 
-    TS = NamedTuple{(:n, :wsJ),Tuple{SVector{N,FT},FT}}
+    TS = NamedTuple{(:n, :sJ, :wsJ),Tuple{SVector{N,FT},FT,FT}}
 
     # TODO move this to cell
     cellfacedims = ((size(cell, 2),), (size(cell, 1),))
@@ -2402,7 +2413,7 @@ function materializemetrics(
             surfacemetrics,
             components(viewwithghosts(firstordermetrics))...,
             facemaps.vmapM,
-            w[n],
+            w,
             n,
             facegroupsize[n],
             facegroupoffsets,
@@ -2565,7 +2576,7 @@ end
             wJ = wr[i] * ws[j] * wt[k] * detJ
             wJinvG = wJ * invG
 
-            firstordermetrics[i, j, k, q] = (; dRdX = invJ, wJ)
+            firstordermetrics[i, j, k, q] = (; dRdX = invJ, J = detJ, wJ)
             secondordermetrics[i, j, k, q] = (; wJinvG, wJ)
         end
     end
@@ -2636,7 +2647,7 @@ end
                 wJ * (dtdz)^2,
             )
 
-            firstordermetrics[i, j, k, q] = (; dRdX, wJ)
+            firstordermetrics[i, j, k, q] = (; dRdX, J, wJ)
             secondordermetrics[i, j, k, q] = (; wJinvG, wJ)
         end
     end
@@ -2645,9 +2656,10 @@ end
 @kernel function hexsurfacemetrics!(
     surfacemetrics,
     dRdXs,
-    wJs,
+    Js,
+    _,
     vmapM,
-    wnormal,
+    w,
     fg,
     facegroupsize,
     facegroupoffsets,
@@ -2664,40 +2676,54 @@ end
             i
         k = vmapM[sk]
         dRdX = dRdXs[k]
-        wJ = wJs[k]
+        J = Js[k]
 
-        wn = fn == 1 ? wnormal[1] : wnormal[end]
         sn = fn == 1 ? -1 : 1
 
-        n = (sn * wJ / wn) * dRdX[fg, :]
+        n = sn * J * dRdX[fg, :]
 
-        wsJ = norm(n)
-        n = n / wsJ
+        sJ = norm(n)
+        n = n / sJ
 
-        surfacemetrics[sk] = (; n, wsJ)
+        if fg == 1
+            wsJ = sJ * w[2][i] * w[3][j]
+        elseif fg == 2
+            wsJ = sJ * w[1][i] * w[3][j]
+        elseif fg == 3
+            wsJ = sJ * w[1][i] * w[2][j]
+        end
+
+        surfacemetrics[sk] = (; n, sJ, wsJ)
     end
 end
 
-@kernel function hexncsurfacemetrics!(surfacemetrics, dRdXs, wJs, vmapNC, nctoface, w)
+@kernel function hexncsurfacemetrics!(surfacemetrics, dRdXs, Js, _, vmapNC, nctoface, w)
     i, j, ft, _ = @index(Local, NTuple)
     _, _, _, q = @index(Global, NTuple)
 
     @inbounds begin
         k = vmapNC[i, j, ft, q]
         dRdX = dRdXs[k]
-        wJ = wJs[k]
+        J = Js[k]
 
         f = ft == 1 ? nctoface[1, q] : nctoface[2, q]
         fg, fn = fldmod1(f, 2)
 
-        wn = fn == 1 ? w[fg][1] : w[fg][end]
         sn = fn == 1 ? -1 : 1
 
-        n = (sn * wJ / wn) * dRdX[fg, :]
-        wsJ = norm(n)
-        n = n / wsJ
+        n = sn * J * dRdX[fg, :]
+        sJ = norm(n)
+        n = n / sJ
 
-        surfacemetrics[i, j, ft, q] = (; n, wsJ)
+        if fg == 1
+            wsJ = sJ * w[2][i] * w[3][j]
+        elseif fg == 2
+            wsJ = sJ * w[1][i] * w[3][j]
+        elseif fg == 3
+            wsJ = sJ * w[1][i] * w[2][j]
+        end
+
+        surfacemetrics[i, j, ft, q] = (; n, sJ, wsJ)
     end
 end
 
@@ -2714,7 +2740,7 @@ function materializemetrics(
     D = derivatives_1d(cell)
     w = vec.(weights_1d(cell))
 
-    T1 = NamedTuple{(:dRdX, :wJ),Tuple{SMatrix{3,3,FT,9},FT}}
+    T1 = NamedTuple{(:dRdX, :J, :wJ),Tuple{SMatrix{3,3,FT,9},FT,FT}}
     firstordermetrics = similar(points, T1)
 
     T2 = NamedTuple{(:wJinvG, :wJ),Tuple{SHermitianCompact{3,FT,6},FT}}
@@ -2755,7 +2781,7 @@ function materializemetrics(
 
     volumemetrics = (firstordermetrics, secondordermetrics)
 
-    TS = NamedTuple{(:n, :wsJ),Tuple{SVector{3,FT},FT}}
+    TS = NamedTuple{(:n, :sJ, :wsJ),Tuple{SVector{3,FT},FT,FT}}
 
     # TODO move this to cell
     cellfacedims = (
@@ -2790,7 +2816,7 @@ function materializemetrics(
             surfacemetrics,
             components(viewwithghosts(firstordermetrics))...,
             facemaps.vmapM,
-            w[n],
+            w,
             n,
             facegroupsize[n],
             facegroupoffsets,
