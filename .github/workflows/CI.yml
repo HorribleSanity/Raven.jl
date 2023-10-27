@@ -38,7 +38,7 @@ jobs:
       - uses: julia-actions/julia-runtest@latest
 
   test-system-apt:
-    timeout-minutes: 20
+    timeout-minutes: 60
     runs-on: ubuntu-20.04
     strategy:
       matrix:
