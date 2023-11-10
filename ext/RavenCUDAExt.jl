@@ -50,6 +50,12 @@ Raven.Stream(::CUDABackend) = CuStream()
 Raven.synchronize(::CUDABackend, a) = synchronize(a)
 Raven.stream!(f::Function, ::CUDABackend, stream::CuStream) = stream!(f, stream)
 
-Adapt.adapt_storage(::CUDA.Adaptor, ::MPI.Comm) = nothing
+if isdefined(CUDA, :Adaptor)
+    # CUDA.Adaptor was removed in CUDA.jl v5.1
+    Adapt.adapt_storage(::CUDA.Adaptor, ::MPI.Comm) = nothing
+else
+    # CUDA.KernelAdaptor was introduced in CUDA.jl v5.1
+    Adapt.adapt_storage(::CUDA.KernelAdaptor, ::MPI.Comm) = nothing
+end
 
 end # module RavenCUDAExt
