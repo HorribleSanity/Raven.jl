@@ -59,8 +59,8 @@ function grids_testsuite(AT, FT)
 
     let
         N = (3, 3, 3)
-        R = 2
-        r = 1
+        R = FT(2)
+        r = FT(1)
 
         coarse_grid = Raven.cubeshellgrid(R, r)
 
@@ -89,7 +89,7 @@ function grids_testsuite(AT, FT)
 
     let
         N = (3, 3)
-        R = 1
+        R = FT(1)
 
         coarse_grid = Raven.cubeshell2dgrid(R)
 
