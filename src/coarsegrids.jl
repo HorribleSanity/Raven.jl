@@ -65,7 +65,8 @@ end
 
 function cubeshellgrid(R::Real, r::Real)
     @assert R > r "R (outer radius) must be greater that r (inner radius)"
-    vertices = zeros(SVector{3,Float64}, 16)
+    T = promote_type(typeof(R), typeof(r))
+    vertices = zeros(SVector{3,T}, 16)
 
     vertices[1] = SVector(+R, +R, -R)
     vertices[2] = SVector(+R, -R, -R)
@@ -109,7 +110,7 @@ function cubeshellgrid(R::Real, r::Real)
         z_x = tan(η)
 
         # Compute the new points
-        x = point[3] / hypot(1, y_x, z_x)
+        x = point[3] / hypot(one(y_x), y_x, z_x)
         y = x * y_x
         z = x * z_x
 
@@ -147,7 +148,7 @@ end
     A cube shell is a 2D connectivity.
 """
 function cubeshell2dgrid(R::Real)
-    vertices = zeros(SVector{3,Float64}, 8)
+    vertices = zeros(SVector{3,typeof(R)}, 8)
 
     vertices[1] = SVector(+R, +R, -R)
     vertices[2] = SVector(+R, -R, -R)
@@ -175,7 +176,7 @@ function cubeshell2dgrid(R::Real)
         z_x = tan(η)
 
         # Compute the new points
-        x = point[3] / hypot(1, y_x, z_x)
+        x = point[3] / hypot(one(y_x), y_x, z_x)
         y = x * y_x
         z = x * z_x
 
