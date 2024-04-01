@@ -66,7 +66,7 @@ function grids_testsuite(AT, FT)
 
         gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 2)
 
-        indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
+        indicator = rand(rng, (Raven.AdaptNone, Raven.AdaptRefine), length(gm))
         adapt!(gm, indicator)
 
         grid = generate(gm)
@@ -95,7 +95,7 @@ function grids_testsuite(AT, FT)
 
         gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 2)
 
-        indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
+        indicator = rand(rng, (Raven.AdaptNone, Raven.AdaptRefine), length(gm))
         adapt!(gm, indicator)
 
         grid = generate(gm)
