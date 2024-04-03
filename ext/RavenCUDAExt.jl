@@ -3,6 +3,7 @@ module RavenCUDAExt
 import Raven
 import Adapt
 import MPI
+import StaticArrays
 
 isdefined(Base, :get_extension) ? (using CUDA) : (using ..CUDA)
 isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAKernels)
@@ -56,6 +57,13 @@ if isdefined(CUDA, :Adaptor)
 else
     # CUDA.KernelAdaptor was introduced in CUDA.jl v5.1
     Adapt.adapt_storage(::CUDA.KernelAdaptor, ::MPI.Comm) = nothing
+end
+
+CUDA.@device_override function Base.checkbounds(A::StaticArrays.MArray, I...)
+    @inline
+    checkbounds(Bool, A, I...) ||
+        CUDA.@print_and_throw("BoundsError while indexing an MArray.")
+    nothing
 end
 
 end # module RavenCUDAExt
