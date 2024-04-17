@@ -65,14 +65,20 @@ if !isdefined(Base, :get_extension)
     using Requires
 end
 
-@static if !isdefined(Base, :get_extension)
-    function __init__()
+function __init__()
+    @static if !isdefined(Base, :get_extension)
         @require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" include(
             "../ext/RavenCUDAExt.jl",
         )
         @require WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192" include(
             "../ext/RavenWriteVTKExt.jl",
         )
+    end
+
+    MPI.add_finalize_hook!() do
+        for cm in COMM_MANAGERS
+            finalize(cm.value)
+        end
     end
 end
 

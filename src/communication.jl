@@ -1,3 +1,5 @@
+const COMM_MANAGERS = WeakRef[]
+
 struct CommPattern{AT,RI,RR,RRI,SI,SR,SRI}
     recvindices::RI
     recvranks::RR
@@ -74,7 +76,7 @@ end
 
 abstract type AbstractCommManager end
 
-struct CommManagerBuffered{CP,RBD,RB,SBD,SB} <: AbstractCommManager
+mutable struct CommManagerBuffered{CP,RBD,RB,SBD,SB} <: AbstractCommManager
     comm::MPI.Comm
     pattern::CP
     tag::Cint
@@ -86,8 +88,8 @@ struct CommManagerBuffered{CP,RBD,RB,SBD,SB} <: AbstractCommManager
     sendrequests::MPI.UnsafeMultiRequest
 end
 
-struct CommManagerTripleBuffered{CP,RBC,RBH,RBD,RB,RS,SBC,SBH,SBD,SB,SS} <:
-       AbstractCommManager
+mutable struct CommManagerTripleBuffered{CP,RBC,RBH,RBD,RB,RS,SBC,SBH,SBD,SB,SS} <:
+               AbstractCommManager
     comm::MPI.Comm
     pattern::CP
     tag::Cint
@@ -184,7 +186,7 @@ function commmanager(
         )
     end
 
-    return if triplebuffer
+    cm = if triplebuffer
         backend = get_backend(arraytype(pattern))
         recvstream = Stream(backend)
         sendstream = Stream(backend)
@@ -218,6 +220,18 @@ function commmanager(
             sendrequests,
         )
     end
+
+    finalizer(cm) do cm
+        for reqs in (cm.recvrequests, cm.sendrequests)
+            for req in reqs
+                MPI.free(req)
+            end
+        end
+    end
+
+    push!(COMM_MANAGERS, WeakRef(cm))
+
+    return cm
 end
 
 get_backend(cm::AbstractCommManager) = get_backend(arraytype(cm.pattern))
