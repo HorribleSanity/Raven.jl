@@ -7,6 +7,7 @@ Pkg.add("UUIDs")
 @static if VERSION >= v"1.8"
     Pkg.compat("MPIPreferences", "0.1")
     Pkg.compat("Preferences", "1")
+    Pkg.compat("UUIDs", "1")
 end
 
 const RAVEN_TEST = get(ENV, "RAVEN_TEST", "RAVEN_JLL_MPI_DEFAULT")
