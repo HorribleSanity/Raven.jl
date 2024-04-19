@@ -380,6 +380,18 @@ Base.Broadcast.BroadcastStyle(
     ::Base.Broadcast.ArrayStyle{GridArray},
     ::A,
 ) where {M,A<:Base.Broadcast.DefaultArrayStyle{M}} = Broadcast.ArrayStyle{GridArray}()
+Base.Broadcast.BroadcastStyle(
+    ::Base.Broadcast.ArrayStyle{GridArray},
+    ::A,
+) where {A<:Base.Broadcast.ArrayStyle} = Broadcast.ArrayStyle{GridArray}()
+Base.Broadcast.BroadcastStyle(
+    ::A,
+    ::Base.Broadcast.ArrayStyle{GridArray},
+) where {A<:Base.Broadcast.ArrayStyle} = Broadcast.ArrayStyle{GridArray}()
+Base.Broadcast.BroadcastStyle(
+    ::Base.Broadcast.ArrayStyle{GridArray},
+    ::Base.Broadcast.ArrayStyle{GridArray},
+) = Broadcast.ArrayStyle{GridArray}()
 
 cat_gridarrays(t::Broadcast.Broadcasted, rest...) =
     (cat_gridarrays(t.args...)..., cat_gridarrays(rest...)...)
