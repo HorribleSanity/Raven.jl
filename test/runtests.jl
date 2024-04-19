@@ -8,6 +8,9 @@ import Raven.P4estTypes
 using Raven.StaticArrays
 using Raven.SparseArrays
 using Test
+using Aqua
+
+Aqua.test_all(Raven; stale_deps = (ignore = [:Requires],))
 
 function runmpitests()
     test_dir = @__DIR__
