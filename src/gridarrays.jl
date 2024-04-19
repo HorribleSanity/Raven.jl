@@ -278,11 +278,16 @@ function Base.similar(
     end
 end
 
+function Base.checkbounds(::Type{Bool}, a::GridArray, I::NTuple{N,<:Integer}) where {N}
+    @inline
+    Base.checkbounds_indices(Bool, axes(a), I)
+end
+
 @inline function Base.getindex(
     a::GridArray{T,N,A,G,F,L},
     I::Vararg{Int,N},
 ) where {T,N,A,G,F,L}
-    @boundscheck Base.checkbounds_indices(Bool, axes(a), I) || Base.throw_boundserror(a, I)
+    @boundscheck checkbounds(a, I)
     data = parent(a)
     d = ntuple(
         i -> (@inbounds getindex(data, insert(I, Val(F), i)...)),
@@ -307,7 +312,7 @@ end
 end
 
 @inline function Base.setindex!(a::GridArray{<:Any,N}, v, I::Vararg{Int,N}) where {N}
-    @boundscheck Base.checkbounds_indices(Bool, axes(a), I) || Base.throw_boundserror(a, I)
+    @boundscheck checkbounds(a, I)
     return _unsafe_setindex!(a, v, I...)
 end
 
