@@ -37,6 +37,8 @@ struct GridArray{T,N,A,G,F,L,C,D,W} <: AbstractArray{T,N}
     dimswithghosts::NTuple{N,Int}
 end
 
+const GridVecOrMat{T} = Union{GridArray{T,1},GridArray{T,2}}
+
 function GridArray{T}(
     ::UndefInitializer,
     ::Type{A},

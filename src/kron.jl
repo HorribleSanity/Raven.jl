@@ -61,6 +61,19 @@ end
     end
 end
 
+@inline (*)(::Kron{Tuple{E₂,E₁}}, f::F) where {E₁<:Eye,E₂<:Eye,F<:AbstractVecOrMat} =
+    copy(f)
+@inline (*)(
+    ::Kron{Tuple{E₃,E₂,E₁}},
+    f::F,
+) where {E₁<:Eye,E₂<:Eye,E₃<:Eye,F<:AbstractVecOrMat} = copy(f)
+@inline (*)(::Kron{Tuple{E₂,E₁}}, f::F) where {E₁<:Eye,E₂<:Eye,F<:GridVecOrMat} = copy(f)
+@inline (*)(::Kron{Tuple{E₃,E₂,E₁}}, f::F) where {E₁<:Eye,E₂<:Eye,E₃<:Eye,F<:GridVecOrMat} =
+    copy(f)
+@inline (*)(::Kron{Tuple{E₂,E₁}}, f::F) where {E₁<:Eye,E₂<:Eye,F<:GridArray} = copy(f)
+@inline (*)(::Kron{Tuple{E₃,E₂,E₁}}, f::F) where {E₁<:Eye,E₂<:Eye,E₃<:Eye,F<:GridArray} =
+    copy(f)
+
 function (*)(K::Kron{Tuple{E,D}}, f::F) where {D<:AbstractMatrix,E<:Eye,F<:AbstractVecOrMat}
     e, d = components(K)
 
