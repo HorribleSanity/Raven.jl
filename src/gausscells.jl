@@ -9,7 +9,7 @@ function gaussoperators_1d(::Type{T}, M) where {T}
     points, weights = legendregauss(BigFloat, M)
     lobattopoints, _ = legendregausslobatto(BigFloat, M)
     derivative = spectralderivative(points)
-    weightedderivative = diagm(weights) * derivative
+    weightedderivative = weights .* derivative
     skewweightedderivative = (weightedderivative - weightedderivative') / 2
     equallyspacedpoints = range(-one(BigFloat), stop = one(BigFloat), length = M)
     toequallyspaced = spectralinterpolation(points, equallyspacedpoints)
