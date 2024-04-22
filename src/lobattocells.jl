@@ -46,7 +46,8 @@ function lobattooperators_1d(::Type{T}, M) where {T}
     )
 end
 
-struct LobattoCell{S,T,A,N,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{S,T,A,N}
+struct LobattoCell{T,A,N,S,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{T,A,N}
+    size::S
     points_1d::O
     weights_1d::O
     points::P
@@ -62,18 +63,18 @@ struct LobattoCell{S,T,A,N,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{S,T,A
     toboundary::TB
 end
 
-function Base.show(io::IO, ::LobattoCell{S,T,A}) where {S,T,A}
+function Base.show(io::IO, ::LobattoCell{T,A,N}) where {T,A,N}
     print(io, "LobattoCell{")
-    Base.show(io, S)
-    print(io, ", ")
     Base.show(io, T)
     print(io, ", ")
     Base.show(io, A)
+    print(io, ", ")
+    Base.show(io, N)
     print(io, "}")
 end
 
-function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
-    o = adapt(A, lobattooperators_1d(T, S1))
+function LobattoCell{T,A}(m) where {T,A}
+    o = adapt(A, lobattooperators_1d(T, m))
     points_1d = (o.points,)
     weights_1d = (o.weights,)
 
@@ -90,6 +91,7 @@ function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
     toboundary = Kron((o.toboundary,))
 
     args = (
+        (m,),
         points_1d,
         weights_1d,
         points,
@@ -104,24 +106,23 @@ function LobattoCell{Tuple{S1},T,A}() where {S1,T,A}
         tolobatto,
         toboundary,
     )
-    LobattoCell{Tuple{S1},T,A,1,typeof.(args[2:end])...}(args...)
+    LobattoCell{T,A,1,typeof(args[1]),typeof.(args[3:end])...}(args...)
 end
 
-function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
-    o = adapt(A, (lobattooperators_1d(T, S1), lobattooperators_1d(T, S2)))
+function LobattoCell{T,A}(m1, m2) where {T,A}
+    o = adapt(A, (lobattooperators_1d(T, m1), lobattooperators_1d(T, m2)))
 
-    points_1d = (reshape(o[1].points, (S1, 1)), reshape(o[2].points, (1, S2)))
-    weights_1d = (reshape(o[1].weights, (S1, 1)), reshape(o[2].weights, (1, S2)))
+    points_1d = (reshape(o[1].points, (m1, 1)), reshape(o[2].points, (1, m2)))
+    weights_1d = (reshape(o[1].weights, (m1, 1)), reshape(o[2].weights, (1, m2)))
     points = vec(SVector.(points_1d...))
-    derivatives =
-        (Kron((Eye{T,S2}(), o[1].derivative)), Kron((o[2].derivative, Eye{T,S1}())))
+    derivatives = (Kron((Eye{T}(m2), o[1].derivative)), Kron((o[2].derivative, Eye{T}(m1))))
     weightedderivatives = (
-        Kron((Eye{T,S2}(), o[1].weightedderivative)),
-        Kron((o[2].weightedderivative, Eye{T,S1}())),
+        Kron((Eye{T}(m2), o[1].weightedderivative)),
+        Kron((o[2].weightedderivative, Eye{T}(m1))),
     )
     skewweightedderivatives = (
-        Kron((Eye{T,S2}(), o[1].skewweightedderivative)),
-        Kron((o[2].skewweightedderivative, Eye{T,S1}())),
+        Kron((Eye{T}(m2), o[1].skewweightedderivative)),
+        Kron((o[2].skewweightedderivative, Eye{T}(m1))),
     )
     mass = Diagonal(vec(.*(weights_1d...)))
     ω1, ω2 = weights_1d
@@ -135,6 +136,7 @@ function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
 
 
     args = (
+        (m1, m2),
         points_1d,
         weights_1d,
         points,
@@ -149,44 +151,44 @@ function LobattoCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
         tolobatto,
         toboundary,
     )
-    LobattoCell{Tuple{S1,S2},T,A,2,typeof.(args[2:end])...}(args...)
+    LobattoCell{T,A,2,typeof(args[1]),typeof.(args[3:end])...}(args...)
 end
 
-function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
+function LobattoCell{T,A}(m1, m2, m3) where {T,A}
     o = adapt(
         A,
         (
-            lobattooperators_1d(T, S1),
-            lobattooperators_1d(T, S2),
-            lobattooperators_1d(T, S3),
+            lobattooperators_1d(T, m1),
+            lobattooperators_1d(T, m2),
+            lobattooperators_1d(T, m3),
         ),
     )
 
     points_1d = (
-        reshape(o[1].points, (S1, 1, 1)),
-        reshape(o[2].points, (1, S2, 1)),
-        reshape(o[3].points, (1, 1, S3)),
+        reshape(o[1].points, (m1, 1, 1)),
+        reshape(o[2].points, (1, m2, 1)),
+        reshape(o[3].points, (1, 1, m3)),
     )
     weights_1d = (
-        reshape(o[1].weights, (S1, 1, 1)),
-        reshape(o[2].weights, (1, S2, 1)),
-        reshape(o[3].weights, (1, 1, S3)),
+        reshape(o[1].weights, (m1, 1, 1)),
+        reshape(o[2].weights, (1, m2, 1)),
+        reshape(o[3].weights, (1, 1, m3)),
     )
     points = vec(SVector.(points_1d...))
     derivatives = (
-        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].derivative)),
-        Kron((Eye{T,S3}(), o[2].derivative, Eye{T,S1}())),
-        Kron((o[3].derivative, Eye{T,S2}(), Eye{T,S1}())),
+        Kron((Eye{T}(m3), Eye{T}(m2), o[1].derivative)),
+        Kron((Eye{T}(m3), o[2].derivative, Eye{T}(m1))),
+        Kron((o[3].derivative, Eye{T}(m2), Eye{T}(m1))),
     )
     weightedderivatives = (
-        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].weightedderivative)),
-        Kron((Eye{T,S3}(), o[2].weightedderivative, Eye{T,S1}())),
-        Kron((o[3].weightedderivative, Eye{T,S2}(), Eye{T,S1}())),
+        Kron((Eye{T}(m3), Eye{T}(m2), o[1].weightedderivative)),
+        Kron((Eye{T}(m3), o[2].weightedderivative, Eye{T}(m1))),
+        Kron((o[3].weightedderivative, Eye{T}(m2), Eye{T}(m1))),
     )
     skewweightedderivatives = (
-        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].skewweightedderivative)),
-        Kron((Eye{T,S3}(), o[2].skewweightedderivative, Eye{T,S1}())),
-        Kron((o[3].skewweightedderivative, Eye{T,S2}(), Eye{T,S1}())),
+        Kron((Eye{T}(m3), Eye{T}(m2), o[1].skewweightedderivative)),
+        Kron((Eye{T}(m3), o[2].skewweightedderivative, Eye{T}(m1))),
+        Kron((o[3].skewweightedderivative, Eye{T}(m2), Eye{T}(m1))),
     )
     mass = Diagonal(vec(.*(weights_1d...)))
     ω1, ω2, ω3 = weights_1d
@@ -205,6 +207,7 @@ function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
     toboundary = Kron((o[3].toboundary, o[2].toboundary, o[1].toboundary))
 
     args = (
+        (m1, m2, m3),
         points_1d,
         weights_1d,
         points,
@@ -219,24 +222,25 @@ function LobattoCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
         tolobatto,
         toboundary,
     )
-    LobattoCell{Tuple{S1,S2,S3},T,A,3,typeof.(args[2:end])...}(args...)
+    LobattoCell{T,A,3,typeof(args[1]),typeof.(args[3:end])...}(args...)
 end
 
-LobattoCell{S,T}() where {S,T} = LobattoCell{S,T,Array}()
-LobattoCell{S}() where {S} = LobattoCell{S,Float64}()
+LobattoCell{T}(args...) where {T} = LobattoCell{T,Array}(args...)
+LobattoCell(args...) = LobattoCell{Float64}(args...)
 
-function Adapt.adapt_structure(to, cell::LobattoCell{S,T,A,N}) where {S,T,A,N}
+function Adapt.adapt_structure(to, cell::LobattoCell{T,A,N}) where {T,A,N}
     names = fieldnames(LobattoCell)
     args = ntuple(j -> adapt(to, getfield(cell, names[j])), length(names))
     B = arraytype(to)
 
-    LobattoCell{S,T,B,N,typeof.(args[2:end])...}(args...)
+    LobattoCell{T,B,N,typeof(args[1]),typeof.(args[3:end])...}(args...)
 end
 
-const LobattoLine{T,A} = LobattoCell{Tuple{B},T,A} where {B}
-const LobattoQuad{T,A} = LobattoCell{Tuple{B,C},T,A} where {B,C}
-const LobattoHex{T,A} = LobattoCell{Tuple{B,C,D},T,A} where {B,C,D}
+const LobattoLine{T,A} = LobattoCell{T,A,1}
+const LobattoQuad{T,A} = LobattoCell{T,A,2}
+const LobattoHex{T,A} = LobattoCell{T,A,3}
 
+Base.size(cell::LobattoCell) = cell.size
 points_1d(cell::LobattoCell) = cell.points_1d
 weights_1d(cell::LobattoCell) = cell.weights_1d
 points(cell::LobattoCell) = cell.points
@@ -424,7 +428,7 @@ function materializepoints(
     FT = floattype(referencecell)
     AT = arraytype(referencecell)
     N = (interpolation_degree + 1, interpolation_degree + 1)
-    interp_r = vec.(points_1d(LobattoCell{Tuple{N...},FT,AT}()))
+    interp_r = vec.(points_1d(LobattoCell{FT,AT}(N...)))
 
     Q = max(512 ÷ prod(length.(r)), 1)
 
@@ -1428,7 +1432,7 @@ function materializepoints(
     FT = floattype(referencecell)
     AT = arraytype(referencecell)
     N = Tuple((interpolation_degree + 1) * ones(Int64, 3))
-    interp_r = vec.(points_1d(LobattoCell{Tuple{N...},FT,AT}()))
+    interp_r = vec.(points_1d(LobattoCell{FT,AT}(N...)))
 
     IntType = typeof(length(r))
     num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))

@@ -1,12 +1,10 @@
 using Raven.StaticArrays: size_to_tuple
 
 function cells_testsuite(AT, FT)
-    cell = LobattoCell{Tuple{3,3},FT,AT}()
+    cell = LobattoCell{FT,AT}(3, 3)
     @test floattype(typeof(cell)) == FT
     @test arraytype(typeof(cell)) <: AT
     @test ndims(typeof(cell)) == 2
-    @test size(typeof(cell)) == (3, 3)
-    @test length(typeof(cell)) == 9
     @test floattype(cell) == FT
     @test arraytype(cell) <: AT
     @test ndims(cell) == 2
@@ -43,15 +41,15 @@ function cells_testsuite(AT, FT)
         @test Array(h1d[2][1]) == I1
         @test Array(h1d[2][2]) == I2
     end
-    @test adapt(Array, cell) isa LobattoCell{S,FT,Array} where {S}
+    @test adapt(Array, cell) isa LobattoCell{FT,Array}
 
-    S = Tuple{3,4,2}
-    cell = LobattoCell{S,FT,AT}()
+    S = (3, 4, 2)
+    cell = LobattoCell{FT,AT}(S...)
     @test floattype(cell) == FT
     @test arraytype(cell) <: AT
     @test Base.ndims(cell) == 3
-    @test size(cell) == size_to_tuple(S)
-    @test length(cell) == prod(size_to_tuple(S))
+    @test size(cell) == S
+    @test length(cell) == prod(S)
     @test sum(mass(cell)) .≈ 8
     @test mass(cell) isa Diagonal
     @test sum(facemass(cell)) .≈ 24
@@ -59,12 +57,9 @@ function cells_testsuite(AT, FT)
     @test faceoffsets(cell) == (0, 8, 16, 22, 28, 40, 52)
     @test strides(cell) == (1, 3, 12)
     D = derivatives(cell)
-    @test Array(D[1] * points(cell)) ≈
-          fill(SVector(one(FT), zero(FT), zero(FT)), prod(size_to_tuple(S)))
-    @test Array(D[2] * points(cell)) ≈
-          fill(SVector(zero(FT), one(FT), zero(FT)), prod(size_to_tuple(S)))
-    @test Array(D[3] * points(cell)) ≈
-          fill(SVector(zero(FT), zero(FT), one(FT)), prod(size_to_tuple(S)))
+    @test Array(D[1] * points(cell)) ≈ fill(SVector(one(FT), zero(FT), zero(FT)), prod(S))
+    @test Array(D[2] * points(cell)) ≈ fill(SVector(zero(FT), one(FT), zero(FT)), prod(S))
+    @test Array(D[3] * points(cell)) ≈ fill(SVector(zero(FT), zero(FT), one(FT)), prod(S))
     D1d = derivatives_1d(cell)
     @test length(D1d) == ndims(cell)
     @test all(
@@ -86,7 +81,7 @@ function cells_testsuite(AT, FT)
         end
     end
 
-    cell = LobattoCell{Tuple{5},FT,AT}()
+    cell = LobattoCell{FT,AT}(5)
     @test floattype(cell) == FT
     @test arraytype(cell) <: AT
     @test Base.ndims(cell) == 1

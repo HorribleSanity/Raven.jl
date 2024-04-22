@@ -60,7 +60,7 @@ coarse_grid = coarsegrid("out/IceCreamCone.inp")
 # coarse_grid = coarsegrid("examples/grids/Pond/Pond.inp")
 
 N = (4, 4)
-gm = GridManager(LobattoCell{Tuple{N...},Float64,AT}(), coarse_grid, min_level = 1)
+gm = GridManager(LobattoCell{Float64,AT}(N...), coarse_grid, min_level = 1)
 
 grid = generate(gm)
 

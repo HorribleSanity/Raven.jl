@@ -115,7 +115,7 @@
         @test dtoc_degree_3_local == dtoc_degree_3_global
         @test dtoc_degree_3_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
 
-        cell_degree_3 = LobattoCell{Tuple{4,4},Float64,Array}()
+        cell_degree_3 = LobattoCell{Float64,Array}(4, 4)
         dtoc_degree_3 =
             Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
         @test isisomorphic(dtoc_degree_3, dtoc_degree_3_global)
@@ -237,7 +237,7 @@
         @test dtoc_degree_3_local == dtoc_degree_3_global
         @test dtoc_degree_3_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
 
-        cell_degree_3 = LobattoCell{Tuple{4,4,4},Float64,Array}()
+        cell_degree_3 = LobattoCell{Float64,Array}(4, 4, 4)
         dtoc_degree_3 =
             Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
         @test isisomorphic(dtoc_degree_3, dtoc_degree_3_global)
@@ -280,7 +280,7 @@
         AT = Array
 
         N = 4
-        cell = LobattoCell{Tuple{N,N},FT,AT}()
+        cell = LobattoCell{FT,AT}(N, N)
 
         # 4--------5--------6
         # |        |        |
@@ -355,7 +355,7 @@
     end
 
     let
-        cell = LobattoCell{Tuple{2,2,2}}()
+        cell = LobattoCell(2, 2, 2)
         cg = brick((1, 1, 1), (true, true, true))
         gm = GridManager(cell, cg)
         grid = generate(gm)
@@ -365,7 +365,7 @@
     end
 
     let
-        cell = LobattoCell{Tuple{2,2}}()
+        cell = LobattoCell(2, 2)
         cg = brick((1, 1), (true, true))
         gm = GridManager(cell, cg)
         grid = generate(gm)
@@ -378,7 +378,7 @@
         AT = Array
 
         N = 5
-        cell = LobattoCell{Tuple{N,N,N}}()
+        cell = LobattoCell(N, N, N)
 
         #    10-------11-------12
         #    /|       /|       /|

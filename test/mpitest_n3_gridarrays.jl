@@ -19,7 +19,7 @@ end
 function test(N, K, ::Type{FT}, ::Type{AT}) where {FT,AT}
     @testset "GridArray ($N, $AT, $FT)" begin
         minlvl = 1
-        cell = LobattoCell{Tuple{N...},Float64,AT}()
+        cell = LobattoCell{Float64,AT}(N...)
         gm = GridManager(cell, Raven.brick(K...); min_level = minlvl)
         grid = generate(gm)
 

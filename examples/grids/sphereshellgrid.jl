@@ -35,7 +35,7 @@ R = 1
 
 coarse_grid = Raven.cubeshell2dgrid(R)
 
-gm = GridManager(LobattoCell{Tuple{N...},Float64,Array}(), coarse_grid, min_level = 2)
+gm = GridManager(LobattoCell{Float64,Array}(N...), coarse_grid, min_level = 2)
 
 indicator = rand((Raven.AdaptNone, Raven.AdaptRefine), length(gm))
 adapt!(gm, indicator)
