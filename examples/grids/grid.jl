@@ -35,7 +35,7 @@ K = (2, 3, 4)
 coordinates = ntuple(d -> range(start = -1.0, stop = 1.0, length = K[d] + 1), length(K))
 
 gm = GridManager(
-    LobattoCell{Tuple{N...},Float64,AT}(),
+    LobattoCell{Float64,AT}(N...),
     Raven.brick(coordinates);
     comm = comm,
     min_level = 2,

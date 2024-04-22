@@ -279,7 +279,7 @@ function run(
     comm = MPI.COMM_WORLD,
 )
     rank = MPI.Comm_rank(comm)
-    cell = LobattoCell{Tuple{(N .+ 1)...},FT,AT}()
+    cell = LobattoCell{FT,AT}((N .+ 1)...)
     coordinates = ntuple(_ -> range(FT(0), stop = FT(2π), length = K + 1), 2)
     periodicity = (true, true)
     gm = GridManager(cell, brick(coordinates, periodicity); comm = comm, min_level = L)

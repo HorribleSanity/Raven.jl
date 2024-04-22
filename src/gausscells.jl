@@ -46,7 +46,8 @@ function gaussoperators_1d(::Type{T}, M) where {T}
     )
 end
 
-struct GaussCell{S,T,A,N,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{S,T,A,N}
+struct GaussCell{T,A,N,S,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{T,A,N}
+    size::S
     points_1d::O
     weights_1d::O
     points::P
@@ -62,18 +63,18 @@ struct GaussCell{S,T,A,N,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{S,T,A,N
     toboundary::TB
 end
 
-function Base.show(io::IO, ::GaussCell{S,T,A}) where {S,T,A}
+function Base.show(io::IO, ::GaussCell{T,A,N}) where {T,A,N}
     print(io, "GaussCell{")
-    Base.show(io, S)
-    print(io, ", ")
     Base.show(io, T)
     print(io, ", ")
     Base.show(io, A)
+    print(io, ", ")
+    Base.show(io, N)
     print(io, "}")
 end
 
-function GaussCell{Tuple{S1},T,A}() where {S1,T,A}
-    o = adapt(A, gaussoperators_1d(T, S1))
+function GaussCell{T,A}(m) where {T,A}
+    o = adapt(A, gaussoperators_1d(T, m))
     points_1d = (o.points,)
     weights_1d = (o.weights,)
 
@@ -90,6 +91,7 @@ function GaussCell{Tuple{S1},T,A}() where {S1,T,A}
     toboundary = Kron((o.toboundary,))
 
     args = (
+        (m,),
         points_1d,
         weights_1d,
         points,
@@ -104,24 +106,23 @@ function GaussCell{Tuple{S1},T,A}() where {S1,T,A}
         tolobatto,
         toboundary,
     )
-    GaussCell{Tuple{S1},T,A,1,typeof.(args[2:end])...}(args...)
+    GaussCell{T,A,1,typeof(args[1]),typeof.(args[3:end])...}(args...)
 end
 
-function GaussCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
-    o = adapt(A, (gaussoperators_1d(T, S1), gaussoperators_1d(T, S2)))
+function GaussCell{T,A}(m1, m2) where {T,A}
+    o = adapt(A, (gaussoperators_1d(T, m1), gaussoperators_1d(T, m2)))
 
-    points_1d = (reshape(o[1].points, (S1, 1)), reshape(o[2].points, (1, S2)))
-    weights_1d = (reshape(o[1].weights, (S1, 1)), reshape(o[2].weights, (1, S2)))
+    points_1d = (reshape(o[1].points, (m1, 1)), reshape(o[2].points, (1, m2)))
+    weights_1d = (reshape(o[1].weights, (m1, 1)), reshape(o[2].weights, (1, m2)))
     points = vec(SVector.(points_1d...))
-    derivatives =
-        (Kron((Eye{T,S2}(), o[1].derivative)), Kron((o[2].derivative, Eye{T,S1}())))
+    derivatives = (Kron((Eye{T}(m2), o[1].derivative)), Kron((o[2].derivative, Eye{T}(m1))))
     weightedderivatives = (
-        Kron((Eye{T,S2}(), o[1].weightedderivative)),
-        Kron((o[2].weightedderivative, Eye{T,S1}())),
+        Kron((Eye{T}(m2), o[1].weightedderivative)),
+        Kron((o[2].weightedderivative, Eye{T}(m1))),
     )
     skewweightedderivatives = (
-        Kron((Eye{T,S2}(), o[1].skewweightedderivative)),
-        Kron((o[2].skewweightedderivative, Eye{T,S1}())),
+        Kron((Eye{T}(m2), o[1].skewweightedderivative)),
+        Kron((o[2].skewweightedderivative, Eye{T}(m1))),
     )
     mass = Diagonal(vec(.*(weights_1d...)))
     ω1, ω2 = weights_1d
@@ -134,6 +135,7 @@ function GaussCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
     toboundary = Kron((o[2].toboundary, o[1].toboundary))
 
     args = (
+        (m1, m2),
         points_1d,
         weights_1d,
         points,
@@ -148,40 +150,40 @@ function GaussCell{Tuple{S1,S2},T,A}() where {S1,S2,T,A}
         tolobatto,
         toboundary,
     )
-    GaussCell{Tuple{S1,S2},T,A,2,typeof.(args[2:end])...}(args...)
+    GaussCell{T,A,2,typeof(args[1]),typeof.(args[3:end])...}(args...)
 end
 
-function GaussCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
+function GaussCell{T,A}(m1, m2, m3) where {T,A}
     o = adapt(
         A,
-        (gaussoperators_1d(T, S1), gaussoperators_1d(T, S2), gaussoperators_1d(T, S3)),
+        (gaussoperators_1d(T, m1), gaussoperators_1d(T, m2), gaussoperators_1d(T, m3)),
     )
 
     points_1d = (
-        reshape(o[1].points, (S1, 1, 1)),
-        reshape(o[2].points, (1, S2, 1)),
-        reshape(o[3].points, (1, 1, S3)),
+        reshape(o[1].points, (m1, 1, 1)),
+        reshape(o[2].points, (1, m2, 1)),
+        reshape(o[3].points, (1, 1, m3)),
     )
     weights_1d = (
-        reshape(o[1].weights, (S1, 1, 1)),
-        reshape(o[2].weights, (1, S2, 1)),
-        reshape(o[3].weights, (1, 1, S3)),
+        reshape(o[1].weights, (m1, 1, 1)),
+        reshape(o[2].weights, (1, m2, 1)),
+        reshape(o[3].weights, (1, 1, m3)),
     )
     points = vec(SVector.(points_1d...))
     derivatives = (
-        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].derivative)),
-        Kron((Eye{T,S3}(), o[2].derivative, Eye{T,S1}())),
-        Kron((o[3].derivative, Eye{T,S2}(), Eye{T,S1}())),
+        Kron((Eye{T}(m3), Eye{T}(m2), o[1].derivative)),
+        Kron((Eye{T}(m3), o[2].derivative, Eye{T}(m1))),
+        Kron((o[3].derivative, Eye{T}(m2), Eye{T}(m1))),
     )
     weightedderivatives = (
-        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].weightedderivative)),
-        Kron((Eye{T,S3}(), o[2].weightedderivative, Eye{T,S1}())),
-        Kron((o[3].weightedderivative, Eye{T,S2}(), Eye{T,S1}())),
+        Kron((Eye{T}(m3), Eye{T}(m2), o[1].weightedderivative)),
+        Kron((Eye{T}(m3), o[2].weightedderivative, Eye{T}(m1))),
+        Kron((o[3].weightedderivative, Eye{T}(m2), Eye{T}(m1))),
     )
     skewweightedderivatives = (
-        Kron((Eye{T,S3}(), Eye{T,S2}(), o[1].skewweightedderivative)),
-        Kron((Eye{T,S3}(), o[2].skewweightedderivative, Eye{T,S1}())),
-        Kron((o[3].skewweightedderivative, Eye{T,S2}(), Eye{T,S1}())),
+        Kron((Eye{T}(m3), Eye{T}(m2), o[1].skewweightedderivative)),
+        Kron((Eye{T}(m3), o[2].skewweightedderivative, Eye{T}(m1))),
+        Kron((o[3].skewweightedderivative, Eye{T}(m2), Eye{T}(m1))),
     )
     mass = Diagonal(vec(.*(weights_1d...)))
     ω1, ω2, ω3 = weights_1d
@@ -200,6 +202,7 @@ function GaussCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
     toboundary = Kron((o[3].toboundary, o[2].toboundary, o[1].toboundary))
 
     args = (
+        (m1, m2, m3),
         points_1d,
         weights_1d,
         points,
@@ -214,24 +217,25 @@ function GaussCell{Tuple{S1,S2,S3},T,A}() where {S1,S2,S3,T,A}
         tolobatto,
         toboundary,
     )
-    GaussCell{Tuple{S1,S2,S3},T,A,3,typeof.(args[2:end])...}(args...)
+    GaussCell{T,A,3,typeof(args[1]),typeof.(args[3:end])...}(args...)
 end
 
-GaussCell{S,T}() where {S,T} = GaussCell{S,T,Array}()
-GaussCell{S}() where {S} = GaussCell{S,Float64}()
+GaussCell{T}(args...) where {T} = GaussCell{T,Array}(args...)
+GaussCell(args...) = GaussCell{Float64}(args...)
 
-function Adapt.adapt_structure(to, cell::GaussCell{S,T,A,N}) where {S,T,A,N}
+function Adapt.adapt_structure(to, cell::GaussCell{T,A,N}) where {T,A,N}
     names = fieldnames(GaussCell)
     args = ntuple(j -> adapt(to, getfield(cell, names[j])), length(names))
     B = arraytype(to)
 
-    GaussCell{S,T,B,N,typeof.(args[2:end])...}(args...)
+    GaussCell{T,B,N,typeof(args[1]),typeof.(args[3:end])...}(args...)
 end
 
 const GaussLine{T,A} = GaussCell{Tuple{B},T,A} where {B}
 const GaussQuad{T,A} = GaussCell{Tuple{B,C},T,A} where {B,C}
 const GaussHex{T,A} = GaussCell{Tuple{B,C,D},T,A} where {B,C,D}
 
+Base.size(cell::GaussCell) = cell.size
 points_1d(cell::GaussCell) = cell.points_1d
 weights_1d(cell::GaussCell) = cell.weights_1d
 points(cell::GaussCell) = cell.points

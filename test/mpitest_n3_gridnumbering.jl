@@ -159,7 +159,7 @@ let
         )
     end
 
-    cell_degree_3 = LobattoCell{Tuple{4,4},Float64,Array}()
+    cell_degree_3 = LobattoCell{Float64,Array}(4, 4)
     dtoc_degree_3 =
         Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
 
@@ -362,7 +362,7 @@ let
         )
     end
 
-    cell_degree_3 = LobattoCell{Tuple{4,4,4},Float64,Array}()
+    cell_degree_3 = LobattoCell{Float64,Array}(4, 4, 4)
     dtoc_degree_3 =
         Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
     if rank == 0

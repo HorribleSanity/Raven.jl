@@ -26,11 +26,7 @@ function grids_testsuite(AT, FT)
         coordinates =
             ntuple(d -> range(-one(FT), stop = one(FT), length = K[d] + 1), length(K))
 
-        gm = GridManager(
-            LobattoCell{Tuple{N...},FT,AT}(),
-            Raven.brick(coordinates);
-            min_level = 2,
-        )
+        gm = GridManager(LobattoCell{FT,AT}(N...), Raven.brick(coordinates); min_level = 2)
 
         indicator = rand(rng, (Raven.AdaptNone, Raven.AdaptRefine), length(gm))
 
@@ -64,7 +60,7 @@ function grids_testsuite(AT, FT)
 
         coarse_grid = Raven.cubeshellgrid(R, r)
 
-        gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 2)
+        gm = GridManager(LobattoCell{FT,AT}(N...), coarse_grid, min_level = 2)
 
         indicator = rand(rng, (Raven.AdaptNone, Raven.AdaptRefine), length(gm))
         adapt!(gm, indicator)
@@ -93,7 +89,7 @@ function grids_testsuite(AT, FT)
 
         coarse_grid = Raven.cubeshell2dgrid(R)
 
-        gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 2)
+        gm = GridManager(LobattoCell{FT,AT}(N...), coarse_grid, min_level = 2)
 
         indicator = rand(rng, (Raven.AdaptNone, Raven.AdaptRefine), length(gm))
         adapt!(gm, indicator)
@@ -121,7 +117,7 @@ function grids_testsuite(AT, FT)
         K = (2, 1)
         coordinates =
             ntuple(d -> range(-one(FT), stop = one(FT), length = K[d] + 1), length(K))
-        cell = LobattoCell{Tuple{N...},FT,AT}()
+        cell = LobattoCell{FT,AT}(N...)
         gm = GridManager(cell, brick(coordinates, (true, true)))
         grid = generate(gm)
         @test all(boundarycodes(grid) .== 0)
@@ -133,11 +129,7 @@ function grids_testsuite(AT, FT)
         coordinates =
             ntuple(d -> range(-one(FT), stop = one(FT), length = K[d] + 1), length(K))
 
-        gm = GridManager(
-            LobattoCell{Tuple{N...},FT,AT}(),
-            Raven.brick(coordinates);
-            min_level = 1,
-        )
+        gm = GridManager(LobattoCell{FT,AT}(N...), Raven.brick(coordinates); min_level = 1)
 
         indicator = rand(rng, (Raven.AdaptNone, Raven.AdaptRefine), length(gm))
 
@@ -164,7 +156,7 @@ function grids_testsuite(AT, FT)
 
 
     let
-        cell = LobattoCell{Tuple{4,4},FT,AT}()
+        cell = LobattoCell{FT,AT}(4, 4)
 
         vertices = [
             SVector{2,FT}(0, 0), # 1
@@ -197,7 +189,7 @@ function grids_testsuite(AT, FT)
     end
 
     let
-        cell = LobattoCell{Tuple{3,3,3},FT,AT}()
+        cell = LobattoCell{FT,AT}(3, 3, 3)
 
         vertices = [
             SVector{3,FT}(0, 0, 0), #  1
@@ -261,7 +253,7 @@ function grids_testsuite(AT, FT)
         level = 2
 
         gm = GridManager(
-            LobattoCell{Tuple{L,M},FT,AT}(),
+            LobattoCell{FT,AT}(L, M),
             Raven.brick(coordinates);
             min_level = level,
         )
@@ -334,7 +326,7 @@ function grids_testsuite(AT, FT)
             # Polynomial orders need to be the same to match up faces.
             # We currently do not support different polynomial orders for
             # joining faces.
-            LobattoCell{Tuple{L,L},FT,AT}(),
+            LobattoCell{FT,AT}(L, L),
             Raven.cubeshell2dgrid(R);
             min_level = level,
         )
@@ -371,7 +363,7 @@ function grids_testsuite(AT, FT)
         level = 0
 
         gm = GridManager(
-            LobattoCell{Tuple{L,M},FT,AT}(),
+            LobattoCell{FT,AT}(L, M),
             Raven.brick(coordinates);
             min_level = level,
         )
@@ -424,7 +416,7 @@ function grids_testsuite(AT, FT)
         level = 0
 
         gm = GridManager(
-            LobattoCell{Tuple{L,M,N},FT,AT}(),
+            LobattoCell{FT,AT}(L, M, N),
             Raven.brick(coordinates);
             min_level = level,
         )
@@ -540,7 +532,7 @@ function grids_testsuite(AT, FT)
         level = 0
 
         gm = GridManager(
-            LobattoCell{Tuple{L,M,N},FT,AT}(),
+            LobattoCell{FT,AT}(L, M, N),
             Raven.brick(coordinates);
             min_level = level,
         )
@@ -562,7 +554,7 @@ function grids_testsuite(AT, FT)
     end
 
     @testset "2D uniform brick grid" begin
-        cell = LobattoCell{Tuple{4,5},FT,AT}()
+        cell = LobattoCell{FT,AT}(4, 5)
         xrange = range(-FT(1000), stop = FT(1000), length = 21)
         yrange = range(-FT(2000), stop = FT(2000), length = 11)
         grid = generate(GridManager(cell, Raven.brick((xrange, yrange))))
@@ -607,7 +599,7 @@ function grids_testsuite(AT, FT)
     end
 
     @testset "3D uniform brick grid" begin
-        cell = LobattoCell{Tuple{4,5,6},FT,AT}()
+        cell = LobattoCell{FT,AT}(4, 5, 6)
         xrange = range(-FT(1000), stop = FT(1000), length = 21)
         yrange = range(-FT(2000), stop = FT(2000), length = 11)
         zrange = range(-FT(3000), stop = FT(3000), length = 6)
@@ -732,7 +724,7 @@ function grids_testsuite(AT, FT)
                 end
 
                 gm = GridManager(
-                    LobattoCell{Tuple{Nq...},FT,AT}(),
+                    LobattoCell{FT,AT}(Nq...),
                     Raven.brick(brickrange, ntuple(_ -> true, dim)),
                 )
                 grid = generate(min_node_dist_warpfun, gm)
@@ -763,18 +755,18 @@ function grids_testsuite(AT, FT)
         cg = coarsegrid(vertices, cells)
         coarse_grid = coarsegrid("curvedboxmesh2d.inp")
 
-        gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg, min_level = 1)
-        gmcurved = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 1)
+        gm = GridManager(LobattoCell{FT,AT}(N...), cg, min_level = 1)
+        gmcurved = GridManager(LobattoCell{FT,AT}(N...), coarse_grid, min_level = 1)
         grid = generate(gm)
         gridcurved = generate(gmcurved)
         @test coarse_grid.vertices ≈ cg.vertices
 
         cg1 = coarsegrid("flatGingerbreadMan.inp")
-        gm1 = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg1, min_level = 1)
+        gm1 = GridManager(LobattoCell{FT,AT}(N...), cg1, min_level = 1)
         grid = generate(gm1)
 
         cg2 = coarsegrid("GingerbreadMan.inp")
-        gm2 = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg2, min_level = 1)
+        gm2 = GridManager(LobattoCell{FT,AT}(N...), cg2, min_level = 1)
         grid2 = generate(gm2)
 
         @test cg1.vertices ≈ cg2.vertices
@@ -801,19 +793,19 @@ function grids_testsuite(AT, FT)
         cg = coarsegrid(vertices, cells)
         coarse_grid = coarsegrid("curvedboxmesh3d.inp")
 
-        gm = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg, min_level = 1)
-        gmcurved = GridManager(LobattoCell{Tuple{N...},FT,AT}(), coarse_grid, min_level = 1)
+        gm = GridManager(LobattoCell{FT,AT}(N...), cg, min_level = 1)
+        gmcurved = GridManager(LobattoCell{FT,AT}(N...), coarse_grid, min_level = 1)
         grid = generate(gm)
         gridcurved = generate(gmcurved)
 
         @test coarse_grid.vertices ≈ cg.vertices
 
         cg1 = coarsegrid("flatHalfCircle3DRot.inp")
-        gm1 = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg1, min_level = 1)
+        gm1 = GridManager(LobattoCell{FT,AT}(N...), cg1, min_level = 1)
         grid = generate(gm1)
 
         cg2 = coarsegrid("HalfCircle3DRot.inp")
-        gm2 = GridManager(LobattoCell{Tuple{N...},FT,AT}(), cg2, min_level = 1)
+        gm2 = GridManager(LobattoCell{FT,AT}(N...), cg2, min_level = 1)
         grid2 = generate(gm2)
 
         @test cg1.vertices ≈ cg2.vertices

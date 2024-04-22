@@ -12,7 +12,7 @@ function test(::Type{FT}, ::Type{AT}) where {FT,AT}
         N = (3, 2)
         K = (2, 1)
         min_level = 1
-        cell = LobattoCell{Tuple{N...},Float64,AT}()
+        cell = LobattoCell{Float64,AT}(N...)
         gm = GridManager(cell, Raven.brick(K...); min_level)
         grid = generate(gm)
 

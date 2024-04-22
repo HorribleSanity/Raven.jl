@@ -6,12 +6,12 @@ function kron_testsuite(AT, FT)
 
     for args in (
         (a,),
-        (a, Raven.Eye{FT,5}()),
-        (Raven.Eye{FT,2}(), b),
+        (a, Raven.Eye{FT}(5)),
+        (Raven.Eye{FT}(2), b),
         (a, b),
-        (Raven.Eye{FT,3}(), Raven.Eye{FT,2}(), c),
-        (Raven.Eye{FT,2}(), b, Raven.Eye{FT,7}()),
-        (a, Raven.Eye{FT,4}(), Raven.Eye{FT,7}()),
+        (Raven.Eye{FT}(3), Raven.Eye{FT}(2), c),
+        (Raven.Eye{FT}(2), b, Raven.Eye{FT}(7)),
+        (a, Raven.Eye{FT}(4), Raven.Eye{FT}(7)),
         (a, b, c),
     )
         K = adapt(AT, collect(Raven.Kron(adapt(Array, args))))
@@ -44,7 +44,7 @@ function kron2dgridarray_testsuite(AT, FT)
     A = adapt(AT, rand(rng, FT, 5, 2))
     B = adapt(AT, rand(rng, FT, 2, 3))
 
-    cell = LobattoCell{Tuple{2,3},FT,AT}()
+    cell = LobattoCell{FT,AT}(2, 3)
     gm = GridManager(cell, Raven.brick(2, 1); min_level = 1)
     grid = generate(gm)
 
@@ -52,7 +52,7 @@ function kron2dgridarray_testsuite(AT, FT)
     v = GridArray{EntryType}(undef, grid)
     v .= adapt(AT, rand(rng, EntryType, size(v)))
 
-    for args in ((Raven.Eye{FT,3}(), A), (B, Raven.Eye{FT,2}()), (B, A))
+    for args in ((Raven.Eye{FT}(3), A), (B, Raven.Eye{FT}(2)), (B, A))
         K = adapt(AT, collect(Raven.Kron(adapt(Array, args))))
         Kv1 = adapt(Array, Raven.Kron(args) * v)
         dimsIn = (prod(size(v)[1:end-1]), size(v)[end])
@@ -68,7 +68,7 @@ function kron3dgridarray_testsuite(AT, FT)
     B = adapt(AT, rand(rng, FT, 2, 3))
     C = adapt(AT, rand(rng, FT, 3, 5))
 
-    cell = LobattoCell{Tuple{2,3,5},FT,AT}()
+    cell = LobattoCell{FT,AT}(2, 3, 5)
     gm = GridManager(cell, Raven.brick(2, 1, 1); min_level = 1)
     grid = generate(gm)
 
@@ -77,12 +77,12 @@ function kron3dgridarray_testsuite(AT, FT)
     v .= adapt(AT, rand(rng, EntryType, size(v)))
 
     for args in (
-        (Raven.Eye{FT,5}(), Raven.Eye{FT,3}(), A),
-        (Raven.Eye{FT,5}(), B, Raven.Eye{FT,2}()),
-        (C, Raven.Eye{FT,3}(), Raven.Eye{FT,2}()),
-        (Raven.Eye{FT,5}(), B, A),
-        (C, Raven.Eye{FT,3}(), A),
-        (C, B, Raven.Eye{FT,2}()),
+        (Raven.Eye{FT}(5), Raven.Eye{FT}(3), A),
+        (Raven.Eye{FT}(5), B, Raven.Eye{FT}(2)),
+        (C, Raven.Eye{FT}(3), Raven.Eye{FT}(2)),
+        (Raven.Eye{FT}(5), B, A),
+        (C, Raven.Eye{FT}(3), A),
+        (C, B, Raven.Eye{FT}(2)),
         (C, B, A),
     )
         K = adapt(AT, collect(Raven.Kron(adapt(Array, args))))

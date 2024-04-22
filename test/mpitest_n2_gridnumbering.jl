@@ -14,7 +14,7 @@ let
     AT = Array
 
     N = 4
-    cell = LobattoCell{Tuple{N,N},FT,AT}()
+    cell = LobattoCell{FT,AT}(N, N)
 
     # 4--------5--------6
     # |        |        |
@@ -130,7 +130,7 @@ let
     AT = Array
 
     N = 3
-    cell = LobattoCell{Tuple{N,N,N}}()
+    cell = LobattoCell(N, N, N)
 
     #    10-------11-------12
     #    /|       /|       /|

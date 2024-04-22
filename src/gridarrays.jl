@@ -89,7 +89,7 @@ end
 
 Create an array containing elements of type `T` for each point in the grid
 (including the ghost cells).  The dimensions of the array is
-`(size(celltype(grid))..., length(grid))` as the ghost cells are hidden by
+`(size(referencecell(grid))..., length(grid))` as the ghost cells are hidden by
 default.
 
 The type `T` is assumed to be able to be interpreted into an `NTuple{M,L}`.
@@ -141,9 +141,9 @@ cells.  The one after is associated with the number of cells.
 """
 function GridArray{T}(::UndefInitializer, grid::Grid) where {T}
     A = arraytype(grid)
-    dims = (size(celltype(grid))..., Int(numcells(grid, Val(false))))
-    dimswithghosts = (size(celltype(grid))..., Int(numcells(grid, Val(true))))
-    F = ndims(celltype(grid)) + 1
+    dims = (size(referencecell(grid))..., Int(numcells(grid, Val(false))))
+    dimswithghosts = (size(referencecell(grid))..., Int(numcells(grid, Val(true))))
+    F = ndims(referencecell(grid)) + 1
 
     return GridArray{T}(undef, A, dims, dimswithghosts, comm(grid), false, F)
 end

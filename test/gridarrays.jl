@@ -3,8 +3,7 @@ function gridarrays_testsuite(AT, FT)
         N = (3, 2)
         K = (2, 3)
         L = 1
-        gm =
-            GridManager(LobattoCell{Tuple{N...},FT,AT}(), Raven.brick(FT, K); min_level = L)
+        gm = GridManager(LobattoCell{FT,AT}(N...), Raven.brick(FT, K); min_level = L)
         grid = generate(gm)
 
         x = points(grid)
