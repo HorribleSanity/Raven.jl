@@ -63,14 +63,12 @@ struct GaussCell{T,A,N,S,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{T,A,N}
     toboundary::TB
 end
 
-function Base.show(io::IO, ::GaussCell{T,A,N}) where {T,A,N}
+function Base.show(io::IO, cell::GaussCell{T,A,N}) where {T,A,N}
     print(io, "GaussCell{")
     Base.show(io, T)
     print(io, ", ")
     Base.show(io, A)
-    print(io, ", ")
-    Base.show(io, N)
-    print(io, "}")
+    print(io, "}$(size(cell))")
 end
 
 function GaussCell{T,A}(m) where {T,A}
