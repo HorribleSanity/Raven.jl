@@ -92,14 +92,14 @@ julia> Raven.numbercontiguous(Int32, [13, 4, 5, 1, 5]; by = x->-x)
 """
 function numbercontiguous(::Type{T}, A; by = identity) where {T}
     p = sortperm(vec(A); by = by)
-    notequalprevious = fill!(similar(p, Bool), false)
-
-    for i in Iterators.drop(eachindex(p), 1)
-        notequalprevious[i] = by(A[p[i]]) != by(A[p[i-1]])
-    end
 
     B = similar(A, T)
-    B[p] .= cumsum(notequalprevious) .+ 1
+    csum = one(T)
+    B[p[begin]] = csum
+    for i in Iterators.drop(eachindex(p), 1)
+        csum += by(A[p[i]]) != by(A[p[i-1]])
+        B[p[i]] = csum
+    end
 
     return B
 end
