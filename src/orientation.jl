@@ -56,7 +56,7 @@ function orientindices(o::Orientation{4}, dims::Dims{2}, invert::Bool = false)
         perm = invperm(perm)
     end
 
-    return PermutedDimsArray(CartesianIndices(indices), perm)
+    return permutedims(collect(CartesianIndices(indices)), perm)
 end
 
 # function orientindices(o::Orientation{8}, dims::Dims{3}, invert::Bool = false)
