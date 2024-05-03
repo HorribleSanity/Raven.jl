@@ -141,7 +141,7 @@ end
 
 function orient(::Val{2}, src::AbstractArray{<:Any,1})
     if size(src) != (2,)
-        throw(ArgumentError("Argument src=$src needs to be of size (2,)"))
+        throw(ArgumentError("Argument src needs to be of size (2,)"))
     end
 
     k = src[1] ≤ src[2] ? 1 : 2
@@ -151,7 +151,7 @@ end
 
 function orient(::Val{4}, src::AbstractArray{<:Any,2})
     if size(src) != (2, 2)
-        throw(ArgumentError("Argument src=$src needs to be of size (2,2)"))
+        throw(ArgumentError("Argument src needs to be of size (2,2)"))
     end
 
     i = LinearIndices(src)[argmin(src)]

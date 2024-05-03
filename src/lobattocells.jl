@@ -1732,7 +1732,33 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
     return dtoc
 end
 
-function _indextoface(i, degree3facelinearindices)
+function _indextoface(::Val{2}, i)
+    degree3facelinearindices = ((5, 9), (8, 12), (2, 3), (14, 15))
+    f = 0
+
+    for (ff, findices) in enumerate(degree3facelinearindices)
+        if i ∈ findices
+            f = ff
+            break
+        end
+    end
+
+    @assert f != 0
+
+    return f
+end
+
+
+function _indextoface(::Val{3}, i)
+    degree3facelinearindices = (
+        (21, 25, 37, 41),
+        (24, 28, 40, 44),
+        (18, 19, 34, 35),
+        (30, 31, 46, 47),
+        (6, 7, 10, 11),
+        (54, 55, 58, 59),
+    )
+
     f = 0
 
     for (ff, findices) in enumerate(degree3facelinearindices)
@@ -1761,22 +1787,23 @@ end
 )
 
 function materializefacemaps(
-    cell::LobattoCell,
+    cell::LobattoCell{T,A,N},
     numcells_local,
     ctod_degree3_local,
     dtoc_degree3_local,
     dtoc_degree3_global,
     quadranttolevel,
     quadranttoglobalid,
-)
+) where {T,A,N}
     numcells = last(size(dtoc_degree3_local))
     cellindices = LinearIndices(size(cell))
 
     if cell isa LobattoQuad
         numfaces = 4
+        tmpface = [0; 0]
         degree3faceindices = ((1, 2:3), (4, 2:3), (2:3, 1), (2:3, 4))
-        degree3facelinearindices = ((5, 9), (8, 12), (2, 3), (14, 15))
         cellfacedims = ((size(cell, 2),), (size(cell, 1),))
+        facefaceindices = (LinearIndices((size(cell, 2),)), LinearIndices((size(cell, 1),)))
         cellfacedims2 =
             ((size(cell, 2),), (size(cell, 2),), (size(cell, 1),), (size(cell, 1),))
         @views cellfaceindices = (
@@ -1787,6 +1814,7 @@ function materializefacemaps(
         )
     elseif cell isa LobattoHex
         numfaces = 6
+        tmpface = [0 0; 0 0]
         degree3faceindices = (
             (1, 2:3, 2:3),
             (4, 2:3, 2:3),
@@ -1795,18 +1823,16 @@ function materializefacemaps(
             (2:3, 2:3, 1),
             (2:3, 2:3, 4),
         )
-        degree3facelinearindices = (
-            (21, 25, 37, 41),
-            (24, 28, 40, 44),
-            (18, 19, 34, 35),
-            (30, 31, 46, 47),
-            (6, 7, 10, 11),
-            (54, 55, 58, 59),
-        )
+
         cellfacedims = (
             (size(cell, 2), size(cell, 3)),
             (size(cell, 1), size(cell, 3)),
             (size(cell, 1), size(cell, 2)),
+        )
+        facefaceindices = (
+            LinearIndices((size(cell, 2), size(cell, 3))),
+            LinearIndices((size(cell, 1), size(cell, 3))),
+            LinearIndices((size(cell, 1), size(cell, 2))),
         )
         cellfacedims2 = (
             (size(cell, 2), size(cell, 3)),
@@ -1828,7 +1854,6 @@ function materializefacemaps(
         error("Unsupported element type $(typeof(cell))")
     end
 
-    facefaceindices = LinearIndices.(cellfacedims)
     numchildfaces = 2^(ndims(cell) - 1)
     faceoffsets = (0, cumsum(prod.(cellfacedims2))...)
 
@@ -1836,8 +1861,8 @@ function materializefacemaps(
         zeros(Raven.Orientation{numchildfaces}, length(degree3faceindices), numcells)
     for q = 1:numcells
         for (f, faceindices) in enumerate(degree3faceindices)
-            face = dtoc_degree3_global[faceindices..., q]
-            faceorientations[f, q] = orient(Val(numchildfaces), face)
+            tmpface .= dtoc_degree3_global[faceindices..., q]
+            faceorientations[f, q] = orient(Val(numchildfaces), tmpface)
         end
     end
 
@@ -1846,9 +1871,9 @@ function materializefacemaps(
     mapP = reshape(collect(1:(last(faceoffsets)*numcells)), (last(faceoffsets), numcells))
 
     quadranttoboundary = zeros(Int, numfaces, numcells_local)
-    numberofnonconfaces = zeros(Int, length(cellfacedims))
-    uniquenonconnfaces = zeros(Int, length(cellfacedims))
-    noncongfacedict = ntuple(length(cellfacedims)) do _
+    numberofnonconfaces = zeros(Int, ndims(cell))
+    uniquenonconnfaces = zeros(Int, ndims(cell))
+    noncongfacedict = ntuple(ndims(cell)) do _
         Dict{Vector{eltype(dtoc_degree3_global)},Int}()
     end
     for q = 1:numcells_local
@@ -1875,23 +1900,65 @@ function materializefacemaps(
         end
     end
 
-    vmapNC = ntuple(length(cellfacedims)) do n
-        zeros(Int, cellfacedims[n]..., 1 + numchildfaces, uniquenonconnfaces[n])
+    # Not sure why I could not use the following.  Type inference
+    # was not working.
+    #
+    # vmapNC = ntuple(Val(ndims(cell))) do n
+    #     zeros(
+    #         Int,
+    #         cellfacedims[n][1:(ndims(cell)-1)]...,
+    #         1 + numchildfaces,
+    #         uniquenonconnfaces[n],
+    #     )
+    # end
+    #
+    # so I ended up just explicitly writing it out
+
+    vmapNC = if ndims(cell) == 2
+        (
+            zeros(Int, cellfacedims[1][1], 1 + numchildfaces, uniquenonconnfaces[1]),
+            zeros(Int, cellfacedims[2][1], 1 + numchildfaces, uniquenonconnfaces[2]),
+        )
+    else
+        (
+            zeros(
+                Int,
+                cellfacedims[1][1],
+                cellfacedims[1][2],
+                1 + numchildfaces,
+                uniquenonconnfaces[1],
+            ),
+            zeros(
+                Int,
+                cellfacedims[2][1],
+                cellfacedims[2][2],
+                1 + numchildfaces,
+                uniquenonconnfaces[2],
+            ),
+            zeros(
+                Int,
+                cellfacedims[3][1],
+                cellfacedims[3][2],
+                1 + numchildfaces,
+                uniquenonconnfaces[3],
+            ),
+        )
+
     end
 
-    ncids = ntuple(length(cellfacedims)) do n
+    ncids = ntuple(ndims(cell)) do n
         zeros(Int, numberofnonconfaces[n])
     end
 
-    nctypes = ntuple(length(cellfacedims)) do n
+    nctypes = ntuple(ndims(cell)) do n
         zeros(Int8, numberofnonconfaces[n])
     end
 
-    nctoface = ntuple(length(cellfacedims)) do n
+    nctoface = ntuple(ndims(cell)) do n
         zeros(Int8, 2, uniquenonconnfaces[n])
     end
 
-    nonconface = zeros(Int, length(cellfacedims))
+    nonconface = zeros(Int, ndims(cell))
     rows = rowvals(ctod_degree3_local)
     for q = 1:numcells_local
         for (f, degree3faceindices) in enumerate(degree3faceindices)
@@ -1909,7 +1976,7 @@ function materializefacemaps(
                 nq = 0
                 for ii in neighborsrange
                     nq, pi = fldmod1(rows[ii], 4^ndims(cell))
-                    nf = _indextoface(pi, degree3facelinearindices)
+                    nf = _indextoface(Val(N), pi)
                     if nq != q || nf != f
                         break
                     end
@@ -1949,7 +2016,7 @@ function materializefacemaps(
                 # compute global quadrant ids that participate in the nonconforming interface
                 qs = fld1.(rows[neighborsrange], 4^ndims(cell))
                 fs = map(
-                    x -> _indextoface(x, degree3facelinearindices),
+                    x -> _indextoface(Val(N), x),
                     mod1.(rows[neighborsrange], 4^ndims(cell)),
                 )
 
@@ -1976,7 +2043,7 @@ function materializefacemaps(
                 nctype = if q == parentquadrant
                     1
                 else
-                    findfirst(==(q), vec(childquadrants)) + 1
+                    something(findfirst(==(q), vec(childquadrants)), 0) + 1
                 end
                 nctypes[fg][nonconface[fg]] = nctype
 
@@ -2005,7 +2072,7 @@ function materializefacemaps(
 
     vmapM = zeros(Int, size(mapM))
     for q = 1:numcells,
-        fg = 1:length(cellfacedims),
+        fg = 1:ndims(cell),
         fn = 1:2,
         j in CartesianIndices(cellfacedims[fg])
 
