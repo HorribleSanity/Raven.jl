@@ -127,12 +127,6 @@ end
         @test Raven.orientindices(Raven.Orientation{2}(2), (3,)) ==
               [CartesianIndex(3), CartesianIndex(2), CartesianIndex(1)]
 
-        @test Raven.orientindices(Raven.Orientation{2}(1), (3,), true) ==
-              [CartesianIndex(1), CartesianIndex(2), CartesianIndex(3)]
-
-        @test Raven.orientindices(Raven.Orientation{2}(2), (3,), true) ==
-              [CartesianIndex(3), CartesianIndex(2), CartesianIndex(1)]
-
         L = LinearIndices((1:2,))
         for j = 1:2
             p = Raven.Orientation{2}(j)
@@ -168,13 +162,6 @@ end
     @testset "Orientation{4}" begin
         dims = (3, 4)
         A = reshape(1:prod(dims), dims)
-
-        for i = 1:8
-            o = Raven.Orientation{4}(i)
-            B = A[Raven.orientindices(o, dims)]
-            C = B[Raven.orientindices(o, dims, true)]
-            @test A == C
-        end
 
         L = LinearIndices((1:2, 1:2))
         for j = 1:8

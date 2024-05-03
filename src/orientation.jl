@@ -17,46 +17,59 @@ kind(o::Orientation) = o.kind
 
 Base.zero(::Type{Orientation{N}}) where {N} = Orientation{N}(1)
 
-function orientindices(o::Orientation{2}, dims::Dims{1}, ::Bool = false)
-    indices = (StepRange(1, Int8(1), dims[1]),)
-
-    if kind(o) == 2
-        indices = reverse.(indices)
-    end
-
-    return CartesianIndices(indices)
+@inline function orientindex(o::Orientation, dims::Dims, I...)
+    return orientindex(o, dims, CartesianIndex(I))
 end
 
-function orientindices(o::Orientation{4}, dims::Dims{2}, invert::Bool = false)
-    is1 = StepRange(1, Int8(1), dims[1])
-    is2 = StepRange(1, Int8(1), dims[2])
+function orientindices(o::Orientation, dims::Dims)
+    return orientindex.(Ref(o), Ref(dims), CartesianIndices(dims))
+end
+
+function orientindices(o::Orientation{4}, dims::Dims{2})
+    indices = orientindex.(Ref(o), Ref(dims), CartesianIndices(dims))
+
+    if fld1(kind(o), 4) != 1
+        indices = reshape(indices, reverse(dims))
+    end
+
+    return indices
+end
+
+@inline function orientindex(
+    o::Orientation{2},
+    dims::Dims{1},
+    I::CartesianIndex{1},
+    ::Bool = false,
+)
+    @boundscheck Base.checkbounds_indices(Bool, (Base.OneTo(dims[1]),), Tuple(I)) ||
+                 throw(BoundsError(o, I))
+
+    index = kind(o) == 1 ? I[1] : dims[1] - I[1] + 1
+
+    return CartesianIndex(index)
+end
+
+@inline function orientindex(o::Orientation{4}, dims::Dims{2}, I::CartesianIndex{2})
+    @boundscheck if !Base.checkbounds_indices(
+        Bool,
+        (Base.OneTo(dims[1]), Base.OneTo(dims[2])),
+        Tuple(I),
+    )
+        throw(BoundsError(o, I))
+    end
 
     div, rem = divrem(kind(o) - 0x1, 4)
 
-    if rem & 0x1 == 0x1
-        is1 = reverse(is1)
+    @inbounds if div != 0
+        li = LinearIndices(dims)[I]
+        ci = CartesianIndices(reverse(dims))[li]
+        I = CartesianIndex(reverse(Tuple(ci)))
     end
 
-    if rem & 0x2 == 0x2
-        is2 = reverse(is2)
-    end
+    i1 = rem & 0x1 == 0x1 ? dims[1] - I[1] + 1 : I[1]
+    i2 = rem & 0x2 == 0x2 ? dims[2] - I[2] + 1 : I[2]
 
-    indices = (is1, is2)
-
-    if div == 0
-        perm = (1, 2)
-    elseif div == 1
-        perm = (2, 1)
-    else
-        throw(ArgumentError("Orientation{4}($(kind(o))) is invalid"))
-    end
-
-    if invert
-        indices = getindex.(Ref(indices), perm)
-        perm = invperm(perm)
-    end
-
-    return permutedims(collect(CartesianIndices(indices)), perm)
+    return CartesianIndex(i1, i2)
 end
 
 # function orientindices(o::Orientation{8}, dims::Dims{3}, invert::Bool = false)
