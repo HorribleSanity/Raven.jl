@@ -1656,8 +1656,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                 continue
             end
 
-            twos = findall(==(2), node)
-            numtwos = length(twos)
+            numtwos = sum(node .== 2)
 
             dims = ntuple(length(cellsize)) do n
                 # We use a StepRange here so that the return type is the same
@@ -1673,25 +1672,37 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
             unrotatedindices = CartesianIndices(dims)
 
             if numtwos == 0
-                indices = unrotatedindices
+                for (j, k) in enumerate(unrotatedindices)
+                    dtoc[k, quad] = j + offset
+                end
+
             elseif numtwos == 1
+                twoindex = findfirst(==(2), node)
+                @assert !isnothing(twoindex)
                 # edge
-                shift = ntuple(m -> m == twos[1] ? 1 : 0, length(cellsize))
+                shift = ntuple(m -> m == twoindex ? 1 : 0, length(cellsize))
                 # get canonical orientation of the edge
                 M = SA[
                     dtoc_degree3_global[node..., quad],
                     dtoc_degree3_global[(node .+ shift)..., quad],
                 ]
                 p = orient(Val(2), M)
-                edgedims = (cellsize[twos[1]] - 2,)
+                edgedims = (cellsize[twoindex] - 2,)
 
-                edgeindices = orientindices(p, edgedims)
-                indices = unrotatedindices[LinearIndices(edgedims)[edgeindices]]
-
+                for (j, ei) in enumerate(CartesianIndices(edgedims))
+                    pei = orientindex(p, edgedims, ei)
+                    k = unrotatedindices[LinearIndices(edgedims)[pei]]
+                    dtoc[k, quad] = j + offset
+                end
             elseif numtwos == 2
                 # face
-                ashift = ntuple(m -> m == twos[1] ? 1 : 0, length(cellsize))
-                bshift = ntuple(m -> m == twos[2] ? 1 : 0, length(cellsize))
+                twoindex1 = findfirst(==(2), node)
+                twoindex2 = findnext(==(2), node, twoindex1 + 1)
+                @assert !isnothing(twoindex1)
+                @assert !isnothing(twoindex2)
+
+                ashift = ntuple(m -> m == twoindex1 ? 1 : 0, length(cellsize))
+                bshift = ntuple(m -> m == twoindex2 ? 1 : 0, length(cellsize))
                 abshift = ashift .+ bshift
                 M = SA[
                     dtoc_degree3_global[node..., quad] dtoc_degree3_global[(node .+ bshift)..., quad]
@@ -1700,19 +1711,20 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                 # get canonical orientation of the edge
                 p = orient(Val(4), M)
 
-                facedims = (cellsize[twos[1]] - 2, cellsize[twos[2]] - 2)
-                faceindices = orientindices(p, facedims)
+                facedims = (cellsize[twoindex1] - 2, cellsize[twoindex2] - 2)
 
-                indices = unrotatedindices[LinearIndices(facedims)[faceindices]]
+                for (j, fi) in enumerate(CartesianIndices(facedims))
+                    pfi = orientindex(p, facedims, fi)
+                    k = unrotatedindices[LinearIndices(facedims)[pfi]]
+                    dtoc[k, quad] = j + offset
+                end
             elseif numtwos == 3
                 # volume
-                indices = unrotatedindices
+                for (j, k) in enumerate(unrotatedindices)
+                    dtoc[k, quad] = j + offset
+                end
             else
                 error("Not implemented")
-            end
-
-            for (j, k) in enumerate(indices)
-                dtoc[k, quad] = j + offset
             end
         end
     end
