@@ -147,7 +147,7 @@ end
             p = Raven.Orientation{2}(j)
             pL = L[Raven.orientindices(p, (2,))]
 
-            q = Raven.orient(Val(2), pL)
+            q = Raven.orient(Val(2), Tuple(pL))
             @test q == inv(p)
         end
 
@@ -192,7 +192,7 @@ end
             p = Raven.Orientation{4}(j)
             pL = L[Raven.orientindices(p, (2, 2))]
 
-            q = Raven.orient(Val(4), pL)
+            q = Raven.orient(Val(4), Tuple(pL))
             @test q == inv(p)
         end
 

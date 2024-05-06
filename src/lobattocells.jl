@@ -1682,10 +1682,10 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                 # edge
                 shift = ntuple(m -> m == twoindex ? 1 : 0, length(cellsize))
                 # get canonical orientation of the edge
-                M = SA[
-                    dtoc_degree3_global[node..., quad],
-                    dtoc_degree3_global[(node .+ shift)..., quad],
-                ]
+                M = (
+                    dtoc_degree3_global[node..., quad]...,
+                    dtoc_degree3_global[(node .+ shift)..., quad]...,
+                )
                 p = orient(Val(2), M)
                 edgedims = (cellsize[twoindex] - 2,)
 
@@ -1704,10 +1704,12 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                 ashift = ntuple(m -> m == twoindex1 ? 1 : 0, length(cellsize))
                 bshift = ntuple(m -> m == twoindex2 ? 1 : 0, length(cellsize))
                 abshift = ashift .+ bshift
-                M = SA[
-                    dtoc_degree3_global[node..., quad] dtoc_degree3_global[(node .+ bshift)..., quad]
-                    dtoc_degree3_global[(node .+ ashift)..., quad] dtoc_degree3_global[(node .+ abshift)..., quad]
-                ]
+                M = (
+                    dtoc_degree3_global[node..., quad]...,
+                    dtoc_degree3_global[(node .+ ashift)..., quad]...,
+                    dtoc_degree3_global[(node .+ bshift)..., quad]...,
+                    dtoc_degree3_global[(node .+ abshift)..., quad]...,
+                )
                 # get canonical orientation of the edge
                 p = orient(Val(4), M)
 
