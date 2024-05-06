@@ -1808,7 +1808,7 @@ function materializefacemaps(
         facefaceindices = (LinearIndices((size(cell, 2),)), LinearIndices((size(cell, 1),)))
         cellfacedims2 =
             ((size(cell, 2),), (size(cell, 2),), (size(cell, 1),), (size(cell, 1),))
-        @views cellfaceindices = (
+        cellfaceindices = (
             cellindices[1, 1:end],
             cellindices[end, 1:end],
             cellindices[1:end, 1],
@@ -1842,7 +1842,7 @@ function materializefacemaps(
             (size(cell, 1), size(cell, 2)),
             (size(cell, 1), size(cell, 2)),
         )
-        @views cellfaceindices = (
+        cellfaceindices = (
             cellindices[1, 1:end, 1:end],
             cellindices[end, 1:end, 1:end],
             cellindices[1:end, 1, 1:end],
