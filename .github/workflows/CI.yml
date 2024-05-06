@@ -36,7 +36,7 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           version: ${{ matrix.version }}
-      - uses: julia-actions/cache@v1
+      - uses: julia-actions/cache@v2
         with:
           cache-compiled: "true"
       - uses: julia-actions/julia-buildpkg@v1
@@ -72,7 +72,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia_version }}
-      - uses: julia-actions/cache@v1
+      - uses: julia-actions/cache@v2
       - name: Build P4est
         run: |
           P4EST_RELEASE="2.8.5"
