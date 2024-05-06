@@ -15,6 +15,31 @@ end
 
 kind(o::Orientation) = o.kind
 
+perm(o::Orientation{2}) = o.kind == 1 ? SA[1, 2] : SA[2, 1]
+
+function perm(o::Orientation{4})
+
+    perm = if kind(o) == 1
+        SA[1, 2, 3, 4]
+    elseif kind(o) == 2
+        SA[2, 1, 4, 3]
+    elseif kind(o) == 3
+        SA[3, 4, 1, 2]
+    elseif kind(o) == 4
+        SA[4, 3, 2, 1]
+    elseif kind(o) == 5
+        SA[1, 3, 2, 4]
+    elseif kind(o) == 6
+        SA[2, 4, 1, 3]
+    elseif kind(o) == 7
+        SA[3, 1, 4, 2]
+    else # kind(o) == 8
+        SA[4, 2, 3, 1]
+    end
+
+    return perm
+end
+
 Base.zero(::Type{Orientation{N}}) where {N} = Orientation{N}(1)
 
 @inline function orientindex(o::Orientation, dims::Dims, I...)
