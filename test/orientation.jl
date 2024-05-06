@@ -157,6 +157,9 @@ end
             p = findorient(Val(2), A[Raven.orientindices(o, size(A))], A)
             @test o == p
         end
+
+        @test Raven.perm(Raven.Orientation{2}(1)) == SA[1, 2]
+        @test Raven.perm(Raven.Orientation{2}(2)) == SA[2, 1]
     end
 
     @testset "Orientation{4}" begin
@@ -213,6 +216,7 @@ end
             src = reshape(1:4, (2, 2))
             dest = reshape(perm, (2, 2))
             @test findorient(Val(4), dest, src) == Raven.Orientation{4}(o)
+            @test perm == Raven.perm(Raven.Orientation{4}(o))
         end
     end
 
