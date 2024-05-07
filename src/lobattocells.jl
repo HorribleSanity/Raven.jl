@@ -1696,10 +1696,10 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                 end
             elseif numtwos == 2
                 # face
-                twoindex1 = findfirst(==(2), node)
-                twoindex2 = findnext(==(2), node, twoindex1 + 1)
-                @assert !isnothing(twoindex1)
-                @assert !isnothing(twoindex2)
+                twoindex1 = something(findfirst(==(2), node), 0)
+                twoindex2 = something(findnext(==(2), node, twoindex1 + 1), 0)
+                @assert twoindex1 != 0
+                @assert twoindex2 != 0
 
                 ashift = ntuple(m -> m == twoindex1 ? 1 : 0, length(cellsize))
                 bshift = ntuple(m -> m == twoindex2 ? 1 : 0, length(cellsize))
