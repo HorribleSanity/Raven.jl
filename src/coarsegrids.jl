@@ -210,13 +210,15 @@ function cubeshell2dgrid(R::Real)
     return coarsegrid(vertices, cells, cubespherewarp, cubesphereunwarp)
 end
 
-struct BrickGrid{T,C,D} <: AbstractCoarseGrid
+struct BrickGrid{T,C,D,P} <: AbstractCoarseGrid
     connectivity::C
     coordinates::D
+    isperiodic::P
 end
 
 connectivity(g::BrickGrid) = g.connectivity
 coordinates(g::BrickGrid) = g.coordinates
+isperiodic(g::BrickGrid) = g.isperiodic
 function vertices(g::BrickGrid{T}) where {T}
     conn = connectivity(g)
     coords = coordinates(g)
@@ -241,7 +243,11 @@ function brick(T::Type, coordinates, p)
     n = length.(coordinates) .- 0x1
     connectivity = P4estTypes.brick(n, p)
 
-    return BrickGrid{T,typeof(connectivity),typeof(coordinates)}(connectivity, coordinates)
+    return BrickGrid{T,typeof(connectivity),typeof(coordinates),typeof(p)}(
+        connectivity,
+        coordinates,
+        p,
+    )
 end
 
 function brick(coordinates::Tuple{<:Any,<:Any}, p::Tuple{Bool,Bool} = (false, false))
