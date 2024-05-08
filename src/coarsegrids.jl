@@ -51,7 +51,7 @@ cells(g::CoarseGrid) = g.cells
 warp(g::CoarseGrid) = g.warp
 unwarp(g::CoarseGrid) = g.unwarp
 
-function coarsegrid(
+function CoarseGrid(
     vertices::AbstractVector,
     cells::AbstractVector{<:NTuple{X}},
     warp = identity,
@@ -61,6 +61,10 @@ function coarsegrid(
     conn = P4estTypes.Connectivity{X}(vertices, cells)
     C, V, L, W, U = typeof.([conn, vertices, cells, warp, unwarp])
     return CoarseGrid{C,V,L,W,U}(conn, vertices, cells, warp, unwarp)
+end
+
+function coarsegrid(vertices, cells, warp = identity, unwarp = identity)
+    return CoarseGrid(vertices, cells, warp, unwarp)
 end
 
 function cubeshellgrid(R::Real, r::Real)
