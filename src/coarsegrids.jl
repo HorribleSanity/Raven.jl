@@ -333,6 +333,58 @@ function brick(
     return brick(T, (l, m, n), (p, q, r))
 end
 
+function Base.show(io::IO, b::BrickGrid{T}) where {T}
+    print(io, "Raven.BrickGrid{", string(T), "}(")
+    Base.show(io, coordinates(b))
+    print(io, ", ")
+    Base.show(io, isperiodic(b))
+    print(io, ")")
+
+    return
+end
+
+function Base.showarg(io::IO, b::BrickGrid{T}, toplevel) where {T}
+    !toplevel && print(io, "::")
+    print(io, "Raven.BrickGrid{", T, "}")
+    toplevel && print(io, " with periodicity $(isperiodic(b))")
+
+    return
+end
+
+function Base.summary(io::IO, b::BrickGrid)
+    n = length.(coordinates(b)) .- 0x1
+    d = Base.dims2string(n)
+    print(io, "$d ")
+    Base.showarg(io, b, true)
+end
+
+function Base.show(io::IO, c::CoarseGrid)
+    print(io, "Raven.CoarseGrid(")
+    Base.show(io, vertices(c))
+    print(io, ", ")
+    Base.show(io, cells(c))
+    print(io, ", ")
+    Base.show(io, warp(c))
+    print(io, ", ")
+    Base.show(io, unwarp(c))
+    print(io, ")")
+
+    return
+end
+
+function Base.showarg(io::IO, ::CoarseGrid, toplevel)
+    !toplevel && print(io, "::")
+    print(io, "Raven.CoarseGrid")
+
+    return
+end
+
+function Base.summary(io::IO, c::CoarseGrid)
+    n = length(cells(c))
+    w = warp(c) === identity ? "unwarped" : "warped"
+    print(io, "$n cell $w ")
+    Base.showarg(io, c, true)
+end
 
 @recipe function f(coarsegrid::BrickGrid)
     cs = cells(coarsegrid)
