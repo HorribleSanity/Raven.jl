@@ -71,6 +71,17 @@ function Base.show(io::IO, cell::LobattoCell{T,A}) where {T,A}
     print(io, "}$(size(cell))")
 end
 
+function Base.showarg(io::IO, ::LobattoCell{T,A,N}, toplevel) where {T,A,N}
+    !toplevel && print(io, "::")
+    print(io, "LobattoCell{", T, ",", A, ",", N, "}")
+    return
+end
+
+function Base.summary(io::IO, cell::LobattoCell{T,A,N}) where {T,A,N}
+    d = Base.dims2string(size(cell))
+    print(io, "$d LobattoCell{", T, ",", A, ",", N, "}")
+end
+
 function LobattoCell{T,A}(m) where {T,A}
     o = adapt(A, lobattooperators_1d(T, m))
     points_1d = (o.points,)

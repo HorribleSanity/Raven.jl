@@ -71,6 +71,17 @@ function Base.show(io::IO, cell::GaussCell{T,A,N}) where {T,A,N}
     print(io, "}$(size(cell))")
 end
 
+function Base.showarg(io::IO, ::GaussCell{T,A,N}, toplevel) where {T,A,N}
+    !toplevel && print(io, "::")
+    print(io, "GaussCell{", T, ",", A, ",", N, "}")
+    return
+end
+
+function Base.summary(io::IO, cell::GaussCell{T,A,N}) where {T,A,N}
+    d = Base.dims2string(size(cell))
+    print(io, "$d GaussCell{", T, ",", A, ",", N, "}")
+end
+
 function GaussCell{T,A}(m) where {T,A}
     o = adapt(A, gaussoperators_1d(T, m))
     points_1d = (o.points,)
