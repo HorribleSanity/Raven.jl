@@ -239,7 +239,7 @@ function cells(g::BrickGrid)
     GC.@preserve conn map.(x -> x + 1, P4estTypes.unsafe_trees(conn))
 end
 
-function brick(T::Type, coordinates, p)
+function BrickGrid{T}(coordinates, p) where {T}
     n = length.(coordinates) .- 0x1
     connectivity = P4estTypes.brick(n, p)
 
@@ -248,6 +248,10 @@ function brick(T::Type, coordinates, p)
         coordinates,
         p,
     )
+end
+
+function brick(T::Type, coordinates, p)
+    return BrickGrid{T}(coordinates, p)
 end
 
 function brick(coordinates::Tuple{<:Any,<:Any}, p::Tuple{Bool,Bool} = (false, false))
