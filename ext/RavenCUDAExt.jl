@@ -1,9 +1,14 @@
 module RavenCUDAExt
 
-import Raven
-import Adapt
-import MPI
-import StaticArrays
+import PrecompileTools
+
+PrecompileTools.@recompile_invalidations begin
+    import Raven
+    import Adapt
+    import MPI
+    import StaticArrays
+    import CUDA
+end
 
 isdefined(Base, :get_extension) ? (using CUDA) : (using ..CUDA)
 isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAKernels)
@@ -57,6 +62,17 @@ if isdefined(CUDA, :Adaptor)
 else
     # CUDA.KernelAdaptor was introduced in CUDA.jl v5.1
     Adapt.adapt_storage(::CUDA.KernelAdaptor, ::MPI.Comm) = nothing
+end
+
+PrecompileTools.@setup_workload let
+    if CUDA.functional()
+        PrecompileTools.@compile_workload begin
+            for FT in (Float32, Float64)
+                AT = CuArray
+                Raven.precompile_workload(FT, AT)
+            end
+        end
+    end
 end
 
 end # module RavenCUDAExt
