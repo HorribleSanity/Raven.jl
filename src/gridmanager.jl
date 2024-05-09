@@ -480,3 +480,41 @@ function materializequadranttointerpolation(abaqus::AbaqusMeshImport)
 
     return quadranttointerpolation
 end
+
+function Base.show(io::IO, g::GridManager)
+    compact = get(io, :compact, false)
+    print(io, "GridManager(")
+    show(io, referencecell(g))
+    print(io, ", ")
+    show(io, coarsegrid(g))
+    print(io, "; comm=")
+    show(io, comm(g))
+    print(io, ")")
+    if !compact
+        nlocal = P4estTypes.lengthoflocalquadrants(forest(g))
+        nglobal = P4estTypes.lengthoflocalquadrants(forest(g))
+        print(io, " with $nlocal of the $nglobal global elements")
+    end
+
+    return
+end
+
+function Base.showarg(io::IO, g::GridManager, toplevel)
+    !toplevel && print(io, "::")
+
+    print(io, "GridManager{")
+    Base.showarg(io, referencecell(g), false)
+    print(io, ", ")
+    Base.showarg(io, coarsegrid(g), false)
+    print(io, "}")
+
+    if toplevel
+        nlocal = P4estTypes.lengthoflocalquadrants(forest(g))
+        nglobal = P4estTypes.lengthoflocalquadrants(forest(g))
+        print(io, " with $nlocal of the $nglobal global elements")
+    end
+
+    return
+end
+
+Base.summary(io::IO, g::GridManager) = Base.showarg(io, g, true)

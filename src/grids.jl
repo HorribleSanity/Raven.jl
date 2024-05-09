@@ -150,3 +150,35 @@ function faceviews(A::AbstractMatrix, cell::AbstractCell)
         reshape(view(A, (1+offsets[f]):offsets[f+1], :), facesizes[f]..., :)
     end
 end
+
+function Base.show(io::IO, g::Grid)
+    compact = get(io, :compact, false)
+    print(io, "Raven.Grid{")
+    show(io, referencecell(g))
+    print(io, "}()")
+    if !compact
+        nlocal = numcells(g, Val(false))
+        nglobal = numcells(g, Val(true))
+        print(io, " with $nlocal of the $nglobal global elements")
+    end
+
+    return
+end
+
+function Base.showarg(io::IO, g::Grid, toplevel)
+    !toplevel && print(io, "::")
+
+    print(io, "Raven.Grid{")
+    Base.showarg(io, referencecell(g), true)
+    print(io, "}")
+
+    if toplevel
+        nlocal = numcells(g, Val(false))
+        nglobal = numcells(g, Val(true))
+        print(io, " with $nlocal of the $nglobal global elements")
+    end
+
+    return
+end
+
+Base.summary(io::IO, g::Grid) = Base.showarg(io, g, true)
