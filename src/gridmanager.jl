@@ -492,7 +492,7 @@ function Base.show(io::IO, g::GridManager)
     print(io, ")")
     if !compact
         nlocal = P4estTypes.lengthoflocalquadrants(forest(g))
-        nglobal = P4estTypes.lengthoflocalquadrants(forest(g))
+        nglobal = P4estTypes.lengthofglobalquadrants(forest(g))
         print(io, " with $nlocal of the $nglobal global elements")
     end
 
@@ -510,7 +510,7 @@ function Base.showarg(io::IO, g::GridManager, toplevel)
 
     if toplevel
         nlocal = P4estTypes.lengthoflocalquadrants(forest(g))
-        nglobal = P4estTypes.lengthoflocalquadrants(forest(g))
+        nglobal = P4estTypes.lengthofglobalquadrants(forest(g))
         print(io, " with $nlocal of the $nglobal global elements")
     end
 
