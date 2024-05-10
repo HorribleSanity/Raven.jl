@@ -71,9 +71,11 @@ CUDA.@device_override function Base.checkbounds(A::StaticArrays.MArray, I...)
 end
 
 PrecompileTools.@compile_workload let
-    for FT in (Float32, Float64)
-        AT = CuArray
-        Raven.precompile_workload(FT, AT)
+    if CUDA.functional()
+        for FT in (Float32, Float64)
+            AT = CuArray
+            Raven.precompile_workload(FT, AT)
+        end
     end
 end
 
