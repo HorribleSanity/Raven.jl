@@ -1,9 +1,13 @@
 module RavenCUDAExt
 
-import Raven
-import Adapt
-import MPI
-import StaticArrays
+import PrecompileTools
+
+PrecompileTools.@recompile_invalidations begin
+    import Raven
+    import Adapt
+    import MPI
+    import StaticArrays
+end
 
 isdefined(Base, :get_extension) ? (using CUDA) : (using ..CUDA)
 isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAKernels)
@@ -64,6 +68,15 @@ CUDA.@device_override function Base.checkbounds(A::StaticArrays.MArray, I...)
     checkbounds(Bool, A, I...) ||
         CUDA.@print_and_throw("BoundsError while indexing an MArray.")
     nothing
+end
+
+PrecompileTools.@compile_workload let
+    if CUDA.functional()
+        for FT in (Float32, Float64)
+            AT = CuArray
+            Raven.precompile_workload(FT, AT)
+        end
+    end
 end
 
 end # module RavenCUDAExt

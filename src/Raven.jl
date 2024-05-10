@@ -1,18 +1,22 @@
 module Raven
 
-using Adapt
-using Compat
-using GPUArraysCore
-using KernelAbstractions
-using KernelAbstractions.Extras: @unroll
-using LinearAlgebra
-using MPI
-using OneDimensionalNodes
-import P4estTypes
-using RecipesBase
-using StaticArrays
-using StaticArrays: tuple_prod, tuple_length, size_to_tuple
-using SparseArrays
+using PrecompileTools: @compile_workload, @recompile_invalidations
+
+@recompile_invalidations begin
+    using Adapt
+    using Compat
+    using GPUArraysCore
+    using KernelAbstractions
+    using KernelAbstractions.Extras: @unroll
+    using LinearAlgebra
+    using MPI
+    using OneDimensionalNodes
+    import P4estTypes
+    using RecipesBase
+    using StaticArrays
+    using StaticArrays: tuple_prod, tuple_length, size_to_tuple
+    using SparseArrays
+end
 
 export LobattoCell, GaussCell
 
@@ -60,6 +64,7 @@ include("grids.jl")
 include("gridmanager.jl")
 include("gridarrays.jl")
 include("kron.jl")
+include("precompile.jl")
 
 if !isdefined(Base, :get_extension)
     using Requires
@@ -79,6 +84,13 @@ function __init__()
         for cm in COMM_MANAGERS
             finalize(cm.value)
         end
+    end
+end
+
+@compile_workload let
+    for FT in (Float32, Float64)
+        AT = Array
+        precompile_workload(FT, AT)
     end
 end
 
