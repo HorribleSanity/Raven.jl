@@ -158,8 +158,7 @@ function Base.show(io::IO, g::Grid)
     print(io, "}()")
     if !compact
         nlocal = numcells(g, Val(false))
-        nglobal = numcells(g, Val(true))
-        print(io, " with $nlocal of the $nglobal global elements")
+        print(io, " with $nlocal local elements")
     end
 
     return
@@ -174,8 +173,7 @@ function Base.showarg(io::IO, g::Grid, toplevel)
 
     if toplevel
         nlocal = numcells(g, Val(false))
-        nglobal = numcells(g, Val(true))
-        print(io, " with $nlocal of the $nglobal global elements")
+        print(io, " with $nlocal local elements")
     end
 
     return
