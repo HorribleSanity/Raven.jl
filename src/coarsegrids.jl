@@ -1,4 +1,5 @@
 abstract type AbstractCoarseGrid end
+abstract type AbstractBrickGrid <: AbstractCoarseGrid end
 
 struct MeshImportCoarseGrid{C,V,L,W,U,M} <: AbstractCoarseGrid
     connectivity::C
@@ -210,7 +211,7 @@ function cubeshell2dgrid(R::Real)
     return coarsegrid(vertices, cells, cubespherewarp, cubesphereunwarp)
 end
 
-struct BrickGrid{T,N,C,D,P} <: AbstractCoarseGrid
+struct BrickGrid{T,N,C,D,P} <: AbstractBrickGrid
     connectivity::C
     coordinates::D
     isperiodic::P
@@ -342,6 +343,72 @@ function brick(
     return brick(T, (l, m, n), (p, q, r))
 end
 
+struct ExtrudedBrickGrid{T,N,B,E} <: AbstractBrickGrid
+    basegrid::B
+    coordinates::E
+    isperiodic::Bool
+end
+
+function ExtrudedBrickGrid(coarsegrid::BrickGrid{T,N}, coordinates, isperiodic) where {T,N}
+    B = typeof(coarsegrid)
+    E = typeof(coordinates)
+    return ExtrudedBrickGrid{T,N + 1,B,E}(coarsegrid, coordinates, isperiodic)
+end
+
+function extrude(coarsegrid::BrickGrid, coordinates; isperiodic = false)
+    return ExtrudedBrickGrid(coarsegrid, coordinates, isperiodic)
+end
+
+function extrude(coarsegrid::BrickGrid{T}, n::Integer; isperiodic = false) where {T}
+    coordinates = (zero(T):n)
+    return extrude(coarsegrid, coordinates; isperiodic)
+end
+
+Base.ndims(::ExtrudedBrickGrid{T,N}) where {T,N} = N
+Base.parent(g::ExtrudedBrickGrid) = g.basegrid
+connectivity(g::ExtrudedBrickGrid) = connectivity(parent(g))
+coordinates(g::ExtrudedBrickGrid) = (coordinates(parent(g))..., g.coordinates)
+isperiodic(g::ExtrudedBrickGrid) = (isperiodic(parent(g))..., g.isperiodic)
+
+function vertices(g::ExtrudedBrickGrid{T,3}) where {T}
+    conn = connectivity(g)
+    coords = coordinates(g)
+
+    indices =
+        GC.@preserve conn convert.(Tuple{Int,Int,Int}, P4estTypes.unsafe_vertices(conn))
+
+    verts = vec([
+        SVector(coords[1][i[1]+1], coords[2][i[2]+1], coords[3][j]) for
+        j in eachindex(coords[3]), i in indices
+    ])
+
+    return verts
+end
+
+function cells(g::ExtrudedBrickGrid{T,3}) where {T}
+    conn = connectivity(g)
+    coords = coordinates(g)
+
+    GC.@preserve conn begin
+        trees = P4estTypes.unsafe_trees(conn)
+        I = eltype(eltype(trees))
+
+        Nextrude = I(length(coords[3]) - 1)
+
+        c = Vector{NTuple{8,I}}(undef, length(trees) * Nextrude)
+
+        for i = 1:length(trees)
+            tree = trees[i] .* (Nextrude .+ 0x1)
+            offset = 0x1
+            for j = 1:Nextrude
+                c[(i-0x1)*Nextrude+j] = ((tree .+ offset)..., (tree .+ offset .+ 0x1)...)
+                offset = offset + 0x1
+            end
+        end
+    end
+    return c
+end
+
 function Base.show(io::IO, b::BrickGrid{T,N}) where {T,N}
     print(io, "Raven.BrickGrid{$T, $N}(")
     Base.show(io, coordinates(b))
@@ -361,6 +428,36 @@ function Base.showarg(io::IO, b::BrickGrid{T,N}, toplevel) where {T,N}
 end
 
 function Base.summary(io::IO, b::BrickGrid)
+    n = length.(coordinates(b)) .- 0x1
+    d = Base.dims2string(n)
+    print(io, "$d ")
+    Base.showarg(io, b, true)
+end
+
+function Base.show(io::IO, b::ExtrudedBrickGrid{T,N}) where {T,N}
+    print(io, "Raven.ExtrudedBrickGrid{$T, $N}(")
+    Base.show(io, b.basegrid)
+    print(io, ", ")
+    Base.show(io, b.coordinates)
+    print(io, ", ")
+    Base.show(io, b.isperiodic)
+    print(io, ")")
+
+    return
+end
+
+function Base.showarg(io::IO, b::ExtrudedBrickGrid{T,N}, toplevel) where {T,N}
+    !toplevel && print(io, "::")
+    print(io, "Raven.ExtrudedBrickGrid{$T, $N}")
+    if toplevel
+        print(io, " with basegrid ")
+        Base.showarg(io, b.basegrid, toplevel = true)
+    end
+
+    return
+end
+
+function Base.summary(io::IO, b::ExtrudedBrickGrid)
     n = length.(coordinates(b)) .- 0x1
     d = Base.dims2string(n)
     print(io, "$d ")
@@ -395,7 +492,7 @@ function Base.summary(io::IO, c::CoarseGrid)
     Base.showarg(io, c, true)
 end
 
-@recipe function f(coarsegrid::BrickGrid)
+@recipe function f(coarsegrid::AbstractBrickGrid)
     cs = cells(coarsegrid)
     vs = vertices(coarsegrid)
 

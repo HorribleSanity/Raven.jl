@@ -36,7 +36,7 @@ export min_node_distance
 
 export flatten, unflatten
 
-export brick, coarsegrid
+export brick, coarsegrid, extrude
 
 export GridManager, generate
 export GridArray, components, sizewithghosts, viewwithghosts, parentwithghosts
