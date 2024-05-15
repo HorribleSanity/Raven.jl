@@ -210,47 +210,56 @@ function cubeshell2dgrid(R::Real)
     return coarsegrid(vertices, cells, cubespherewarp, cubesphereunwarp)
 end
 
-struct BrickGrid{T,C,D,P} <: AbstractCoarseGrid
+struct BrickGrid{T,N,C,D,P} <: AbstractCoarseGrid
     connectivity::C
     coordinates::D
     isperiodic::P
 end
 
+Base.ndims(::BrickGrid{T,N}) where {T,N} = N
 connectivity(g::BrickGrid) = g.connectivity
 coordinates(g::BrickGrid) = g.coordinates
 isperiodic(g::BrickGrid) = g.isperiodic
-function vertices(g::BrickGrid{T}) where {T}
+
+function vertices(g::BrickGrid{T,2}) where {T}
     conn = connectivity(g)
     coords = coordinates(g)
     indices =
         GC.@preserve conn convert.(Tuple{Int,Int,Int}, P4estTypes.unsafe_vertices(conn))
-    if conn isa P4estTypes.Connectivity{4}
-        verts = [SVector(coords[1][i[1]+1], coords[2][i[2]+1]) for i in indices]
-    else
-        verts = [
-            SVector(coords[1][i[1]+1], coords[2][i[2]+1], coords[3][i[3]+1]) for
-            i in indices
-        ]
-    end
+    verts = [SVector(coords[1][i[1]+1], coords[2][i[2]+1]) for i in indices]
+
     return verts
 end
+
+function vertices(g::BrickGrid{T,3}) where {T}
+    conn = connectivity(g)
+    coords = coordinates(g)
+    indices =
+        GC.@preserve conn convert.(Tuple{Int,Int,Int}, P4estTypes.unsafe_vertices(conn))
+    verts =
+        [SVector(coords[1][i[1]+1], coords[2][i[2]+1], coords[3][i[3]+1]) for i in indices]
+
+    return verts
+end
+
 function cells(g::BrickGrid)
     conn = connectivity(g)
     GC.@preserve conn map.(x -> x + 1, P4estTypes.unsafe_trees(conn))
 end
 
 function BrickGrid{T}(coordinates, p) where {T}
+    N = length(coordinates)
     n = length.(coordinates) .- 0x1
     connectivity = P4estTypes.brick(n, p)
 
-    return BrickGrid{T,typeof(connectivity),typeof(coordinates),typeof(p)}(
+    return BrickGrid{T,N,typeof(connectivity),typeof(coordinates),typeof(p)}(
         connectivity,
         coordinates,
         p,
     )
 end
 
-function brick(T::Type, coordinates, p)
+function brick(::Type{T}, coordinates, p) where {T}
     return BrickGrid{T}(coordinates, p)
 end
 
@@ -333,8 +342,8 @@ function brick(
     return brick(T, (l, m, n), (p, q, r))
 end
 
-function Base.show(io::IO, b::BrickGrid{T}) where {T}
-    print(io, "Raven.BrickGrid{", string(T), "}(")
+function Base.show(io::IO, b::BrickGrid{T,N}) where {T,N}
+    print(io, "Raven.BrickGrid{$T, $N}(")
     Base.show(io, coordinates(b))
     print(io, ", ")
     Base.show(io, isperiodic(b))
@@ -343,9 +352,9 @@ function Base.show(io::IO, b::BrickGrid{T}) where {T}
     return
 end
 
-function Base.showarg(io::IO, b::BrickGrid{T}, toplevel) where {T}
+function Base.showarg(io::IO, b::BrickGrid{T,N}, toplevel) where {T,N}
     !toplevel && print(io, "::")
-    print(io, "Raven.BrickGrid{", T, "}")
+    print(io, "Raven.BrickGrid{$T, $N}")
     toplevel && print(io, " with periodicity $(isperiodic(b))")
 
     return
