@@ -80,6 +80,7 @@ function cells_testsuite(AT, FT)
             @test Array(h1d[n][2]) == Matrix{FT}(spectralinterpolation(p, (p .+ 1) ./ 2))
         end
     end
+    @test similar(cell, (3, 4)) isa LobattoCell{FT,AT}
 
     cell = LobattoCell{FT,AT}(5)
     @test floattype(cell) == FT

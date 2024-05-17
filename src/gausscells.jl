@@ -63,6 +63,10 @@ struct GaussCell{T,A,N,S,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{T,A,N}
     toboundary::TB
 end
 
+function Base.similar(::GaussCell{T,A}, dims::Dims) where {T,A}
+    return GaussCell{T,A}(dims...)
+end
+
 function Base.show(io::IO, cell::GaussCell{T,A,N}) where {T,A,N}
     print(io, "GaussCell{")
     Base.show(io, T)

@@ -63,6 +63,10 @@ struct LobattoCell{T,A,N,S,O,P,D,WD,SWD,M,FM,E,H,TG,TL,TB} <: AbstractCell{T,A,N
     toboundary::TB
 end
 
+function Base.similar(::LobattoCell{T,A}, dims::Dims) where {T,A}
+    return LobattoCell{T,A}(dims...)
+end
+
 function Base.show(io::IO, cell::LobattoCell{T,A}) where {T,A}
     print(io, "LobattoCell{")
     Base.show(io, T)
