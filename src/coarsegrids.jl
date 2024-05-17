@@ -1,6 +1,9 @@
 abstract type AbstractCoarseGrid end
 abstract type AbstractBrickGrid <: AbstractCoarseGrid end
 
+isextruded(::AbstractCoarseGrid) = false
+columnlength(::AbstractCoarseGrid) = 1
+
 struct MeshImportCoarseGrid{C,V,L,W,U,M} <: AbstractCoarseGrid
     connectivity::C
     vertices::V
@@ -363,6 +366,9 @@ function extrude(coarsegrid::BrickGrid{T}, n::Integer; isperiodic = false) where
     coordinates = (zero(T):n)
     return extrude(coarsegrid, coordinates; isperiodic)
 end
+
+isextruded(::ExtrudedBrickGrid) = true
+columnlength(g::ExtrudedBrickGrid) = length(g.coordinates) - 0x1
 
 Base.ndims(::ExtrudedBrickGrid{T,N}) where {T,N} = N
 Base.parent(g::ExtrudedBrickGrid) = g.basegrid

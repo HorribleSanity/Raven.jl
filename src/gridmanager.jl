@@ -26,6 +26,7 @@ coarsegrid(gm::GridManager) = gm.coarsegrid
 coarsegridcells(gm::GridManager) = gm.coarsegridcells
 coarsegridvertices(gm::GridManager) = gm.coarsegridvertices
 forest(gm::GridManager) = gm.forest
+isextruded(gm::GridManager) = isextruded(coarsegrid(gm))
 
 function GridManager(
     referencecell,
