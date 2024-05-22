@@ -232,7 +232,7 @@ function materializequadranttoglobalid(forest, ghost)
     ghostnumberofquadrants = length(ghosts)
     totalnumberofquadrants = localnumberofquadrants + ghostnumberofquadrants
 
-    GC.@preserve forest ghost begin
+    GC.@preserve forest ghost ghosts begin
         global_first_quadrant = P4estTypes.unsafe_global_first_quadrant(forest)
         gfq = global_first_quadrant[rank+1]
         T = eltype(global_first_quadrant)
