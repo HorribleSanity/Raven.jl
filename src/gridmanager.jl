@@ -218,6 +218,31 @@ function materializequadrantdata(forest, ghost)
     return (quadranttolevel, quadranttotreeid, quadranttocoordinate)
 end
 
+function extrudequadrantdata(
+    unextrudedquadranttolevel,
+    unextrudedquadranttotreeid,
+    unextrudedquadranttocoordinate,
+    columnnumberofquadrants,
+)
+    quadranttolevel = repeat(unextrudedquadranttolevel, inner = columnnumberofquadrants)
+    quadranttotreeid = similar(unextrudedquadranttotreeid, size(quadranttolevel))
+
+    for i = 1:length(unextrudedquadranttotreeid)
+        treeidoffset = (unextrudedquadranttotreeid[i] - 1) * columnnumberofquadrants
+        for j = 1:columnnumberofquadrants
+            quadranttotreeid[(i-1)*columnnumberofquadrants+j] = treeidoffset + j
+        end
+    end
+
+    u = unextrudedquadranttocoordinate
+    q = similar(u, (size(u, 1), size(u, 2) + 1))
+    q[:, 1:size(u, 2)] .= u
+    q[:, size(u, 2)+1] .= zero(eltype(u))
+    quadranttocoordinate = repeat(q, inner = (columnnumberofquadrants, 1))
+
+    return (quadranttolevel, quadranttotreeid, quadranttocoordinate)
+end
+
 """
     materializequadranttoglobalid(forest, ghost)
 
@@ -257,6 +282,24 @@ function materializequadranttoglobalid(forest, ghost)
     return globalquadrantids
 end
 
+function extrudequadranttoglobalid(unextrudedquadranttoglobalid, columnnumberofquadrants)
+    unextrudednumberofquadrants = length(unextrudedquadranttoglobalid)
+    quadranttoglobalid = similar(
+        unextrudedquadranttoglobalid,
+        unextrudednumberofquadrants * columnnumberofquadrants,
+    )
+
+    for q = 1:unextrudednumberofquadrants
+        p = unextrudedquadranttoglobalid[q]
+        for c = 1:columnnumberofquadrants
+            quadranttoglobalid[(q-1)*columnnumberofquadrants+c] =
+                (p - 1) * columnnumberofquadrants + c
+        end
+    end
+
+    return quadranttoglobalid
+end
+
 function materializedtoc(forest, ghost, nodes, quadrantcommpattern, comm)
     localnumberofquadrants = P4estTypes.lengthoflocalquadrants(forest)
     ghostnumberofquadrants = length(P4estTypes.ghosts(ghost))
@@ -278,6 +321,49 @@ function materializedtoc(forest, ghost, nodes, quadrantcommpattern, comm)
     return (dtoc_local, dtoc_global)
 end
 
+function extrudedtoc(
+    unextrudeddtoc::AbstractArray{T,3},
+    columnnumberofquadrants,
+    columnnumberofcelldofs,
+    columnisperiodic,
+) where {T}
+    s = size(unextrudeddtoc)
+    dtoc = similar(
+        unextrudeddtoc,
+        s[1],
+        s[2],
+        columnnumberofcelldofs,
+        columnnumberofquadrants,
+        s[end],
+    )
+
+    numccnodes = columnnumberofquadrants * (columnnumberofcelldofs - 1) + !columnisperiodic
+
+    for q = 1:s[end], c = 1:columnnumberofquadrants
+        for k = 1:columnnumberofcelldofs
+            cnode = (c - 1) * (columnnumberofcelldofs - 1) + k
+            @assert cnode <= numccnodes
+            for j = 1:s[2], i = 1:s[1]
+                dtoc[i, j, k, c, q] = (unextrudeddtoc[i, j, q] - 1) * numccnodes + cnode
+
+            end
+        end
+        if columnisperiodic
+            for j = 1:s[2], i = 1:s[1]
+                dtoc[i, j, end, end, q] = dtoc[i, j, 1, 1, q]
+            end
+        end
+    end
+
+    return reshape(
+        dtoc,
+        s[1],
+        s[2],
+        columnnumberofcelldofs,
+        columnnumberofquadrants * s[end],
+    )
+end
+
 function materializectod(dtoc)
     dtoc = vec(dtoc)
     data = similar(dtoc, Bool)
@@ -287,10 +373,13 @@ end
 
 materializequadranttofacecode(nodes) = copy(P4estTypes.unsafe_face_code(nodes))
 
-function materializequadrantcommlists(forest, quadrantcommpattern)
-    num_local = P4estTypes.lengthoflocalquadrants(forest)
+function extrudequadranttofacecode(unextrudedquadranttofacecode, columnnumberofquadrants)
+    return repeat(unextrudedquadranttofacecode, inner = columnnumberofquadrants)
+end
+
+function materializequadrantcommlists(localnumberofquadrants, quadrantcommpattern)
     communicatingcells = unique!(sort(quadrantcommpattern.sendindices))
-    noncommunicatingcells = setdiff(0x1:num_local, communicatingcells)
+    noncommunicatingcells = setdiff(0x1:localnumberofquadrants, communicatingcells)
 
     return (communicatingcells, noncommunicatingcells)
 end
@@ -304,6 +393,8 @@ function generate(warp::Function, gm::GridManager)
     nodes = P4estTypes.lnodes(forest(gm); ghost, degree = 3)
     P4estTypes.expand!(ghost, forest(gm), nodes)
 
+    localnumberofquadrants = P4estTypes.lengthoflocalquadrants(forest(gm))
+
     (quadranttolevel, quadranttotreeid, quadranttocoordinate) =
         materializequadrantdata(forest(gm), ghost)
 
@@ -314,6 +405,43 @@ function generate(warp::Function, gm::GridManager)
     (dtoc_degree3_local, dtoc_degree3_global) =
         materializedtoc(forest(gm), ghost, nodes, quadrantcommpattern, comm(gm))
 
+    quadranttofacecode = materializequadranttofacecode(nodes)
+
+    if isextruded(coarsegrid(gm))
+        columnnumberofquadrants = columnlength(coarsegrid(gm))
+
+        localnumberofquadrants *= columnnumberofquadrants
+
+        (quadranttolevel, quadranttotreeid, quadranttocoordinate) = extrudequadrantdata(
+            quadranttolevel,
+            quadranttotreeid,
+            quadranttocoordinate,
+            columnnumberofquadrants,
+        )
+
+        quadranttoglobalid =
+            extrudequadranttoglobalid(quadranttoglobalid, columnnumberofquadrants)
+
+        quadrantcommpattern = expand(quadrantcommpattern, columnnumberofquadrants)
+
+        dtoc_degree3_local = extrudedtoc(
+            dtoc_degree3_local,
+            columnnumberofquadrants,
+            4,
+            last(isperiodic(coarsegrid(gm))),
+        )
+
+        dtoc_degree3_global = extrudedtoc(
+            dtoc_degree3_global,
+            columnnumberofquadrants,
+            4,
+            last(isperiodic(coarsegrid(gm))),
+        )
+
+        quadranttofacecode =
+            extrudequadranttofacecode(quadranttofacecode, columnnumberofquadrants)
+    end
+
     discontinuoustocontinuous =
         materializedtoc(referencecell(gm), dtoc_degree3_local, dtoc_degree3_global)
 
@@ -321,7 +449,7 @@ function generate(warp::Function, gm::GridManager)
 
     facemaps, quadranttoboundary = materializefacemaps(
         referencecell(gm),
-        P4estTypes.lengthoflocalquadrants(forest(gm)),
+        localnumberofquadrants,
         ctod_degree3_local,
         dtoc_degree3_local,
         dtoc_degree3_global,
@@ -344,10 +472,8 @@ function generate(warp::Function, gm::GridManager)
         quadranttolevel,
     )
 
-    quadranttofacecode = materializequadranttofacecode(nodes)
-
     communicatingquadrants, noncommunicatingquadrants =
-        materializequadrantcommlists(forest(gm), quadrantcommpattern)
+        materializequadrantcommlists(localnumberofquadrants, quadrantcommpattern)
 
     # Send data to the device
     quadranttolevel = A(pin(A, quadranttolevel))
@@ -363,7 +489,7 @@ function generate(warp::Function, gm::GridManager)
     noncommunicatingquadrants = Adapt.adapt(A, noncommunicatingquadrants)
     facemaps = Adapt.adapt(A, facemaps)
 
-    if coarsegrid(gm) isa BrickGrid
+    if coarsegrid(gm) isa AbstractBrickGrid
         points = materializebrickpoints(
             referencecell(gm),
             coarsegridcells(gm),
@@ -418,7 +544,7 @@ function generate(warp::Function, gm::GridManager)
     pcm = commmanager(eltype(points), nodecommpattern; comm = comm(gm))
     share!(points, pcm)
 
-    isunwarpedbrick = coarsegrid(gm) isa BrickGrid && warp == identity
+    isunwarpedbrick = coarsegrid(gm) isa AbstractBrickGrid && warp == identity
 
     volumemetrics, surfacemetrics = materializemetrics(
         referencecell(gm),
@@ -436,13 +562,18 @@ function generate(warp::Function, gm::GridManager)
         offset = global_first_quadrant[part]
     end
 
+    if isextruded(coarsegrid(gm))
+        columnnumberofquadrants = columnlength(coarsegrid(gm))
+        offset *= columnnumberofquadrants
+    end
+
     return Grid(
         comm(gm),
         part,
         nparts,
         referencecell(gm),
         offset,
-        length(gm),
+        convert(Int, localnumberofquadrants),
         points,
         volumemetrics,
         surfacemetrics,

@@ -14,7 +14,7 @@ struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CTOD,DTOC,CC,FM} <: AbstractGrid{
     nparts::Int
     cell::C
     offset::Int
-    locallength::Int32
+    locallength::Int
     points::P
     volumemetrics::V
     surfacemetrics::S
