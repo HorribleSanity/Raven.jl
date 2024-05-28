@@ -371,7 +371,7 @@ function generate(warp::Function, gm::GridManager)
             quadranttolevel,
             quadranttotreeid,
             quadranttocoordinate,
-            forest(gm),
+            localnumberofquadrants,
             comm(gm),
         )
     elseif coarsegrid(gm) isa MeshImportCoarseGrid
@@ -395,7 +395,7 @@ function generate(warp::Function, gm::GridManager)
             quadranttolevel,
             quadranttotreeid,
             quadranttocoordinate,
-            forest(gm),
+            localnumberofquadrants,
             comm(gm),
         )
     else
@@ -406,7 +406,7 @@ function generate(warp::Function, gm::GridManager)
             quadranttolevel,
             quadranttotreeid,
             quadranttocoordinate,
-            forest(gm),
+            localnumberofquadrants,
             comm(gm),
         )
     end

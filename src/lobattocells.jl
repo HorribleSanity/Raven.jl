@@ -385,14 +385,14 @@ function materializepoints(
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
-    forest,
+    localnumberofquadrants,
     comm,
 )
     r = vec.(points_1d(referencecell))
     Q = max(512 ÷ prod(length.(r)), 1)
 
     IntType = typeof(length(r))
-    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    num_local = IntType(localnumberofquadrants)
     points = GridArray{eltype(coarsegridvertices)}(
         undef,
         arraytype(referencecell),
@@ -433,7 +433,7 @@ function materializepoints(
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
-    forest,
+    localnumberofquadrants,
     comm,
 )
     r = vec.(points_1d(referencecell))
@@ -446,7 +446,7 @@ function materializepoints(
     Q = max(512 ÷ prod(length.(r)), 1)
 
     IntType = typeof(length(r))
-    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    num_local = IntType(localnumberofquadrants)
     points = GridArray{eltype(coarsegridvertices)}(
         undef,
         arraytype(referencecell),
@@ -772,14 +772,14 @@ function materializebrickpoints(
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
-    forest,
+    localnumberofquadrants,
     comm,
 )
     r = vec.(points_1d(referencecell))
     Q = max(512 ÷ prod(length.(r)), 1)
 
     IntType = typeof(length(r))
-    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    num_local = IntType(localnumberofquadrants)
     points = GridArray{eltype(coarsegridvertices)}(
         undef,
         arraytype(referencecell),
@@ -910,13 +910,13 @@ function materializepoints(
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
-    forest,
+    localnumberofquadrants,
     comm,
 )
     r = vec.(points_1d(referencecell))
 
     IntType = typeof(length(r))
-    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    num_local = IntType(localnumberofquadrants)
     points = GridArray{eltype(coarsegridvertices)}(
         undef,
         arraytype(referencecell),
@@ -1438,7 +1438,7 @@ function materializepoints(
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
-    forest,
+    localnumberofquadrants,
     comm,
 )
     r = vec.(points_1d(referencecell))
@@ -1448,7 +1448,7 @@ function materializepoints(
     interp_r = vec.(points_1d(LobattoCell{FT,AT}(N...)))
 
     IntType = typeof(length(r))
-    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    num_local = IntType(localnumberofquadrants)
     points = GridArray{eltype(coarsegridvertices)}(
         undef,
         arraytype(referencecell),
@@ -1574,13 +1574,13 @@ function materializebrickpoints(
     quadranttolevel,
     quadranttotreeid,
     quadranttocoordinate,
-    forest,
+    localnumberofquadrants,
     comm,
 )
     r = vec.(points_1d(referencecell))
 
     IntType = typeof(length(r))
-    num_local = IntType(P4estTypes.lengthoflocalquadrants(forest))
+    num_local = IntType(localnumberofquadrants)
     points = GridArray{eltype(coarsegridvertices)}(
         undef,
         arraytype(referencecell),
