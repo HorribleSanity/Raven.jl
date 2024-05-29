@@ -14,7 +14,7 @@ Raven.arraytype(::Type{T}) where {T<:CuDeviceArray} = CuArray
 
 function Raven.pin(::Type{T}, A::Array) where {T<:CuArray}
     if length(A) > 0
-        A = CUDA.Mem.pin(A)
+        A = CUDA.pin(A)
     end
 
     return A
@@ -57,13 +57,6 @@ if isdefined(CUDA, :Adaptor)
 else
     # CUDA.KernelAdaptor was introduced in CUDA.jl v5.1
     Adapt.adapt_storage(::CUDA.KernelAdaptor, ::MPI.Comm) = nothing
-end
-
-CUDA.@device_override function Base.checkbounds(A::StaticArrays.MArray, I...)
-    @inline
-    checkbounds(Bool, A, I...) ||
-        CUDA.@print_and_throw("BoundsError while indexing an MArray.")
-    nothing
 end
 
 end # module RavenCUDAExt

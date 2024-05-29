@@ -27,7 +27,7 @@ RavenWriteVTKExt = "WriteVTK"
 
 [compat]
 Adapt = "3, 4"
-CUDA = "4, 5"
+CUDA = "5.3"
 Compat = "3.42, 4"
 GPUArraysCore = "0.1"
 KernelAbstractions = "0.9"
