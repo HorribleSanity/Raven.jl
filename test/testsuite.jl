@@ -18,6 +18,7 @@ include("flatten.jl")
 include("grids.jl")
 include("gridarrays.jl")
 include("kron.jl")
+include("extrude.jl")
 
 function testsuite(AT, FT)
     @testset "Cells ($AT, $FT)" begin
@@ -37,6 +38,10 @@ function testsuite(AT, FT)
 
         @testset "Grid arrays ($AT, $FT)" begin
             gridarrays_testsuite(AT, FT)
+        end
+
+        @testset "Grid extrude ($AT, $FT)" begin
+            extrude_testsuite(AT, FT)
         end
 
         @testset "Kronecker operators (GridArray 2D) ($AT, $FT)" begin
