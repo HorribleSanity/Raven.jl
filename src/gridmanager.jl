@@ -66,11 +66,14 @@ Base.length(gm::GridManager) = P4estTypes.lengthoflocalquadrants(forest(gm))
 
 function fill_quadrant_user_data(forest, _, quadrant, quadrantid, treeid, flags)
     id = quadrantid + P4estTypes.offset(forest[treeid])
-    P4estTypes.storeuserdata!(quadrant, QuadData(id, P4estTypes.level(quadrant), flags[id]))
+    P4estTypes.unsafe_storeuserdata!(
+        quadrant,
+        QuadData(id, P4estTypes.level(quadrant), flags[id]),
+    )
 end
 
 function fill_adapt_flags(::P4estTypes.Pxest{X}, _, quadrant, _, _, flags) where {X}
-    d = P4estTypes.loaduserdata(quadrant)
+    d = P4estTypes.unsafe_loaduserdata(quadrant, QuadData)
 
     if d.old_level < P4estTypes.level(quadrant)
         flags[d.old_id] = AdaptRefine
@@ -84,10 +87,10 @@ function fill_adapt_flags(::P4estTypes.Pxest{X}, _, quadrant, _, _, flags) where
 end
 
 function replace_quads(_, _, outgoing, incoming)
-    outd = P4estTypes.loaduserdata(first(outgoing))
+    outd = P4estTypes.unsafe_loaduserdata(first(outgoing), QuadData)
 
     for quadrant in incoming
-        P4estTypes.storeuserdata!(
+        P4estTypes.unsafe_storeuserdata!(
             quadrant,
             QuadData(outd.old_id, outd.old_level, AdaptTouched),
         )
@@ -97,7 +100,7 @@ function replace_quads(_, _, outgoing, incoming)
 end
 
 function refine_quads(_, _, quadrant)
-    retval = P4estTypes.loaduserdata(quadrant).adapt_flag == AdaptRefine
+    retval = P4estTypes.unsafe_loaduserdata(quadrant, QuadData).adapt_flag == AdaptRefine
     return retval
 end
 
@@ -105,7 +108,8 @@ function coarsen_quads(_, _, children)
     coarsen = true
 
     for child in children
-        coarsen &= P4estTypes.loaduserdata(child).adapt_flag == AdaptCoarsen
+        coarsen &=
+            P4estTypes.unsafe_loaduserdata(child, QuadData).adapt_flag == AdaptCoarsen
     end
 
     return coarsen
