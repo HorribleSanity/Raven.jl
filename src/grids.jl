@@ -8,7 +8,7 @@ floattype(grid::AbstractGrid) = floattype(typeof(grid))
 arraytype(grid::AbstractGrid) = arraytype(typeof(grid))
 celltype(grid::AbstractGrid) = celltype(typeof(grid))
 
-struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CTOD,DTOC,CC,FM} <: AbstractGrid{C}
+struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CTOD,DTOC,CC,NCC,FM} <: AbstractGrid{C}
     comm::MPI.Comm
     part::Int
     nparts::Int
@@ -27,7 +27,7 @@ struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CTOD,DTOC,CC,FM} <: AbstractGrid{
     continuoustodiscontinuous::CTOD
     discontinuoustocontinuous::DTOC
     communicatingcells::CC
-    noncommunicatingcells::CC
+    noncommunicatingcells::NCC
     facemaps::FM
 end
 

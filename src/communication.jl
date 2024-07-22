@@ -45,10 +45,38 @@ function expand(r::UnitRange, factor)
     return a:b
 end
 
-expand(v::AbstractVector, factor) = vec((0x1:factor) .+ (v' .- 0x1) .* factor)
+@kernel function expand_vector_kernel!(dest, src, factor, offset)
+    i = @index(Global)
 
-function expand(pattern::CommPattern{AT}, factor) where {AT}
-    recvindices = expand(pattern.recvindices, factor)
+    @inbounds begin
+        b, a = fldmod1(src[i], offset)
+
+        for f = 1:factor
+            dest[f+(i-0x1)*factor] = a + (f - 0x1) * offset + (b - 0x1) * factor * offset
+        end
+    end
+end
+
+function expand(v::AbstractVector, factor, offset = 1)
+    w = similar(v, length(v) * factor)
+
+    expand_vector_kernel!(get_backend(w), 256)(w, v, factor, offset, ndrange = length(v))
+
+    return w
+end
+
+"""
+    expand(pattern::CommPattern, factor, offset)
+
+Create a new `CommPattern` where the `recvindices` and `sendindices` are
+expanded in size by `factor` entries and offset by `offset`.
+
+For example, to expand a `nodecommpattern` to communicate all fields of an
+array that is indexed via `(node, field, element)` use
+`expand(nodecommpattern(grid), nfields, nnodes)`.
+"""
+function expand(pattern::CommPattern{AT}, factor, offset = 1) where {AT}
+    recvindices = expand(pattern.recvindices, factor, offset)
     recvranks = copy(pattern.recvranks)
     recvrankindices = similar(pattern.recvrankindices)
     @assert eltype(recvrankindices) <: UnitRange
@@ -56,7 +84,7 @@ function expand(pattern::CommPattern{AT}, factor) where {AT}
         recvrankindices[i] = expand(pattern.recvrankindices[i], factor)
     end
 
-    sendindices = expand(pattern.sendindices, factor)
+    sendindices = expand(pattern.sendindices, factor, offset)
     sendranks = copy(pattern.sendranks)
     sendrankindices = similar(pattern.sendrankindices)
     @assert eltype(sendrankindices) <: UnitRange
@@ -109,7 +137,7 @@ end
 
 function _get_mpi_buffers(buffer, rankindices)
     # Hack to make the element type of the buffer arrays concrete
-    @assert eltype(rankindices) == typeof(1:length(rankindices))
+    @assert eltype(rankindices) == UnitRange{eltype(eltype(rankindices))}
     T = typeof(view(buffer, 1:length(rankindices)))
 
     bufs = Array{MPI.Buffer{T}}(undef, length(rankindices))
