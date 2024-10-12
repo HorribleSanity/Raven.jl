@@ -405,7 +405,7 @@ function rhs_surface_kernel!(
     return nothing
 end
 
-function rhs_volume_kernel!(
+function rhs_volume_vertical_kernel!(
     dq,
     q,
     dRdX,
@@ -413,52 +413,139 @@ function rhs_volume_kernel!(
     invwJ,
     DT,
     ::Val{N},
-    ::Val{C},
-) where {N, C}
-    i, j, k = threadIdx() #@index(Local, NTuple)
-    c = blockIdx().x #@index(Global, NTuple)
+    ::Val{ISTRIDE},
+) where {N, ISTRIDE}
+    j, k = threadIdx() #@index(Local, NTuple)
+    c, i = blockIdx() #@index(Global, NTuple)
+
+    il = 0x1
+    
+    lDT3 = CuStaticSharedArray(Float64, (N[3], N[3]))
+
+    lHˣ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
+    lHʸ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
+    lHᶻ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
+
+    lEˣ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
+    lEʸ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
+    lEᶻ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
+
+    @inbounds begin
+        for sj = 0x0:N[2]:(N[3]-0x1)
+            if j+sj <= N[3]
+                lDT3[j+sj, k] = DT[3][j+sj, k]
+            end
+        end
+
+        # loading into local mem data (i, j, k) from global index cell c
+        lHˣ[il, j, k] = q[i, j, k, 0x1, c]
+        lHʸ[il, j, k] = q[i, j, k, 0x2, c]
+        lHᶻ[il, j, k] = q[i, j, k, 0x3, c]
+        lEˣ[il, j, k] = q[i, j, k, 0x4, c]
+        lEʸ[il, j, k] = q[i, j, k, 0x5, c]
+        lEᶻ[il, j, k] = q[i, j, k, 0x6, c]
+    end
+
+    sync_threads()
+
+    @inbounds begin
+        dHˣijkc_update = -zero(Float64)
+        dHʸijkc_update = -zero(Float64)
+        dHᶻijkc_update = -zero(Float64)
+        dEˣijkc_update = -zero(Float64)
+        dEʸijkc_update = -zero(Float64)
+        dEᶻijkc_update = -zero(Float64)
+
+        invwJijkc = invwJ[i, j, k, 1, c]
+        wJijkc = wJ[i, j, k, 1, c]
+
+        # dHˣdt = - D_y Eᶻ + D_z Eʸ = - (r_y D_r + s_y D_s + t_y D_t) Eᶻ + (r_z D_r + s_z D_s + t_z D_t) Eʸ
+        # dHʸdt = - D_z Eˣ + D_x Eᶻ = - (r_z D_r + s_z D_s + t_z D_t) Eˣ + (r_x D_r + s_x D_s + t_x D_t) Eᶻ
+        # dHᶻdt = - D_x Eʸ + D_y Eˣ = - (r_x D_r + s_x D_s + t_x D_t) Eʸ + (r_y D_r + s_y D_s + t_y D_t) Eˣ
+
+
+        # dEˣdt =   D_y Hᶻ - D_z Hʸ =   (r_y D_r + s_y D_s + t_y D_t) Hᶻ - (r_z D_r + s_z D_s + t_z D_t) Hʸ
+        # dEʸdt =   D_z Hˣ - D_x Hᶻ =   (r_z D_r + s_z D_s + t_z D_t) Hˣ - (r_x D_r + s_x D_s + t_x D_t) Hᶻ
+        # dEᶻdt =   D_x Hʸ - D_y Hˣ =   (r_x D_r + s_x D_s + t_x D_t) Hʸ - (r_y D_r + s_y D_s + t_y D_t) Hˣ
+
+        for m = 0x1:N[3]
+            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lEᶻ[il, j, m]
+            dHˣijkc_update += wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lEʸ[il, j, m]
+
+            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lEˣ[il, j, m]
+            dHʸijkc_update += wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lEᶻ[il, j, m]
+
+            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lEʸ[il, j, m]
+            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lEˣ[il, j, m]
+
+            dEˣijkc_update += wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lHᶻ[il, j, m]
+            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lHʸ[il, j, m]
+
+            dEʸijkc_update += wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lHˣ[il, j, m]
+            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lHᶻ[il, j, m]
+
+            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lHʸ[il, j, m]
+            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lHˣ[il, j, m]
+        end
+
+        dq[i, j, k, 1, c] += invwJijkc * dHˣijkc_update
+        dq[i, j, k, 2, c] += invwJijkc * dHʸijkc_update
+        dq[i, j, k, 3, c] += invwJijkc * dHᶻijkc_update
+        dq[i, j, k, 4, c] += invwJijkc * dEˣijkc_update
+        dq[i, j, k, 5, c] += invwJijkc * dEʸijkc_update
+        dq[i, j, k, 6, c] += invwJijkc * dEᶻijkc_update
+    end
+    return nothing
+end
+
+
+#TODO: add striding, gpuize time stepping, fix memory transfers from host to dev
+function rhs_volume_horizontal_kernel!(
+    dq,
+    q,
+    dRdX,
+    wJ,
+    invwJ,
+    DT,
+    ::Val{N},
+    ::Val{KSTRIDE},
+) where {N, KSTRIDE}
+    i, j = threadIdx() #@index(Local, NTuple)
+    c, k = blockIdx() #@index(Global, NTuple)
+    kl = 0x1
     #c = blockIdx().x #@index(Global, NTuple)
-    cl = 0x1
 
     lDT1 = CuStaticSharedArray(Float64, (N[1], N[1]))
     lDT2 = CuStaticSharedArray(Float64, (N[2], N[2]))
-    lDT3 = CuStaticSharedArray(Float64, (N[3], N[3]))
-    #lU = @localmem eltype(q) (N..., C)
 
-    lHˣ = CuStaticSharedArray(Float64, (N..., C))
-    lHʸ = CuStaticSharedArray(Float64, (N..., C))
-    lHᶻ = CuStaticSharedArray(Float64, (N..., C))
+    lHˣ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
+    lHʸ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
+    lHᶻ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
 
-    lEˣ = CuStaticSharedArray(Float64, (N..., C))
-    lEʸ = CuStaticSharedArray(Float64, (N..., C))
-    lEᶻ = CuStaticSharedArray(Float64, (N..., C))
+    lEˣ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
+    lEʸ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
+    lEᶻ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
 
     @inbounds begin
         for sj = 0x0:N[2]:(N[1]-0x1)
-            if j+sj <= N[1] && cl == 0x1
+            if j+sj <= N[1]
                 lDT1[i, j+sj] = DT[1][i, j+sj]
             end
         end
 
         for si = 0x0:N[1]:(N[2]-0x1)
-            if i+si <= N[2] && cl == 0x1
+            if i+si <= N[2]
                 lDT2[i+si, j] = DT[2][i+si, j]
             end
         end
 
-        for si = 0x0:N[1]:(N[3]-0x1)
-            if i+si <= N[3] && cl == 0x1
-                lDT3[i+si, k] = DT[3][i+si, k]
-            end
-        end
-
         # loading into local mem data (i, j, k) from global index cell c
-        lHˣ[i, j, k, cl] = q[i, j, k, 0x1, c]
-        lHʸ[i, j, k, cl] = q[i, j, k, 0x2, c]
-        lHᶻ[i, j, k, cl] = q[i, j, k, 0x3, c]
-        lEˣ[i, j, k, cl] = q[i, j, k, 0x4, c]
-        lEʸ[i, j, k, cl] = q[i, j, k, 0x5, c]
-        lEᶻ[i, j, k, cl] = q[i, j, k, 0x6, c]
+        lHˣ[i, j, kl] = q[i, j, k, 0x1, c]
+        lHʸ[i, j, kl] = q[i, j, k, 0x2, c]
+        lHᶻ[i, j, kl] = q[i, j, k, 0x3, c]
+        lEˣ[i, j, kl] = q[i, j, k, 0x4, c]
+        lEʸ[i, j, kl] = q[i, j, k, 0x5, c]
+        lEᶻ[i, j, kl] = q[i, j, k, 0x6, c]
     end
 
     sync_threads()
@@ -484,45 +571,46 @@ function rhs_volume_kernel!(
         # dEᶻdt =   D_x Hʸ - D_y Hˣ =   (r_x D_r + s_x D_s + t_x D_t) Hʸ - (r_y D_r + s_y D_s + t_y D_t) Hˣ
 
         for l = 0x1:N[1]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lEᶻ[l, j, k, cl]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lEʸ[l, j, k, cl]
+            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lEᶻ[l, j, kl]
+            dHˣijkc_update += wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lEʸ[l, j, kl]
 
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lEˣ[l, j, k, cl]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lEᶻ[l, j, k, cl]
+            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lEˣ[l, j, kl]
+            dHʸijkc_update += wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lEᶻ[l, j, kl]
 
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lEʸ[l, j, k, cl]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lEˣ[l, j, k, cl]
+            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lEʸ[l, j, kl]
+            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lEˣ[l, j, kl]
 
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lHᶻ[l, j, k, cl]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lHʸ[l, j, k, cl]
+            dEˣijkc_update += wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lHᶻ[l, j, kl]
+            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lHʸ[l, j, kl]
 
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lHˣ[l, j, k, cl]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lHᶻ[l, j, k, cl]
+            dEʸijkc_update += wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lHˣ[l, j, kl]
+            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lHᶻ[l, j, kl]
 
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lHʸ[l, j, k, cl]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lHˣ[l, j, k, cl]
+            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lHʸ[l, j, kl]
+            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lHˣ[l, j, kl]
         end
 
         for n = 0x1:N[2]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lEᶻ[i, n, k, cl]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lEʸ[i, n, k, cl]
+            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lEᶻ[i, n, kl]
+            dHˣijkc_update += wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lEʸ[i, n, kl]
 
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lEˣ[i, n, k, cl]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lEᶻ[i, n, k, cl]
+            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lEˣ[i, n, kl]
+            dHʸijkc_update += wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lEᶻ[i, n, kl]
 
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lEʸ[i, n, k, cl]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lEˣ[i, n, k, cl]
+            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lEʸ[i, n, kl]
+            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lEˣ[i, n, kl]
 
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lHᶻ[i, n, k, cl]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lHʸ[i, n, k, cl]
+            dEˣijkc_update += wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lHᶻ[i, n, kl]
+            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lHʸ[i, n, kl]
 
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lHˣ[i, n, k, cl]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lHᶻ[i, n, k, cl]
+            dEʸijkc_update += wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lHˣ[i, n, kl]
+            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lHᶻ[i, n, kl]
 
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lHʸ[i, n, k, cl]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lHˣ[i, n, k, cl]
+            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lHʸ[i, n, kl]
+            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lHˣ[i, n, kl]
         end
 
+        #=
         for m = 0x1:N[3]
             dHˣijkc_update -= wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lEᶻ[i, j, m, cl]
             dHˣijkc_update += wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lEʸ[i, j, m, cl]
@@ -542,6 +630,7 @@ function rhs_volume_kernel!(
             dEᶻijkc_update += wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lHʸ[i, j, m, cl]
             dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lHˣ[i, j, m, cl]
         end
+        =#
 
         dq[i, j, k, 1, c] += invwJijkc * dHˣijkc_update
         dq[i, j, k, 2, c] += invwJijkc * dHʸijkc_update
@@ -562,10 +651,22 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
 
     start!(q, cm)
 
-    C = 1 #max(512 ÷ prod(size(cell)), 1)
+    C = min(512 ÷ prod(size(cell)), 1)
     b = cld(size(dq)[4],C)
+    S = size(cell)
 
-    @cuda threads=size(cell) blocks=b rhs_volume_kernel!(
+    @cuda threads=(S[1], S[2]) blocks=(b, S[3]) rhs_volume_horizontal_kernel!(
+        parent(dq),
+        parent(q),
+        parent(dRdX),
+        parent(wJ),
+        parent(invwJ),
+        DT,
+        Val(size(cell)),
+        Val(C)
+    )
+
+    @cuda threads=(S[2], S[3]) blocks=(size(dq,4), S[1]) rhs_volume_vertical_kernel!(
         parent(dq),
         parent(q),
         parent(dRdX),
@@ -612,7 +713,7 @@ function run(
     gm = GridManager(cell, brick(coordinates, periodicity); comm = comm, min_level = L)
     grid = generate(gm)
 
-    timeend = 5.0
+    timeend = 0.5
 
     #jl # crude dt estimate
     cfl = 1 // 20
@@ -688,6 +789,7 @@ function run(
         end
     
         for (i, stage) in enumerate(eachindex(RKA, RKB))
+            #These should be done with CUDA.jl call to mult by scaler factor.
             @. dq *= RKA[stage]
             rhs!(dq, q, grid, invwJ, DT, cm)
             @. q += RKB[stage] * dt * dq
@@ -774,7 +876,7 @@ let
         rank == 0 && @info "Starting convergence study h-refinement"
         err = zeros(FT, numlevels)
         for l = 1:numlevels
-            K = 4
+            K = 8
             L = l - 1
             totalcells = (K * 2^L, K * 2^L)
             dofs = prod(totalcells)*prod(1 .+ N)
