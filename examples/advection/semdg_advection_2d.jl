@@ -1,6 +1,7 @@
-#
+#--------------------------------Markdown Language Header-----------------------
+# # Advection equation
 # The Volume and Surface kernels are adapted from libParanumal.
-#
+# ```
 # @MISC{ChalmersKarakusAustinSwirydowiczWarburton2020,
 #    author = {Chalmers, N. and Karakus, A. and Austin, A. P.
 #       and Swirydowicz, K. and Warburton, T.},
@@ -11,7 +12,8 @@
 #    doi = {10.5281/zenodo.4004744},
 #    note = {Release 0.5.0}
 # }
-#
+# ```
+#--------------------------------Markdown Language Header-----------------------
 using Adapt
 using MPI
 using CUDA
@@ -23,10 +25,10 @@ using Raven
 using StaticArrays
 using WriteVTK
 
-# advection velocity
+#jl advection velocity
 const v = SVector(1, 1)
 
-# Gaussian initial condition
+#jl Gaussian initial condition
 function gaussian(x, t)
     FT = eltype(x)
     xp = mod1.(x .- v .* t, FT(2π))
@@ -34,7 +36,7 @@ function gaussian(x, t)
     exp(-2norm(xp .- xc)^2)
 end
 
-# sine initial condition
+#jl # sine initial condition
 sineproduct(x, t) = prod(sin.(x .- v .* t))
 
 meshwarp(x) =
@@ -128,7 +130,7 @@ end
     @synchronize
 
     @inbounds if ij <= N[2]
-        # Faces with r=-1
+        #jl # Faces with r=-1
         i = 1
         j = ij
         fid = j
@@ -148,7 +150,7 @@ end
         lqflux[i, j, c1] +=
             fscale * ((nf ⋅ (v * qM)) + (nf ⋅ (v * qP)) - abs(nf ⋅ v) * (qP - qM))
 
-        # Faces with r=1
+        #jl # Faces with r=1
         i = N[1]
         j = ij
         fid = N[2] + j
@@ -172,7 +174,7 @@ end
     @synchronize
 
     @inbounds if ij <= N[1]
-        # Faces with s=-1
+        #jl # Faces with s=-1
         i = ij
         j = 1
         fid = 2N[2] + i
@@ -192,7 +194,7 @@ end
         lqflux[i, j, c1] +=
             fscale * ((nf ⋅ (v * qM)) + (nf ⋅ (v * qP)) - abs(nf ⋅ v) * (qP - qM))
 
-        # Faces with s=1
+        #jl # Faces with s=1
         i = ij
         j = N[2]
         fid = 2N[2] + N[1] + i
@@ -215,7 +217,7 @@ end
 
     @synchronize
 
-    # RHS update
+    #jl # RHS update
     i = ij
     @inbounds if i <= N[1]
         @unroll for j = 1:N[2]
@@ -287,7 +289,7 @@ function run(
 
     timeend = FT(2π)
 
-    # crude dt estimate
+    #jl # crude dt estimate
     cfl = 1 // 20
     dx = Base.step(first(coordinates))
     dt = cfl * dx / (maximum(N))^2
@@ -331,27 +333,27 @@ function run(
         end
     end
 
-    # initialize state
+    #jl # initialize state
     q = solution.(points(grid), FT(0))
 
-    # storage for RHS
+    #jl # storage for RHS
     dq = similar(q)
     dq .= 0
 
     # precompute inverse of weights × Jacobian
     _, _, wJ = components(first(volumemetrics(grid)))
     invwJ = inv.(wJ)
-    # precompute derivative transpose
+    #jl # precompute derivative transpose
     DT = transpose.(derivatives_1d(cell))
 
     cm = commmanager(eltype(q), nodecommpattern(grid); comm)
 
-    # initial output
+    #jl # initial output
     step = 0
     time = FT(0)
     do_output(step, time, q)
 
-    # time integration
+    #jl # time integration
     for step = 1:numberofsteps
         if time + dt > timeend
             dt = timeend - time
@@ -365,7 +367,7 @@ function run(
         do_output(step, time, q)
     end
 
-    # final output
+    #jl # final output
     do_output(numberofsteps, timeend, q)
     if outputvtk && rank == 0
         cd(vtkdir) do
@@ -376,7 +378,7 @@ function run(
     # compute error
     _, _, wJ = components(first(volumemetrics(grid)))
     qexact = solution.(points(grid), timeend)
-    # TODO add sum to GridArray so the following reduction is on the device
+    #jl # TODO add sum to GridArray so the following reduction is on the device
     errf = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* (q .- qexact) .^ 2)), +, comm))
 
     return errf
@@ -398,7 +400,7 @@ let
     FT = Float64
     N = (4, 5)
 
-    # run on the GPU if possible
+    #jl # run on the GPU if possible
     AT = CUDA.functional() && CUDA.has_cuda_gpu() ? CuArray : Array
 
     if rank == 0
@@ -409,7 +411,7 @@ let
         """
     end
 
-    # visualize solution of advected Gaussian
+    #jl # visualize solution of advected Gaussian
     K = 2
     L = 2
     vtkdir = "vtk_semdg_advection_2d$(K)x$(K)_L$(L)"
@@ -423,7 +425,7 @@ let
     run(gaussian, FT, AT, N, K, L; outputvtk = true, vtkdir, comm)
     rank == 0 && @info "Finished, vtk output written to $vtkdir"
 
-    # run convergence study using a simple sine field
+    #jl # run convergence study using a simple sine field
     rank == 0 && @info "Starting convergence study"
     numlevels = @isdefined(_testing) ? 2 : 5
     err = zeros(FT, numlevels)

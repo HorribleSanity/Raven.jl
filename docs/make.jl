@@ -3,6 +3,9 @@ using Documenter
 
 DocMeta.setdocmeta!(Raven, :DocTestSetup, :(using Raven); recursive = true)
 
+# Generate examples
+include("generate.jl")
+
 makedocs(;
     modules = [Raven],
     authors = "Raven contributors",
@@ -17,6 +20,7 @@ makedocs(;
     pages = [
         "Home" => "index.md"
         "Usage" => "usage.md"
+        "Examples" => GENERATEDEXAMPLES
         "Reference" => "reference.md"
         "Index" => "refindex.md"
     ],
