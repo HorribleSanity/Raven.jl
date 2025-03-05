@@ -1,8 +1,8 @@
-using WriteVTK: num_cells_structured
-using CUDA: initialize_context
 #--------------------------------Markdown Language Header-----------------------
 # # 3D Maxwells equation
 #--------------------------------Markdown Language Header-----------------------
+using WriteVTK: num_cells_structured
+using CUDA: initialize_context
 using Base: sign_mask
 using Adapt
 using MPI
@@ -10,12 +10,15 @@ using CUDA
 using LinearAlgebra
 using Printf
 using Raven
+using Raven.KernelAbstractions.Extras: @unroll
 using StaticArrays
 using WriteVTK
 using Pkg
 
+using ProgressBars
+
 const outputvtk = false 
-const convergetest = true 
+const convergetest = false 
 
 
 function solution(x::SVector{3}, t)
@@ -44,21 +47,21 @@ function rhs_surface_kernel!(
     ::Val{C}
 ) where {N, C}
     ijk, cl = threadIdx()
-    c = (blockIdx().x-1)*blockDim().y + cl
+    c = (blockIdx().x-0x1)*C + cl
 
-    Hxflux = CuStaticSharedArray(eltype(dq), (N..., C)) # @localmem eltype(dq) (N..., C)
-    Hyflux = CuStaticSharedArray(eltype(dq), (N..., C)) #  @localmem eltype(dq) (N..., C)
-    Hzflux = CuStaticSharedArray(eltype(dq), (N..., C)) #  @localmem eltype(dq) (N..., C)
+    Hxflux = CuStaticSharedArray(eltype(dq), (N..., C))
+    Hyflux = CuStaticSharedArray(eltype(dq), (N..., C))
+    Hzflux = CuStaticSharedArray(eltype(dq), (N..., C))
 
-    Exflux = CuStaticSharedArray(eltype(dq), (N..., C)) #  @localmem eltype(dq) (N..., C)
-    Eyflux = CuStaticSharedArray(eltype(dq), (N..., C)) #  @localmem eltype(dq) (N..., C)
-    Ezflux = CuStaticSharedArray(eltype(dq), (N..., C)) #  @localmem eltype(dq) (N..., C)
+    Exflux = CuStaticSharedArray(eltype(dq), (N..., C))
+    Eyflux = CuStaticSharedArray(eltype(dq), (N..., C))
+    Ezflux = CuStaticSharedArray(eltype(dq), (N..., C))
 
-    @inbounds if ijk <= N[1] * N[2]
+    @inbounds if ijk <= N[0x1] * N[0x2]
         ij = ijk
-        j, i = fldmod1(ij, N[1])
+        j, i = fldmod1(ij, N[0x1])
 
-        for k = 1:N[3]
+        for k = 1:N[0x3]
             z = zero(eltype(Hxflux))
             Hxflux[i, j, k, cl] = z
             Hyflux[i, j, k, cl] = z
@@ -72,46 +75,46 @@ function rhs_surface_kernel!(
 
     sync_threads()
 
-    @inbounds if ijk <= N[2]*N[3]
+    @inbounds if ijk <= N[0x2]*N[0x3]
         alpha = 1.0
         # face with r = -1
         jk = ijk
-        i = 1
-        k, j = fldmod1(jk, N[2])
+        i = 0x1
+        k, j = fldmod1(jk, N[0x2])
 
         fid = jk 
 
-        idP = vmapP[fid, c]  # global GPU memory access
-        idB = mapB[1, c]     # global GPU memory access
+        idP = vmapP[fid, c]
+        idB = mapB[0x1, c]
 
-        if idB == 1
+        if idB == 0x1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 4, c]
-            dEy = -2 * q[i, j, k, 5, c]
-            dEz = -2 * q[i, j, k, 6, c]
+            dEx = -2 * q[i, j, k, 0x4, c]
+            dEy = -2 * q[i, j, k, 0x5, c]
+            dEz = -2 * q[i, j, k, 0x6, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[1]*N[2]*N[3])
-            Pk, Pij  = fldmod1(Pijk, N[1]*N[2])
-            Pj, Pi   = fldmod1(Pij,  N[1])
+            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
+            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
+            Pj, Pi   = fldmod1(Pij,  N[0x1])
 
-            dHx = q[Pi, Pj, Pk, 1, Pc] - q[i, j, k, 1, c]
-            dHy = q[Pi, Pj, Pk, 2, Pc] - q[i, j, k, 2, c]
-            dHz = q[Pi, Pj, Pk, 3, Pc] - q[i, j, k, 3, c]
+            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
+            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
+            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
 
-            dEx = q[Pi, Pj, Pk, 4, Pc] - q[i, j, k, 4, c]
-            dEy = q[Pi, Pj, Pk, 5, Pc] - q[i, j, k, 5, c]
-            dEz = q[Pi, Pj, Pk, 6, Pc] - q[i, j, k, 6, c]
+            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
+            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
+            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
         end
 
-        nx = n[1, fid, c]
-        ny = n[2, fid, c]
-        nz = n[3, fid, c]
-        wsJf = wsJ[1, fid, c]
+        nx = n[0x1, fid, c]
+        ny = n[0x2, fid, c]
+        nz = n[0x3, fid, c]
+        wsJf = wsJ[0x1, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 1, c]
+        invwJijkc = invwJ[i, j, k, 0x1, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -126,41 +129,41 @@ function rhs_surface_kernel!(
         Ezflux[i, j, k, cl] += fscale * ( nx * dHy - ny*dHx + alpha*(dEz - ndotdE*nz))
 
         # face with r = 1
-        i = N[1]
-        fid = N[2]*N[3] + jk
+        i = N[0x1]
+        fid = N[0x2]*N[0x3] + jk
 
-        idP = vmapP[fid, c]  # global GPU memory access
-        idB = mapB[2, c]     # global GPU memory access
+        idP = vmapP[fid, c]
+        idB = mapB[0x2, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 4, c]
-            dEy = -2 * q[i, j, k, 5, c]
-            dEz = -2 * q[i, j, k, 6, c]
+            dEx = -2 * q[i, j, k, 0x4, c]
+            dEy = -2 * q[i, j, k, 0x5, c]
+            dEz = -2 * q[i, j, k, 0x6, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[1]*N[2]*N[3])
-            Pk, Pij  = fldmod1(Pijk, N[1]*N[2])
-            Pj, Pi   = fldmod1(Pij,  N[1])
+            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
+            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
+            Pj, Pi   = fldmod1(Pij,  N[0x1])
 
-            dHx = q[Pi, Pj, Pk, 1, Pc] - q[i, j, k, 1, c]
-            dHy = q[Pi, Pj, Pk, 2, Pc] - q[i, j, k, 2, c]
-            dHz = q[Pi, Pj, Pk, 3, Pc] - q[i, j, k, 3, c]
+            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
+            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
+            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
 
-            dEx = q[Pi, Pj, Pk, 4, Pc] - q[i, j, k, 4, c]
-            dEy = q[Pi, Pj, Pk, 5, Pc] - q[i, j, k, 5, c]
-            dEz = q[Pi, Pj, Pk, 6, Pc] - q[i, j, k, 6, c]
+            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
+            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
+            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
 
         end
 
-        nx = n[1, fid, c]
-        ny = n[2, fid, c]
-        nz = n[3, fid, c]
-        wsJf = wsJ[1, fid, c]
+        nx = n[0x1, fid, c]
+        ny = n[0x2, fid, c]
+        nz = n[0x3, fid, c]
+        wsJf = wsJ[0x1, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 1, c]
+        invwJijkc = invwJ[i, j, k, 0x1, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -177,47 +180,47 @@ function rhs_surface_kernel!(
 
     sync_threads()
 
-    @inbounds if ijk <= N[1]*N[3]
+    @inbounds if ijk <= N[0x1]*N[0x3]
         alpha = 1.0
         # face with s = -1
         ik = ijk
         j = 1
-        k, i = fldmod1(ik, N[1])
+        k, i = fldmod1(ik, N[0x1])
 
-        fid = 2 * N[2] * N[3] + ik
+        fid = 2 * N[0x2] * N[0x3] + ik
 
-        idP = vmapP[fid, c]  # global GPU memory access
-        idB = mapB[3, c]     # global GPU memory access
+        idP = vmapP[fid, c]
+        idB = mapB[0x3, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 4, c]
-            dEy = -2 * q[i, j, k, 5, c]
-            dEz = -2 * q[i, j, k, 6, c]
+            dEx = -2 * q[i, j, k, 0x4, c]
+            dEy = -2 * q[i, j, k, 0x5, c]
+            dEz = -2 * q[i, j, k, 0x6, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[1]*N[2]*N[3])
-            Pk, Pij  = fldmod1(Pijk, N[1]*N[2])
-            Pj, Pi   = fldmod1(Pij,  N[1])
+            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
+            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
+            Pj, Pi   = fldmod1(Pij,  N[0x1])
 
-            dHx = q[Pi, Pj, Pk, 1, Pc] - q[i, j, k, 1, c]
-            dHy = q[Pi, Pj, Pk, 2, Pc] - q[i, j, k, 2, c]
-            dHz = q[Pi, Pj, Pk, 3, Pc] - q[i, j, k, 3, c]
+            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
+            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
+            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
 
-            dEx = q[Pi, Pj, Pk, 4, Pc] - q[i, j, k, 4, c]
-            dEy = q[Pi, Pj, Pk, 5, Pc] - q[i, j, k, 5, c]
-            dEz = q[Pi, Pj, Pk, 6, Pc] - q[i, j, k, 6, c]
+            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
+            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
+            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
 
         end
 
-        nx = n[1, fid, c]
-        ny = n[2, fid, c]
-        nz = n[3, fid, c]
-        wsJf = wsJ[1, fid, c]
+        nx = n[0x1, fid, c]
+        ny = n[0x2, fid, c]
+        nz = n[0x3, fid, c]
+        wsJf = wsJ[0x1, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 1, c]
+        invwJijkc = invwJ[i, j, k, 0x1, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -232,41 +235,41 @@ function rhs_surface_kernel!(
         Ezflux[i, j, k, cl] += fscale * ( nx * dHy - ny*dHx + alpha*(dEz - ndotdE*nz))
 
         # face with s = 1
-        j = N[2]
-        fid = 2*N[2]*N[3] + N[1]*N[3]  + ik
+        j = N[0x2]
+        fid = 2*N[0x2]*N[0x3] + N[0x1]*N[0x3]  + ik
 
-        idP = vmapP[fid, c]  # global GPU memory access
-        idB = mapB[4, c]     # global GPU memory access
+        idP = vmapP[fid, c]
+        idB = mapB[0x4, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 4, c]
-            dEy = -2 * q[i, j, k, 5, c]
-            dEz = -2 * q[i, j, k, 6, c]
+            dEx = -2 * q[i, j, k, 0x4, c]
+            dEy = -2 * q[i, j, k, 0x5, c]
+            dEz = -2 * q[i, j, k, 0x6, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[1]*N[2]*N[3])
-            Pk, Pij  = fldmod1(Pijk, N[1]*N[2])
-            Pj, Pi   = fldmod1(Pij,  N[1])
+            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
+            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
+            Pj, Pi   = fldmod1(Pij,  N[0x1])
 
-            dHx = q[Pi, Pj, Pk, 1, Pc] - q[i, j, k, 1, c]
-            dHy = q[Pi, Pj, Pk, 2, Pc] - q[i, j, k, 2, c]
-            dHz = q[Pi, Pj, Pk, 3, Pc] - q[i, j, k, 3, c]
+            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
+            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
+            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
 
-            dEx = q[Pi, Pj, Pk, 4, Pc] - q[i, j, k, 4, c]
-            dEy = q[Pi, Pj, Pk, 5, Pc] - q[i, j, k, 5, c]
-            dEz = q[Pi, Pj, Pk, 6, Pc] - q[i, j, k, 6, c]
+            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
+            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
+            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
 
         end
 
-        nx = n[1, fid, c]
-        ny = n[2, fid, c]
-        nz = n[3, fid, c]
-        wsJf = wsJ[1, fid, c]
+        nx = n[0x1, fid, c]
+        ny = n[0x2, fid, c]
+        nz = n[0x3, fid, c]
+        wsJf = wsJ[0x1, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 1, c]
+        invwJijkc = invwJ[i, j, k, 0x1, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -284,47 +287,47 @@ function rhs_surface_kernel!(
 
     sync_threads()
 
-    @inbounds if ijk <= N[1]*N[2]
+    @inbounds if ijk <= N[0x1]*N[0x2]
         alpha = 1.0
         # face with t = -1
         ij = ijk
 
-        j, i = fldmod1(ij, N[1])
+        j, i = fldmod1(ij, N[0x1])
         k = 1
 
-        fid = 2 * (N[2] * N[3] + N[1] * N[3]) + ij 
+        fid = 2 * (N[0x2] * N[0x3] + N[0x1] * N[0x3]) + ij 
 
-        idP = vmapP[fid, c]  # global GPU memory access
-        idB = mapB[5, c]     # global GPU memory access
+        idP = vmapP[fid, c]
+        idB = mapB[0x5, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 4, c]
-            dEy = -2 * q[i, j, k, 5, c]
-            dEz = -2 * q[i, j, k, 6, c]
+            dEx = -2 * q[i, j, k, 0x4, c]
+            dEy = -2 * q[i, j, k, 0x5, c]
+            dEz = -2 * q[i, j, k, 0x6, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[1]*N[2]*N[3])
-            Pk, Pij  = fldmod1(Pijk, N[1]*N[2])
-            Pj, Pi   = fldmod1(Pij,  N[1])
+            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
+            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
+            Pj, Pi   = fldmod1(Pij,  N[0x1])
 
-            dHx = q[Pi, Pj, Pk, 1, Pc] - q[i, j, k, 1, c]
-            dHy = q[Pi, Pj, Pk, 2, Pc] - q[i, j, k, 2, c]
-            dHz = q[Pi, Pj, Pk, 3, Pc] - q[i, j, k, 3, c]
+            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
+            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
+            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
 
-            dEx = q[Pi, Pj, Pk, 4, Pc] - q[i, j, k, 4, c]
-            dEy = q[Pi, Pj, Pk, 5, Pc] - q[i, j, k, 5, c]
-            dEz = q[Pi, Pj, Pk, 6, Pc] - q[i, j, k, 6, c]
+            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
+            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
+            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
         end
 
-        nx = n[1, fid, c]
-        ny = n[2, fid, c]
-        nz = n[3, fid, c]
-        wsJf = wsJ[1, fid, c]
+        nx = n[0x1, fid, c]
+        ny = n[0x2, fid, c]
+        nz = n[0x3, fid, c]
+        wsJf = wsJ[0x1, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 1, c]
+        invwJijkc = invwJ[i, j, k, 0x1, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -339,40 +342,40 @@ function rhs_surface_kernel!(
         Ezflux[i, j, k, cl] += fscale * ( nx * dHy - ny*dHx + alpha*(dEz - ndotdE*nz))
 
         # face with t = 1
-        k = N[3]
-        fid = 2 * (N[2] * N[3] + N[1] * N[3]) + N[1] * N[2]  + ij
+        k = N[0x3]
+        fid = 2 * (N[0x2] * N[0x3] + N[0x1] * N[0x3]) + N[0x1] * N[0x2]  + ij
 
-        idP = vmapP[fid, c]  # global GPU memory access
-        idB = mapB[6, c]     # global GPU memory access
+        idP = vmapP[fid, c]
+        idB = mapB[0x6, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 4, c]
-            dEy = -2 * q[i, j, k, 5, c]
-            dEz = -2 * q[i, j, k, 6, c]
+            dEx = -2 * q[i, j, k, 0x4, c]
+            dEy = -2 * q[i, j, k, 0x5, c]
+            dEz = -2 * q[i, j, k, 0x6, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[1]*N[2]*N[3])
-            Pk, Pij  = fldmod1(Pijk, N[1]*N[2])
-            Pj, Pi   = fldmod1(Pij,  N[1])
+            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
+            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
+            Pj, Pi   = fldmod1(Pij,  N[0x1])
 
-            dHx = q[Pi, Pj, Pk, 1, Pc] - q[i, j, k, 1, c]
-            dHy = q[Pi, Pj, Pk, 2, Pc] - q[i, j, k, 2, c]
-            dHz = q[Pi, Pj, Pk, 3, Pc] - q[i, j, k, 3, c]
+            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
+            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
+            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
 
-            dEx = q[Pi, Pj, Pk, 4, Pc] - q[i, j, k, 4, c]
-            dEy = q[Pi, Pj, Pk, 5, Pc] - q[i, j, k, 5, c]
-            dEz = q[Pi, Pj, Pk, 6, Pc] - q[i, j, k, 6, c]
+            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
+            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
+            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
         end
 
-        nx = n[1, fid, c]
-        ny = n[2, fid, c]
-        nz = n[3, fid, c]
-        wsJf = wsJ[1, fid, c]
+        nx = n[0x1, fid, c]
+        ny = n[0x2, fid, c]
+        nz = n[0x3, fid, c]
+        wsJf = wsJ[0x1, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 1, c]
+        invwJijkc = invwJ[i, j, k, 0x1, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -390,16 +393,16 @@ function rhs_surface_kernel!(
     sync_threads()
 
     ij = ijk
-    @inbounds if ij <= N[1] * N[2]
-        j, i = fldmod1(ij, N[1])
+    @inbounds if ij <= N[0x1] * N[0x2]
+        j, i = fldmod1(ij, N[0x1])
 
-        for k = 1:N[3]
-            dq[i, j, k, 1, c] += Hxflux[i, j, k, cl]
-            dq[i, j, k, 2, c] += Hyflux[i, j, k, cl]
-            dq[i, j, k, 3, c] += Hzflux[i, j, k, cl]
-            dq[i, j, k, 4, c] += Exflux[i, j, k, cl]
-            dq[i, j, k, 5, c] += Eyflux[i, j, k, cl]
-            dq[i, j, k, 6, c] += Ezflux[i, j, k, cl]
+        for k = 1:N[0x3]
+            dq[i, j, k, 0x1, c] += Hxflux[i, j, k, cl]
+            dq[i, j, k, 0x2, c] += Hyflux[i, j, k, cl]
+            dq[i, j, k, 0x3, c] += Hzflux[i, j, k, cl]
+            dq[i, j, k, 0x4, c] += Exflux[i, j, k, cl]
+            dq[i, j, k, 0x5, c] += Eyflux[i, j, k, cl]
+            dq[i, j, k, 0x6, c] += Ezflux[i, j, k, cl]
         end
     end
     return nothing
@@ -412,32 +415,31 @@ function rhs_volume_vertical_kernel!(
     wJ,
     invwJ,
     DT,
+    ::Val{G},
     ::Val{N},
     ::Val{ISTRIDE},
-) where {N, ISTRIDE}
-    j, k = threadIdx() #@index(Local, NTuple)
-    c, i = blockIdx() #@index(Global, NTuple)
+) where {G, N, ISTRIDE}
+    il, j, k = threadIdx()
+    c, iblockidx = blockIdx()
+    i = (iblockidx-0x1)*ISTRIDE + il
 
-    il = 0x1
-    
-    lDT3 = CuStaticSharedArray(Float64, (N[3], N[3]))
+    lDT3 = CuStaticSharedArray(eltype(dq), (N[0x3], N[0x3]))
 
-    lHˣ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
-    lHʸ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
-    lHᶻ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
+    lHˣ = CuStaticSharedArray(eltype(dq), (ISTRIDE, N[0x2], N[0x3]))
+    lHʸ = CuStaticSharedArray(eltype(dq), (ISTRIDE, N[0x2], N[0x3]))
+    lHᶻ = CuStaticSharedArray(eltype(dq), (ISTRIDE, N[0x2], N[0x3]))
 
-    lEˣ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
-    lEʸ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
-    lEᶻ = CuStaticSharedArray(Float64, (ISTRIDE, N[2], N[3]))
+    lEˣ = CuStaticSharedArray(eltype(dq), (ISTRIDE, N[0x2], N[0x3]))
+    lEʸ = CuStaticSharedArray(eltype(dq), (ISTRIDE, N[0x2], N[0x3]))
+    lEᶻ = CuStaticSharedArray(eltype(dq), (ISTRIDE, N[0x2], N[0x3]))
 
-    @inbounds begin
-        for sj = 0x0:N[2]:(N[3]-0x1)
-            if j+sj <= N[3]
-                lDT3[j+sj, k] = DT[3][j+sj, k]
+    @inbounds if i <= G[0x1]
+        for sj = 0x0:N[0x2]:(N[0x3]-0x1)
+            if j+sj <= N[0x3]
+                lDT3[j+sj, k] = DT[0x3][j+sj, k]
             end
         end
-
-        # loading into local mem data (i, j, k) from global index cell c
+    
         lHˣ[il, j, k] = q[i, j, k, 0x1, c]
         lHʸ[il, j, k] = q[i, j, k, 0x2, c]
         lHᶻ[il, j, k] = q[i, j, k, 0x3, c]
@@ -448,58 +450,46 @@ function rhs_volume_vertical_kernel!(
 
     sync_threads()
 
-    @inbounds begin
-        dHˣijkc_update = -zero(Float64)
-        dHʸijkc_update = -zero(Float64)
-        dHᶻijkc_update = -zero(Float64)
-        dEˣijkc_update = -zero(Float64)
-        dEʸijkc_update = -zero(Float64)
-        dEᶻijkc_update = -zero(Float64)
+    @inbounds  if i <= G[0x1]
+        dHˣijkc_update = -zero(eltype(dq))
+        dHʸijkc_update = -zero(eltype(dq))
+        dHᶻijkc_update = -zero(eltype(dq))
+        dEˣijkc_update = -zero(eltype(dq))
+        dEʸijkc_update = -zero(eltype(dq))
+        dEᶻijkc_update = -zero(eltype(dq))
 
-        invwJijkc = invwJ[i, j, k, 1, c]
-        wJijkc = wJ[i, j, k, 1, c]
+        invwJijkc = invwJ[i, j, k, 0x1, c]
+        wJijkc = wJ[i, j, k, 0x1, c]
 
-        # dHˣdt = - D_y Eᶻ + D_z Eʸ = - (r_y D_r + s_y D_s + t_y D_t) Eᶻ + (r_z D_r + s_z D_s + t_z D_t) Eʸ
-        # dHʸdt = - D_z Eˣ + D_x Eᶻ = - (r_z D_r + s_z D_s + t_z D_t) Eˣ + (r_x D_r + s_x D_s + t_x D_t) Eᶻ
-        # dHᶻdt = - D_x Eʸ + D_y Eˣ = - (r_x D_r + s_x D_s + t_x D_t) Eʸ + (r_y D_r + s_y D_s + t_y D_t) Eˣ
+        for m = 0x1:N[0x3]
+            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 0x6, c] * lDT3[k, m] * lEᶻ[il, j, m]
+            dHˣijkc_update += wJijkc * dRdX[i, j, k, 0x9, c] * lDT3[k, m] * lEʸ[il, j, m]
 
+            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 0x9, c] * lDT3[k, m] * lEˣ[il, j, m]
+            dHʸijkc_update += wJijkc * dRdX[i, j, k, 0x3, c] * lDT3[k, m] * lEᶻ[il, j, m]
 
-        # dEˣdt =   D_y Hᶻ - D_z Hʸ =   (r_y D_r + s_y D_s + t_y D_t) Hᶻ - (r_z D_r + s_z D_s + t_z D_t) Hʸ
-        # dEʸdt =   D_z Hˣ - D_x Hᶻ =   (r_z D_r + s_z D_s + t_z D_t) Hˣ - (r_x D_r + s_x D_s + t_x D_t) Hᶻ
-        # dEᶻdt =   D_x Hʸ - D_y Hˣ =   (r_x D_r + s_x D_s + t_x D_t) Hʸ - (r_y D_r + s_y D_s + t_y D_t) Hˣ
-
-        for m = 0x1:N[3]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lEᶻ[il, j, m]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lEʸ[il, j, m]
-
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lEˣ[il, j, m]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lEᶻ[il, j, m]
-
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lEʸ[il, j, m]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lEˣ[il, j, m]
-
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lHᶻ[il, j, m]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lHʸ[il, j, m]
-
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lHˣ[il, j, m]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lHᶻ[il, j, m]
-
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lHʸ[il, j, m]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lHˣ[il, j, m]
+            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x3, c] * lDT3[k, m] * lEʸ[il, j, m]
+            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 0x6, c] * lDT3[k, m] * lEˣ[il, j, m]
+                                                                                      
+            dEˣijkc_update += wJijkc * dRdX[i, j, k, 0x6, c] * lDT3[k, m] * lHᶻ[il, j, m]
+            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 0x9, c] * lDT3[k, m] * lHʸ[il, j, m]                                                                                      
+            dEʸijkc_update += wJijkc * dRdX[i, j, k, 0x9, c] * lDT3[k, m] * lHˣ[il, j, m]
+            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 0x3, c] * lDT3[k, m] * lHᶻ[il, j, m]
+                                                                                      
+            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 0x3, c] * lDT3[k, m] * lHʸ[il, j, m]
+            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x6, c] * lDT3[k, m] * lHˣ[il, j, m]
         end
 
-        dq[i, j, k, 1, c] += invwJijkc * dHˣijkc_update
-        dq[i, j, k, 2, c] += invwJijkc * dHʸijkc_update
-        dq[i, j, k, 3, c] += invwJijkc * dHᶻijkc_update
-        dq[i, j, k, 4, c] += invwJijkc * dEˣijkc_update
-        dq[i, j, k, 5, c] += invwJijkc * dEʸijkc_update
-        dq[i, j, k, 6, c] += invwJijkc * dEᶻijkc_update
+        dq[i, j, k, 0x1, c] += invwJijkc * dHˣijkc_update
+        dq[i, j, k, 0x2, c] += invwJijkc * dHʸijkc_update
+        dq[i, j, k, 0x3, c] += invwJijkc * dHᶻijkc_update
+        dq[i, j, k, 0x4, c] += invwJijkc * dEˣijkc_update
+        dq[i, j, k, 0x5, c] += invwJijkc * dEʸijkc_update
+        dq[i, j, k, 0x6, c] += invwJijkc * dEᶻijkc_update
     end
     return nothing
 end
 
-
-#TODO: add striding, gpuize time stepping, fix memory transfers from host to dev
 function rhs_volume_horizontal_kernel!(
     dq,
     q,
@@ -507,39 +497,38 @@ function rhs_volume_horizontal_kernel!(
     wJ,
     invwJ,
     DT,
+    ::Val{G},
     ::Val{N},
     ::Val{KSTRIDE},
-) where {N, KSTRIDE}
-    i, j = threadIdx() #@index(Local, NTuple)
-    c, k = blockIdx() #@index(Global, NTuple)
-    kl = 0x1
-    #c = blockIdx().x #@index(Global, NTuple)
+) where {G, N, KSTRIDE}
+    i, j, kl = threadIdx()
+    c, kblockidx = blockIdx()
+    k = (kblockidx - 0x1) * KSTRIDE + kl
 
-    lDT1 = CuStaticSharedArray(Float64, (N[1], N[1]))
-    lDT2 = CuStaticSharedArray(Float64, (N[2], N[2]))
+    lDT1 = CuStaticSharedArray(eltype(dq), (N[0x1], N[0x1]))
+    lDT2 = CuStaticSharedArray(eltype(dq), (N[0x2], N[0x2]))
 
-    lHˣ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
-    lHʸ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
-    lHᶻ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
+    lHˣ = CuStaticSharedArray(eltype(dq), (N[0x1], N[0x2], KSTRIDE))
+    lHʸ = CuStaticSharedArray(eltype(dq), (N[0x1], N[0x2], KSTRIDE))
+    lHᶻ = CuStaticSharedArray(eltype(dq), (N[0x1], N[0x2], KSTRIDE))
 
-    lEˣ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
-    lEʸ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
-    lEᶻ = CuStaticSharedArray(Float64, (N[1], N[2], KSTRIDE))
+    lEˣ = CuStaticSharedArray(eltype(dq), (N[0x1], N[0x2], KSTRIDE))
+    lEʸ = CuStaticSharedArray(eltype(dq), (N[0x1], N[0x2], KSTRIDE))
+    lEᶻ = CuStaticSharedArray(eltype(dq), (N[0x1], N[0x2], KSTRIDE))
 
-    @inbounds begin
-        for sj = 0x0:N[2]:(N[1]-0x1)
-            if j+sj <= N[1]
-                lDT1[i, j+sj] = DT[1][i, j+sj]
+    @inbounds if k <= G[0x3] 
+        @unroll for sj = 0x0:N[0x2]:(N[0x1]-0x1)
+            if j+sj <= N[0x1]
+                lDT1[i, j+sj] = DT[0x1][i, j+sj]
             end
         end
 
-        for si = 0x0:N[1]:(N[2]-0x1)
-            if i+si <= N[2]
-                lDT2[i+si, j] = DT[2][i+si, j]
+        @unroll for si = 0x0:N[0x1]:(N[0x2]-0x1)
+            if i+si <= N[0x2]
+                lDT2[i+si, j] = DT[0x2][i+si, j]
             end
         end
 
-        # loading into local mem data (i, j, k) from global index cell c
         lHˣ[i, j, kl] = q[i, j, k, 0x1, c]
         lHʸ[i, j, kl] = q[i, j, k, 0x2, c]
         lHᶻ[i, j, kl] = q[i, j, k, 0x3, c]
@@ -550,7 +539,7 @@ function rhs_volume_horizontal_kernel!(
 
     sync_threads()
 
-    @inbounds begin
+    @inbounds if k <= G[0x3]
         dHˣijkc_update = -zero(eltype(dq))
         dHʸijkc_update = -zero(eltype(dq))
         dHᶻijkc_update = -zero(eltype(dq))
@@ -558,86 +547,55 @@ function rhs_volume_horizontal_kernel!(
         dEʸijkc_update = -zero(eltype(dq))
         dEᶻijkc_update = -zero(eltype(dq))
 
-        invwJijkc = invwJ[i, j, k, 1, c]
-        wJijkc = wJ[i, j, k, 1, c]
+        invwJijkc = invwJ[i, j, k, 0x1, c]
+        wJijkc = wJ[i, j, k, 0x1, c]
 
-        # dHˣdt = - D_y Eᶻ + D_z Eʸ = - (r_y D_r + s_y D_s + t_y D_t) Eᶻ + (r_z D_r + s_z D_s + t_z D_t) Eʸ
-        # dHʸdt = - D_z Eˣ + D_x Eᶻ = - (r_z D_r + s_z D_s + t_z D_t) Eˣ + (r_x D_r + s_x D_s + t_x D_t) Eᶻ
-        # dHᶻdt = - D_x Eʸ + D_y Eˣ = - (r_x D_r + s_x D_s + t_x D_t) Eʸ + (r_y D_r + s_y D_s + t_y D_t) Eˣ
+        @unroll for l = 0x1:N[0x1]
+            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 0x4, c] * lDT1[i, l] * lEᶻ[l, j, kl]
+            dHˣijkc_update += wJijkc * dRdX[i, j, k, 0x7, c] * lDT1[i, l] * lEʸ[l, j, kl]
 
+            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 0x7, c] * lDT1[i, l] * lEˣ[l, j, kl]
+            dHʸijkc_update += wJijkc * dRdX[i, j, k, 0x1, c] * lDT1[i, l] * lEᶻ[l, j, kl]
 
-        # dEˣdt =   D_y Hᶻ - D_z Hʸ =   (r_y D_r + s_y D_s + t_y D_t) Hᶻ - (r_z D_r + s_z D_s + t_z D_t) Hʸ
-        # dEʸdt =   D_z Hˣ - D_x Hᶻ =   (r_z D_r + s_z D_s + t_z D_t) Hˣ - (r_x D_r + s_x D_s + t_x D_t) Hᶻ
-        # dEᶻdt =   D_x Hʸ - D_y Hˣ =   (r_x D_r + s_x D_s + t_x D_t) Hʸ - (r_y D_r + s_y D_s + t_y D_t) Hˣ
+            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x1, c] * lDT1[i, l] * lEʸ[l, j, kl]
+            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 0x4, c] * lDT1[i, l] * lEˣ[l, j, kl]
 
-        for l = 0x1:N[1]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lEᶻ[l, j, kl]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lEʸ[l, j, kl]
+            dEˣijkc_update += wJijkc * dRdX[i, j, k, 0x4, c] * lDT1[i, l] * lHᶻ[l, j, kl]
+            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 0x7, c] * lDT1[i, l] * lHʸ[l, j, kl]
 
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lEˣ[l, j, kl]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lEᶻ[l, j, kl]
+            dEʸijkc_update += wJijkc * dRdX[i, j, k, 0x7, c] * lDT1[i, l] * lHˣ[l, j, kl]
+            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 0x1, c] * lDT1[i, l] * lHᶻ[l, j, kl]
 
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lEʸ[l, j, kl]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lEˣ[l, j, kl]
-
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lHᶻ[l, j, kl]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lHʸ[l, j, kl]
-
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 7, c] * lDT1[i, l] * lHˣ[l, j, kl]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lHᶻ[l, j, kl]
-
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 1, c] * lDT1[i, l] * lHʸ[l, j, kl]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 4, c] * lDT1[i, l] * lHˣ[l, j, kl]
+            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 0x1, c] * lDT1[i, l] * lHʸ[l, j, kl]
+            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x4, c] * lDT1[i, l] * lHˣ[l, j, kl]
         end
 
-        for n = 0x1:N[2]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lEᶻ[i, n, kl]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lEʸ[i, n, kl]
+        @unroll for n = 0x1:N[0x2]
+            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 0x5, c] * lDT2[j, n] * lEᶻ[i, n, kl]
+            dHˣijkc_update += wJijkc * dRdX[i, j, k, 0x8, c] * lDT2[j, n] * lEʸ[i, n, kl]
 
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lEˣ[i, n, kl]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lEᶻ[i, n, kl]
+            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 0x8, c] * lDT2[j, n] * lEˣ[i, n, kl]
+            dHʸijkc_update += wJijkc * dRdX[i, j, k, 0x2, c] * lDT2[j, n] * lEᶻ[i, n, kl]
 
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lEʸ[i, n, kl]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lEˣ[i, n, kl]
+            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x2, c] * lDT2[j, n] * lEʸ[i, n, kl]
+            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 0x5, c] * lDT2[j, n] * lEˣ[i, n, kl]
 
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lHᶻ[i, n, kl]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lHʸ[i, n, kl]
+            dEˣijkc_update += wJijkc * dRdX[i, j, k, 0x5, c] * lDT2[j, n] * lHᶻ[i, n, kl]
+            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 0x8, c] * lDT2[j, n] * lHʸ[i, n, kl]
 
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 8, c] * lDT2[j, n] * lHˣ[i, n, kl]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lHᶻ[i, n, kl]
+            dEʸijkc_update += wJijkc * dRdX[i, j, k, 0x8, c] * lDT2[j, n] * lHˣ[i, n, kl]
+            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 0x2, c] * lDT2[j, n] * lHᶻ[i, n, kl]
 
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 2, c] * lDT2[j, n] * lHʸ[i, n, kl]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 5, c] * lDT2[j, n] * lHˣ[i, n, kl]
+            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 0x2, c] * lDT2[j, n] * lHʸ[i, n, kl]
+            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x5, c] * lDT2[j, n] * lHˣ[i, n, kl]
         end
 
-        #=
-        for m = 0x1:N[3]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lEᶻ[i, j, m, cl]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lEʸ[i, j, m, cl]
-
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lEˣ[i, j, m, cl]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lEᶻ[i, j, m, cl]
-
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lEʸ[i, j, m, cl]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lEˣ[i, j, m, cl]
-
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lHᶻ[i, j, m, cl]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lHʸ[i, j, m, cl]
-
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 9, c] * lDT3[k, m] * lHˣ[i, j, m, cl]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lHᶻ[i, j, m, cl]
-
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 3, c] * lDT3[k, m] * lHʸ[i, j, m, cl]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 6, c] * lDT3[k, m] * lHˣ[i, j, m, cl]
-        end
-        =#
-
-        dq[i, j, k, 1, c] += invwJijkc * dHˣijkc_update
-        dq[i, j, k, 2, c] += invwJijkc * dHʸijkc_update
-        dq[i, j, k, 3, c] += invwJijkc * dHᶻijkc_update
-        dq[i, j, k, 4, c] += invwJijkc * dEˣijkc_update
-        dq[i, j, k, 5, c] += invwJijkc * dEʸijkc_update
-        dq[i, j, k, 6, c] += invwJijkc * dEᶻijkc_update
+        dq[i, j, k, 0x1, c] += invwJijkc * dHˣijkc_update
+        dq[i, j, k, 0x2, c] += invwJijkc * dHʸijkc_update
+        dq[i, j, k, 0x3, c] += invwJijkc * dHᶻijkc_update
+        dq[i, j, k, 0x4, c] += invwJijkc * dEˣijkc_update
+        dq[i, j, k, 0x5, c] += invwJijkc * dEʸijkc_update
+        dq[i, j, k, 0x6, c] += invwJijkc * dEᶻijkc_update
     end
     return nothing
 end
@@ -648,39 +606,44 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
     dRdX, _, wJ = components(first(volumemetrics(grid)))
     n, _, wsJ = components(first(surfacemetrics(grid)))
     fm = facemaps(grid)
+    S = size(cell)
 
     start!(q, cm)
 
-    C = min(512 ÷ prod(size(cell)), 1)
-    b = cld(size(dq)[4],C)
-    S = size(cell)
-
-    @cuda threads=(S[1], S[2]) blocks=(b, S[3]) rhs_volume_horizontal_kernel!(
+    KSTRIDE = max(512 ÷ (S[1]*S[2]), 1)
+    threads = (S[1], S[2], KSTRIDE)
+    blocks = (size(dq, 4), cld(S[3], KSTRIDE))
+    @cuda threads=threads blocks=blocks rhs_volume_horizontal_kernel!(
         parent(dq),
         parent(q),
         parent(dRdX),
         parent(wJ),
         parent(invwJ),
         DT,
+        Val(size(dq.data)),
         Val(size(cell)),
-        Val(C)
+        Val(KSTRIDE)
     )
 
-    @cuda threads=(S[2], S[3]) blocks=(size(dq,4), S[1]) rhs_volume_vertical_kernel!(
+    ISTRIDE = max(512 ÷ (S[2]*S[3]), 1)
+    threads = (ISTRIDE, S[2], S[3])
+    blocks = (size(dq,4), cld(S[1], ISTRIDE))
+    @cuda threads=threads blocks=blocks rhs_volume_vertical_kernel!(
         parent(dq),
         parent(q),
         parent(dRdX),
         parent(wJ),
         parent(invwJ),
         DT,
+        Val(size(dq.data)),
         Val(size(cell)),
-        Val(C)
+        Val(ISTRIDE)
     )
 
     finish!(q, cm)
 
-    J = maximum([prod(size(cell)[[idx...]]) for idx in [(1,2), (2,3), (1,3)]])
-    C = 2^3# max(128 ÷ J, 1)
+    J = maximum([S[1]*S[2], S[1]*S[3], S[2]*S[3]])
+    C = max(128 ÷ J, 1)
     @cuda threads=(J, C) blocks=cld(last(size(dq)),C) rhs_surface_kernel!( 
         parent(dq),
         parent(viewwithghosts(q)),
@@ -713,15 +676,51 @@ function run(
     gm = GridManager(cell, brick(coordinates, periodicity); comm = comm, min_level = L)
     grid = generate(gm)
 
-    timeend = 0.5
+    timeend = 0.05
 
     #jl # crude dt estimate
     cfl = 1 // 20
-    dx = Base.step(first(coordinates))
+    dx = FT(2.0^(1-L)/K) 
     dt = cfl * dx / (maximum(N))^2
-
     numberofsteps = ceil(Int, timeend / dt)
     dt = timeend / numberofsteps
+
+
+    #=
+    RKA = (
+        FT(0),
+        FT(-0.7188012108672410),
+        FT(-0.7785331173421570),
+        FT(-0.0053282796654044),
+        FT(-0.8552979934029281),
+        FT(-3.9564138245774565),
+        FT(-1.5780575380587385),
+        FT(-2.0837094552574054),
+        FT(-0.7483334182761610),
+        FT(-0.7032861106563359),
+        FT(0.0013917096117681),
+        FT(-0.0932075369637460),
+        FT(-0.9514200470875948),
+        FT(-7.1151571693922548)
+    )
+
+    RKB = (
+        FT(0.0367762454319673),
+        FT(0.3136296607553959),
+        FT(0.1531848691869027),
+        FT(0.0030097086818182),
+        FT(0.3326293790646110),
+        FT(0.2440251405350864),
+        FT(0.3718879239592277),
+        FT(0.6204126221582444),
+        FT(0.1524043173028741),
+        FT(0.0760894927419266),
+        FT(0.0077604214040978),
+        FT(0.0024647284755382),
+        FT(0.0780348340049386),
+        FT(5.5059777270269628)
+    )
+    =#
 
     RKA = (
         FT(0),
@@ -778,18 +777,12 @@ function run(
 
     if outputvtk do_output(step, time, q) end
 
-    nwarm = min(numberofsteps - 1, 10)
-
-    #rhs!(dq, q, grid, invwJ, DT, cm)
-
-    @info "Number of steps: $numberofsteps"
-    for step = 1:numberofsteps
+    for step  in ProgressBar(1:numberofsteps)
         if time + dt > timeend
             dt = timeend - time
         end
     
         for (i, stage) in enumerate(eachindex(RKA, RKB))
-            #These should be done with CUDA.jl call to mult by scaler factor.
             @. dq *= RKA[stage]
             rhs!(dq, q, grid, invwJ, DT, cm)
             @. q += RKB[stage] * dt * dq
@@ -826,11 +819,13 @@ function run(
 end
 
 let
-    FT = Float64
+    FT = Float32
     @assert CUDA.functional() && CUDA.has_cuda_gpu() "NVidia GPU not available"
     AT = CuArray
 
     N = (4, 4, 4)
+    K = 4
+    L = 3
 
     if !MPI.Initialized()
         MPI.Init()
@@ -844,47 +839,50 @@ let
         CUDA.allowscalar(false)
     end
 
-    if outputvtk 
-        if rank == 0
-            @info """Configuration:
-                precision        = $FT
-                polynomial order = $N
-                array type       = $AT
-            """
-        end
-
-    
-        #jl # visualize solution of test problem 
-        K = 4
-        L = 1
-        vtkdir = "vtk_semdg_maxwells_3d$(K)x$(K)x$(K)_L$(L)"
-        if rank == 0
-            @info """Starting Maxwells test problem with:
-                ($K, $K, $K) coarse grid
-                $L refinement level
-            """
-        end
-
-        run(initialcondition, FT, AT, N, K, L; outputvtk = true, vtkdir, comm)
-        rank == 0 && @info "Finished, vtk output written to $vtkdir"
+    if rank == 0
+        @info """Configuration:
+            precision        = $FT
+            array type       = $AT
+            outputvtx        = $outputvtk
+            convergetest     = $convergetest
+        """
     end
+
+    vtkdir = "vtk_semdg_maxwells_3d$(K)x$(K)x$(K)_L$(L)"
+
+    run(initialcondition, FT, AT, N, K, L; outputvtk = outputvtk, vtkdir, comm)
+
+    totalcells = (K * 2^L, K * 2^L, K * 2^L)
+    dofs = prod(totalcells)*prod(1 .+ N)
+    err = run(initialcondition, FT, AT, N, K, L; outputvtk=false, comm)
+
+    if rank == 0
+        @info @sprintf(
+            "Level %d, cells = (%2d, %2d, %2d), dof = %d, error = %.16e",
+            L,
+            totalcells...,
+            dofs,
+            err
+        )
+    end
+
 
     #jl # run convergence study
     if convergetest
-        numlevels = 2
+        numlevels = 4
         N = (4, 4, 4)
         rank == 0 && @info "Starting convergence study h-refinement"
         err = zeros(FT, numlevels)
         for l = 1:numlevels
-            K = 8
+            K = 4
             L = l - 1
-            totalcells = (K * 2^L, K * 2^L)
+            totalcells = (K * 2^L, K * 2^L, K * 2^L)
             dofs = prod(totalcells)*prod(1 .+ N)
             err[l] = run(initialcondition, FT, AT, N, K, L; outputvtk=false, comm)
 
             if rank == 0
                 @info @sprintf(
-                    "Level %d, cells = (%2d, %2d), dof = %d, error = %.16e",
+                    "Level %d, cells = (%2d, %2d, %2d), dof = %d, error = %.16e",
                     l,
                     totalcells...,
                     dofs,

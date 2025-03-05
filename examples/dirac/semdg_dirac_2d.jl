@@ -261,6 +261,10 @@ function rhs!(dq, q, grid, invwJ, DT, materialparams, bc, cm)
     @infiltrate
     start!(q, cm)
 
+    #=
+    rhs_CRBC_kernel!(backend, ())(
+    )
+    =#
     C = max(512 ÷ prod(size(cell)), 1)
     rhs_volume_kernel!(backend, (size(cell)..., C))(
         dq,
