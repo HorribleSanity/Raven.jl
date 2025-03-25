@@ -435,7 +435,7 @@ function rhs_volume_vertical_kernel!(
 
     @inbounds if i <= G[0x1]
         for sj = 0x0:N[0x2]:(N[0x3]-0x1)
-            if j+sj <= N[0x3]
+            if j+sj <= N[0x3] && il == 1
                 lDT3[j+sj, k] = DT[0x3][j+sj, k]
             end
         end
@@ -461,23 +461,28 @@ function rhs_volume_vertical_kernel!(
         invwJijkc = invwJ[i, j, k, 0x1, c]
         wJijkc = wJ[i, j, k, 0x1, c]
 
-        for m = 0x1:N[0x3]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 0x6, c] * lDT3[k, m] * lEᶻ[il, j, m]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 0x9, c] * lDT3[k, m] * lEʸ[il, j, m]
+        wJdRdXijkc_3 = wJijkc * dRdX[i, j, k, 0x3, c]
+        wJdRdXijkc_6 = wJijkc * dRdX[i, j, k, 0x6, c]
+        wJdRdXijkc_9 = wJijkc * dRdX[i, j, k, 0x9, c]
 
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 0x9, c] * lDT3[k, m] * lEˣ[il, j, m]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 0x3, c] * lDT3[k, m] * lEᶻ[il, j, m]
+        @unroll for m = 0x1:N[0x3]
+            lDT3km = lDT3[k, m]
+            dHˣijkc_update -= wJdRdXijkc_6 * lDT3km * lEᶻ[il, j, m]
+            dHˣijkc_update += wJdRdXijkc_9 * lDT3km * lEʸ[il, j, m]
 
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x3, c] * lDT3[k, m] * lEʸ[il, j, m]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 0x6, c] * lDT3[k, m] * lEˣ[il, j, m]
-                                                                                      
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 0x6, c] * lDT3[k, m] * lHᶻ[il, j, m]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 0x9, c] * lDT3[k, m] * lHʸ[il, j, m]                                                                                      
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 0x9, c] * lDT3[k, m] * lHˣ[il, j, m]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 0x3, c] * lDT3[k, m] * lHᶻ[il, j, m]
-                                                                                      
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 0x3, c] * lDT3[k, m] * lHʸ[il, j, m]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x6, c] * lDT3[k, m] * lHˣ[il, j, m]
+            dHʸijkc_update -= wJdRdXijkc_9 * lDT3km * lEˣ[il, j, m]
+            dHʸijkc_update += wJdRdXijkc_3 * lDT3km * lEᶻ[il, j, m]
+
+            dHᶻijkc_update -= wJdRdXijkc_3 * lDT3km * lEʸ[il, j, m]
+            dHᶻijkc_update += wJdRdXijkc_6 * lDT3km * lEˣ[il, j, m]
+
+            dEˣijkc_update += wJdRdXijkc_6 * lDT3km * lHᶻ[il, j, m]
+            dEˣijkc_update -= wJdRdXijkc_9 * lDT3km * lHʸ[il, j, m]
+            dEʸijkc_update += wJdRdXijkc_9 * lDT3km * lHˣ[il, j, m]
+            dEʸijkc_update -= wJdRdXijkc_3 * lDT3km * lHᶻ[il, j, m]
+
+            dEᶻijkc_update += wJdRdXijkc_3 * lDT3km * lHʸ[il, j, m]
+            dEᶻijkc_update -= wJdRdXijkc_6 * lDT3km * lHˣ[il, j, m]
         end
 
         dq[i, j, k, 0x1, c] += invwJijkc * dHˣijkc_update
@@ -550,44 +555,55 @@ function rhs_volume_horizontal_kernel!(
         invwJijkc = invwJ[i, j, k, 0x1, c]
         wJijkc = wJ[i, j, k, 0x1, c]
 
+        wJdRdXijkc_1 = wJijkc * dRdX[i, j, k, 0x1, c]
+        wJdRdXijkc_4 = wJijkc * dRdX[i, j, k, 0x4, c]
+        wJdRdXijkc_7 = wJijkc * dRdX[i, j, k, 0x7, c]
+
+
         @unroll for l = 0x1:N[0x1]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 0x4, c] * lDT1[i, l] * lEᶻ[l, j, kl]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 0x7, c] * lDT1[i, l] * lEʸ[l, j, kl]
+            lDT1il = lDT1[i, l]
+            dHˣijkc_update -= wJdRdXijkc_4 * lDT1il * lEᶻ[l, j, kl]
+            dHˣijkc_update += wJdRdXijkc_7 * lDT1il * lEʸ[l, j, kl]
 
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 0x7, c] * lDT1[i, l] * lEˣ[l, j, kl]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 0x1, c] * lDT1[i, l] * lEᶻ[l, j, kl]
+            dHʸijkc_update -= wJdRdXijkc_7 * lDT1il * lEˣ[l, j, kl]
+            dHʸijkc_update += wJdRdXijkc_1 * lDT1il * lEᶻ[l, j, kl]
 
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x1, c] * lDT1[i, l] * lEʸ[l, j, kl]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 0x4, c] * lDT1[i, l] * lEˣ[l, j, kl]
+            dHᶻijkc_update -= wJdRdXijkc_1 * lDT1il * lEʸ[l, j, kl]
+            dHᶻijkc_update += wJdRdXijkc_4 * lDT1il * lEˣ[l, j, kl]
 
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 0x4, c] * lDT1[i, l] * lHᶻ[l, j, kl]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 0x7, c] * lDT1[i, l] * lHʸ[l, j, kl]
+            dEˣijkc_update += wJdRdXijkc_4 * lDT1il * lHᶻ[l, j, kl]
+            dEˣijkc_update -= wJdRdXijkc_7 * lDT1il * lHʸ[l, j, kl]
 
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 0x7, c] * lDT1[i, l] * lHˣ[l, j, kl]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 0x1, c] * lDT1[i, l] * lHᶻ[l, j, kl]
+            dEʸijkc_update += wJdRdXijkc_7 * lDT1il * lHˣ[l, j, kl]
+            dEʸijkc_update -= wJdRdXijkc_1 * lDT1il * lHᶻ[l, j, kl]
 
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 0x1, c] * lDT1[i, l] * lHʸ[l, j, kl]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x4, c] * lDT1[i, l] * lHˣ[l, j, kl]
+            dEᶻijkc_update += wJdRdXijkc_1 * lDT1il * lHʸ[l, j, kl]
+            dEᶻijkc_update -= wJdRdXijkc_4 * lDT1il * lHˣ[l, j, kl]
         end
 
+        wJdRdXijkc_2 = wJijkc * dRdX[i, j, k, 0x2, c]
+        wJdRdXijkc_5 = wJijkc * dRdX[i, j, k, 0x5, c]
+        wJdRdXijkc_8 = wJijkc * dRdX[i, j, k, 0x8, c]
+
         @unroll for n = 0x1:N[0x2]
-            dHˣijkc_update -= wJijkc * dRdX[i, j, k, 0x5, c] * lDT2[j, n] * lEᶻ[i, n, kl]
-            dHˣijkc_update += wJijkc * dRdX[i, j, k, 0x8, c] * lDT2[j, n] * lEʸ[i, n, kl]
+            lDT2jn = lDT2[j,n]
+            dHˣijkc_update -= wJdRdXijkc_5 * lDT2jn * lEᶻ[i, n, kl]
+            dHˣijkc_update += wJdRdXijkc_8 * lDT2jn * lEʸ[i, n, kl]
 
-            dHʸijkc_update -= wJijkc * dRdX[i, j, k, 0x8, c] * lDT2[j, n] * lEˣ[i, n, kl]
-            dHʸijkc_update += wJijkc * dRdX[i, j, k, 0x2, c] * lDT2[j, n] * lEᶻ[i, n, kl]
+            dHʸijkc_update -= wJdRdXijkc_8 * lDT2jn * lEˣ[i, n, kl]
+            dHʸijkc_update += wJdRdXijkc_2 * lDT2jn * lEᶻ[i, n, kl]
 
-            dHᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x2, c] * lDT2[j, n] * lEʸ[i, n, kl]
-            dHᶻijkc_update += wJijkc * dRdX[i, j, k, 0x5, c] * lDT2[j, n] * lEˣ[i, n, kl]
+            dHᶻijkc_update -= wJdRdXijkc_2 * lDT2jn * lEʸ[i, n, kl]
+            dHᶻijkc_update += wJdRdXijkc_5 * lDT2jn * lEˣ[i, n, kl]
 
-            dEˣijkc_update += wJijkc * dRdX[i, j, k, 0x5, c] * lDT2[j, n] * lHᶻ[i, n, kl]
-            dEˣijkc_update -= wJijkc * dRdX[i, j, k, 0x8, c] * lDT2[j, n] * lHʸ[i, n, kl]
+            dEˣijkc_update += wJdRdXijkc_5 * lDT2jn * lHᶻ[i, n, kl]
+            dEˣijkc_update -= wJdRdXijkc_8 * lDT2jn * lHʸ[i, n, kl]
 
-            dEʸijkc_update += wJijkc * dRdX[i, j, k, 0x8, c] * lDT2[j, n] * lHˣ[i, n, kl]
-            dEʸijkc_update -= wJijkc * dRdX[i, j, k, 0x2, c] * lDT2[j, n] * lHᶻ[i, n, kl]
+            dEʸijkc_update += wJdRdXijkc_8 * lDT2jn * lHˣ[i, n, kl]
+            dEʸijkc_update -= wJdRdXijkc_2 * lDT2jn * lHᶻ[i, n, kl]
 
-            dEᶻijkc_update += wJijkc * dRdX[i, j, k, 0x2, c] * lDT2[j, n] * lHʸ[i, n, kl]
-            dEᶻijkc_update -= wJijkc * dRdX[i, j, k, 0x5, c] * lDT2[j, n] * lHˣ[i, n, kl]
+            dEᶻijkc_update += wJdRdXijkc_2 * lDT2jn * lHʸ[i, n, kl]
+            dEᶻijkc_update -= wJdRdXijkc_5 * lDT2jn * lHˣ[i, n, kl]
         end
 
         dq[i, j, k, 0x1, c] += invwJijkc * dHˣijkc_update
@@ -610,7 +626,7 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
 
     start!(q, cm)
 
-    KSTRIDE = max(512 ÷ (S[1]*S[2]), 1)
+    KSTRIDE = max(256 ÷ (S[1]*S[2]), 1)
     threads = (S[1], S[2], KSTRIDE)
     blocks = (size(dq, 4), cld(S[3], KSTRIDE))
     @cuda threads=threads blocks=blocks rhs_volume_horizontal_kernel!(
@@ -819,11 +835,11 @@ function run(
 end
 
 let
-    FT = Float32
+    FT = Float64
     @assert CUDA.functional() && CUDA.has_cuda_gpu() "NVidia GPU not available"
     AT = CuArray
 
-    N = (4, 4, 4)
+    N = (7, 7, 7)
     K = 4
     L = 3
 
@@ -865,7 +881,6 @@ let
             err
         )
     end
-
 
     #jl # run convergence study
     if convergetest
