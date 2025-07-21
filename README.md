@@ -1,4 +1,4 @@
-# Raven 𓅂
+# Raven 🐦‍⬛
 <p align="center">
   <a href="https://HorribleSanity.github.io/Raven.jl/dev/">Documentation</a> •
   <a href="#contributing">Contributing</a>

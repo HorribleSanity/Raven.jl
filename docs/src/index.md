@@ -1,4 +1,4 @@
-# Raven 𓅂
+# Raven 🐦‍⬛
 
 [Raven](https://github.com/HorribleSanity/Raven.jl)
 is a toolbox for adapted discontinuous spectral element discretizations of
