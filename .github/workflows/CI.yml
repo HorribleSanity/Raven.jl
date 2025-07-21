@@ -22,6 +22,7 @@ jobs:
       matrix:
         version:
           - '^1.10.0-0'
+          - '^1.12.0-0'
         os:
           - ubuntu-latest
           - macOS-latest
@@ -51,6 +52,7 @@ jobs:
           - libopenmpi-dev
         julia_version:
           - "1.10"
+          - '^1.12.0-0'
       fail-fast: false
     env:
       P4ESTTYPES_TEST: P4ESTTYPES_CUSTOM_MPI_CUSTOM
