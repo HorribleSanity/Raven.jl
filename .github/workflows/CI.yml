@@ -24,11 +24,20 @@ jobs:
           - '~1.10.10'
           - '^1.12.0-0'
         os:
-          - ubuntu-latest
-          - macOS-latest
+          - ubuntu-24.04
+          - macOS-15
           # - windows-latest
-        arch:
-          - x64
+        arch: ['x64', 'arm64']
+        exclude:
+          - os: ubuntu-24.04
+            arch: arm64
+          # macOS 13 is Intel-only, while macOS 14+ only support Apple Silicon
+          - os: macOS-15
+            arch: x64
+          - os: macOS-14
+            arch: x64
+          - os: macOS-13
+            arch: arm64
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
