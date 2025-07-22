@@ -61,6 +61,8 @@ include("gridmanager.jl")
 include("gridarrays.jl")
 include("kron.jl")
 
+include("balancelaws/BalanceLaws.jl")
+
 if !isdefined(Base, :get_extension)
     using Requires
 end

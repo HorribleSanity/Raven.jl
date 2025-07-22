@@ -285,7 +285,7 @@ mutable struct ARK{FT,RHS,LINRHS,RKA,RKB,RKC,QHAT,K,FAC,QS}
             fac = nothing
             dt_fac = dt
         else
-            mat = Bennu.batchedbandedmatrix(linrhs!, q, Qhat)
+            mat = Raven.batchedbandedmatrix(linrhs!, q, Qhat)
             mid = cld(size(mat.data, 2), 2)
             mat.data .*= -dt * im_rka[end, end]
             mat.data[:, mid, :, :] .+= 1

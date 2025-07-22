@@ -12,6 +12,7 @@ problem(law::AbstractBalanceLaw) = law.problem
 Base.eltype(::AbstractBalanceLaw{FT}) where {FT} = FT
 Base.ndims(::AbstractBalanceLaw{FT,D}) where {FT,D} = D
 numberofstates(::AbstractBalanceLaw{FT,D,S}) where {FT,D,S} = S
+typeofstate(::AbstractBalanceLaw{FT,D,S}) where {FT,D,S} = SVector{S,FT}
 constants(::AbstractBalanceLaw{FT,D,S,C}) where {FT,D,S,C} = C
 
 auxiliary(law::AbstractBalanceLaw, x⃗) = SVector(nothing)
@@ -22,10 +23,8 @@ boundarystate(::AbstractBalanceLaw, ::AbstractProblem, n⃗, q⁻, aux⁻, tag) 
 source!(::AbstractBalanceLaw, dq, q, aux, dim, directions) = nothing
 source!(::AbstractBalanceLaw, ::AbstractProblem, dq, q, aux, dim, directions) = nothing
 nonconservative_term!(::AbstractBalanceLaw, dq, q, aux, directions, dim) = nothing
-function Bennu.fieldarray(init, law::AbstractBalanceLaw, grid::Bennu.AbstractGrid)
-    FT = eltype(law)
-    nstate = numberofstates(law)
-    return fieldarray(init, SVector{nstate,FT}, grid)
+function Raven.GridArray(init, law::AbstractBalanceLaw, grid::Raven.Grid)
+    return GridArray{typeofstate(law)}(init, grid)
 end
 
 function entropy end

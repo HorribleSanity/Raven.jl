@@ -29,7 +29,7 @@ end
 
 directions(::DGSEM{L,G,A1,A2,A3,A4,VF,SNF,DIR}) where {L,G,A1,A2,A3,A4,VF,SNF,DIR} = DIR
 
-Bennu.referencecell(dg::DGSEM) = referencecell(dg.grid)
+Raven.referencecell(dg::DGSEM) = referencecell(dg.grid)
 
 function Adapt.adapt_structure(to, dg::DGSEM)
     names = fieldnames(DGSEM)
@@ -59,7 +59,7 @@ function DGSEM(;
     args = (law, grid, MJ, MJI, faceMJ, auxstate, volume_form, surface_numericalflux)
     DGSEM{typeof.(args)...,directions}(args...)
 end
-getdevice(dg::DGSEM) = Bennu.device(arraytype(referencecell(dg)))
+getdevice(dg::DGSEM) = Raven.device(arraytype(referencecell(dg)))
 
 function (dg::DGSEM)(dq, q, time; increment = true)
     cell = referencecell(dg)
@@ -85,7 +85,7 @@ function (dg::DGSEM)(dq, q, time; increment = true)
         dg.law,
         dq,
         q,
-        Val(Bennu.connectivityoffsets(cell, Val(2))),
+        Val(Raven.connectivityoffsets(cell, Val(2))),
         dg.surface_numericalflux,
         dg.MJI,
         faceix⁻,
