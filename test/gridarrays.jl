@@ -19,5 +19,7 @@ function gridarrays_testsuite(AT, FT)
         perm = insert(nonfielddims, 1, F)
         xp = permutedims(xp, perm)
         @test reinterpret(reshape, FT, y) == xp
+
+        @test GridArray{SVector{0,FT}}(undef, grid) isa GridArray
     end
 end
