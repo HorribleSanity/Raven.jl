@@ -59,13 +59,14 @@ function GridArray{T}(
     types = flatten(recursive_fieldtypes(T), DataType)
 
     L = length(types)::Int
-    if L == 0
-        throw(ArgumentError("Type T has no Real fields"))
-    end
 
-    E = first(types)
-    if !allequal(types)
-        throw(ArgumentError("Type T has different field types: $types"))
+    if L == 0
+        E = eltype(T)
+    else
+        E = first(types)
+        if !allequal(types)
+            throw(ArgumentError("Type T has different field types: $types"))
+        end
     end
 
     datawithghosts = A{E}(undef, insert(dimswithghosts, Val(fieldindex), L))
@@ -291,6 +292,14 @@ end
         Val(L),
     )::NTuple{L,eltype(data)}
     return unflatten(T, d)
+end
+
+@inline function Base.getindex(
+    a::GridArray{T,N,A,G,F,0},
+    I::Vararg{Int,N},
+) where {T,N,A,G,F}
+    @boundscheck checkbounds(a, I)
+    return T()
 end
 
 @generated function _unsafe_setindex!(
