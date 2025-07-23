@@ -15,7 +15,7 @@ numberofstates(::AbstractBalanceLaw{FT,D,S}) where {FT,D,S} = S
 typeofstate(::AbstractBalanceLaw{FT,D,S}) where {FT,D,S} = SVector{S,FT}
 constants(::AbstractBalanceLaw{FT,D,S,C}) where {FT,D,S,C} = C
 
-auxiliary(law::AbstractBalanceLaw, x⃗) = SVector(nothing)
+auxiliary(::AbstractBalanceLaw{FT}, x⃗) where {FT} = SVector{0,FT}()
 
 function flux end
 function wavespeed end

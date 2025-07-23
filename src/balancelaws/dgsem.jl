@@ -16,7 +16,7 @@ struct FluxDifferencingForm{VNF,K} <: AbstractVolumeForm
     end
 end
 
-struct DGSEM{L,G,A1,A2,A3,A4,VF,SNF,DIR}
+struct DGSEM{L,G,A1,A2,A3,A4,VF,SNF,CM,DIR}
     law::L
     grid::G
     MJ::A1
@@ -25,15 +25,20 @@ struct DGSEM{L,G,A1,A2,A3,A4,VF,SNF,DIR}
     auxstate::A4
     volume_form::VF
     surface_numericalflux::SNF
+    comm_manager::CM
 end
 
-directions(::DGSEM{L,G,A1,A2,A3,A4,VF,SNF,DIR}) where {L,G,A1,A2,A3,A4,VF,SNF,DIR} = DIR
+function directions(
+    ::DGSEM{L,G,A1,A2,A3,A4,VF,SNF,CM,DIR},
+) where {L,G,A1,A2,A3,A4,VF,SNF,CM,DIR}
+    return DIR
+end
 
 Raven.referencecell(dg::DGSEM) = referencecell(dg.grid)
 
 function Adapt.adapt_structure(to, dg::DGSEM)
     names = fieldnames(DGSEM)
-    args = ntuple(j->adapt(to, getfield(dg, names[j])), length(names))
+    args = ntuple(j -> adapt(to, getfield(dg, names[j])), length(names))
     DGSEM{typeof.(args)...,directions(dg)}(args...)
 end
 
@@ -44,98 +49,118 @@ function DGSEM(;
     volume_form = WeakForm(),
     directions = 1:ndims(law),
     auxstate = auxiliary.(Ref(law), points(grid)),
+    comm = MPI.COMM_WORLD,
 )
-    cell = referencecell(grid)
-    M = mass(cell)
-    _, J = components(metrics(grid))
-    MJ = M * J
+    _, _, MJ = components(first(volumemetrics(grid)))
     MJI = 1 ./ MJ
+    _, _, faceMJ = components(first(surfacemetrics(grid)))
 
-    faceM = facemass(cell)
-    _, faceJ = components(facemetrics(grid))
+    comm_manager = commmanager(typeofstate(law), nodecommpattern(grid); comm)
 
-    faceMJ = faceM * faceJ
-
-    args = (law, grid, MJ, MJI, faceMJ, auxstate, volume_form, surface_numericalflux)
+    args = (
+        law,
+        grid,
+        MJ,
+        MJI,
+        faceMJ,
+        auxstate,
+        volume_form,
+        surface_numericalflux,
+        comm_manager,
+    )
     DGSEM{typeof.(args)...,directions}(args...)
 end
-getdevice(dg::DGSEM) = Raven.device(arraytype(referencecell(dg)))
+Raven.get_backend(dg::DGSEM) = Raven.get_backend(arraytype(referencecell(dg)))
 
 function (dg::DGSEM)(dq, q, time; increment = true)
+
     cell = referencecell(dg)
     grid = dg.grid
-    device = getdevice(dg)
+    backend = Raven.get_backend(dg)
     dim = ndims(cell)
     Nq = size(cell)[1]
 
     @assert all(size(cell) .== Nq)
     @assert(length(eltype(q)) == numberofstates(dg.law))
 
-    comp_stream = Event(device)
+    start!(q, dg.comm_manager)
 
-    comp_stream =
-        launch_volumeterm(dg.volume_form, dq, q, dg; increment, dependencies = comp_stream)
+    launch_volumeterm(dg.volume_form, dq, q, dg; increment)
 
-    Nfp = Nq ^ (dim - 1)
+    finish!(q, dg.comm_manager)
+
+    Nfp = Nq^(dim - 1)
     workgroup_face = (Nfp,)
     ndrange = (Nfp * length(grid),)
-    faceix⁻, faceix⁺ = faceindices(grid)
-    facenormal, _ = components(facemetrics(grid))
-    comp_stream = surfaceterm!(device, workgroup_face)(
+    fm = facemaps(grid)
+    faceix⁻, faceix⁺ = fm.vmapM, fm.vmapP
+    facenormal, _, _ = components(first(surfacemetrics(grid)))
+    surfaceterm!(backend, workgroup_face)(
         dg.law,
         dq,
         q,
-        Val(Raven.connectivityoffsets(cell, Val(2))),
+        Val(Raven.faceoffsets(cell)),
         dg.surface_numericalflux,
         dg.MJI,
         faceix⁻,
         faceix⁺,
         dg.faceMJ,
         facenormal,
-        boundaryfaces(grid),
+        boundarycodes(grid),
         dg.auxstate,
         Val(directions(dg));
         ndrange,
-        dependencies = comp_stream,
     )
-
-    wait(comp_stream)
 end
 
-function launch_volumeterm(::WeakForm, dq, q, dg; increment, dependencies)
-    device = getdevice(dg)
+function launch_volumeterm(::WeakForm, dq, q, dg; increment)
+    backend = Raven.get_backend(dg)
     cell = referencecell(dg)
     Nq = size(cell)[1]
     dim = ndims(cell)
     workgroup = ntuple(i -> i <= dim ? Nq : 1, 3)
     ndrange = (length(dg.grid) * workgroup[1], Base.tail(workgroup)...)
-    comp_stream = volumeterm!(device, workgroup)(
+
+    q = reshape(q, (:, last(size(q))))
+    dq = reshape(dq, (:, last(size(dq))))
+    metrics = first(volumemetrics(dg.grid))
+    metrics = reshape(metrics, (:, last(size(metrics))))
+    MJ = reshape(dg.MJ, (:, last(size(dg.MJ))))
+    MJI = reshape(dg.MJI, (:, last(size(dg.MJI))))
+    auxstate = reshape(dg.auxstate, (:, last(size(dg.auxstate))))
+
+    volumeterm!(backend, workgroup)(
         dg.law,
         dq,
         q,
         derivatives_1d(cell)[1],
-        metrics(dg.grid),
-        dg.MJ,
-        dg.MJI,
-        dg.auxstate,
+        metrics,
+        MJ,
+        MJI,
+        auxstate,
         Val(dim),
         Val(Nq),
         Val(numberofstates(dg.law)),
         Val(increment),
         Val(directions(dg));
         ndrange,
-        dependencies,
     )
-
-    comp_stream
 end
 
-function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment, dependencies)
+function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment)
     cell = referencecell(dg)
-    device = getdevice(dg)
+    backend = Raven.get_backend(dg)
     Nq = size(cell)[1]
     dim = ndims(cell)
-    Naux = eltype(eltype(dg.auxstate)) === Nothing ? 0 : length(eltype(dg.auxstate))
+    Naux = length(eltype(dg.auxstate))
+
+    q = reshape(q, (:, last(size(q))))
+    dq = reshape(dq, (:, last(size(dq))))
+    metrics = first(volumemetrics(dg.grid))
+    metrics = reshape(metrics, (:, last(size(metrics))))
+    MJ = reshape(dg.MJ, (:, last(size(dg.MJ))))
+    MJI = reshape(dg.MJI, (:, last(size(dg.MJI))))
+    auxstate = reshape(dg.auxstate, (:, last(size(dg.auxstate))))
 
     kernel_type = form.kernel_type
     if kernel_type == :naive
@@ -143,16 +168,16 @@ function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment, dep
         @assert directions(dg) == 1:ndims(dg.law)
         workgroup = ntuple(i -> i <= min(2, dim) ? Nq : 1, 3)
         ndrange = (length(dg.grid) * workgroup[1], Base.tail(workgroup)...)
-        comp_stream = esvolumeterm!(device, workgroup)(
+        esvolumeterm!(backend, workgroup)(
             dg.law,
             dq,
             q,
             derivatives_1d(cell)[1],
             form.volume_numericalflux,
-            metrics(dg.grid),
-            dg.MJ,
-            dg.MJI,
-            dg.auxstate,
+            metrics,
+            MJ,
+            MJI,
+            auxstate,
             Val(dim),
             Val(Nq),
             Val(numberofstates(dg.law)),
@@ -160,23 +185,22 @@ function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment, dep
             Val(increment),
             Val(directions(dg));
             ndrange,
-            dependencies,
         )
     elseif kernel_type == :per_dir
         workgroup = ntuple(i -> i <= dim ? Nq : 1, 3)
         ndrange = (length(dg.grid) * workgroup[1], Base.tail(workgroup)...)
-        comp_stream = dependencies
+
         for dir in directions(dg)
-            comp_stream = esvolumeterm_dir!(device, workgroup)(
+            esvolumeterm_dir!(backend, workgroup)(
                 dg.law,
                 dq,
                 q,
                 derivatives_1d(cell)[1],
                 form.volume_numericalflux,
-                metrics(dg.grid),
-                dg.MJ,
-                dg.MJI,
-                dg.auxstate,
+                metrics,
+                MJ,
+                MJI,
+                auxstate,
                 Val(dir),
                 Val(dim),
                 Val(Nq),
@@ -184,24 +208,22 @@ function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment, dep
                 Val(Naux),
                 Val(dir == directions(dg)[1] ? increment : true);
                 ndrange,
-                dependencies = comp_stream,
             )
         end
     elseif kernel_type == :per_dir_symmetric
         workgroup = ntuple(i -> i <= dim ? Nq : 1, 3)
         ndrange = (length(dg.grid) * workgroup[1], Base.tail(workgroup)...)
-        comp_stream = dependencies
         for dir in directions(dg)
-            comp_stream = esvolumeterm_dir_symmetric!(device, workgroup)(
+            esvolumeterm_dir_symmetric!(backend, workgroup)(
                 dg.law,
                 dq,
                 q,
                 derivatives_1d(cell)[1],
                 form.volume_numericalflux,
-                metrics(dg.grid),
-                dg.MJ,
-                dg.MJI,
-                dg.auxstate,
+                metrics,
+                MJ,
+                MJI,
+                auxstate,
                 Val(dir),
                 Val(dim),
                 Val(Nq),
@@ -209,14 +231,11 @@ function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment, dep
                 Val(Naux),
                 Val(dir == directions(dg)[1] ? increment : true);
                 ndrange,
-                dependencies = comp_stream,
             )
         end
     else
         error("Unknown kernel type $kernel_type")
     end
-
-    comp_stream
 end
 
 @kernel function volumeterm!(
@@ -252,7 +271,7 @@ end
     @inbounds begin
         ijk = i + Nq * (j - 1 + Nq * (k - 1))
 
-        g = metrics[ijk, e].g
+        g = metrics[ijk, e].dRdX
 
         qijk = q[ijk, e]
         auxijk = auxstate[ijk, e]
@@ -367,7 +386,7 @@ end
             end
             if dim > 2
                 @unroll for d = 1:dim
-                    pencil_g3[d, k] = metrics[ijk, e].g[3, d]
+                    pencil_g3[d, k] = metrics[ijk, e].dRdX[3, d]
                     pencil_g3[d, k] *= pencil_MJ[k]
                 end
             end
@@ -386,9 +405,9 @@ end
 
             MJk = pencil_MJ[k]
             @unroll for d = 1:dim
-                l_g[i, j, 1, d] = MJk * metrics[ijk, e].g[1, d]
+                l_g[i, j, 1, d] = MJk * metrics[ijk, e].dRdX[1, d]
                 if dim > 1
-                    l_g[i, j, 2, d] = MJk * metrics[ijk, e].g[2, d]
+                    l_g[i, j, 2, d] = MJk * metrics[ijk, e].dRdX[2, d]
                 end
             end
 
@@ -503,7 +522,7 @@ end
     q1 = @private FT (Ns,)
     aux1 = @private FT (Naux,)
 
-    l_g = @localmem FT (Nq ^ 3, 3)
+    l_g = @localmem FT (Nq^3, 3)
 
     e = @index(Group, Linear)
     i, j, k = @index(Local, NTuple)
@@ -513,7 +532,7 @@ end
 
         MJijk = MJ[ijk, e]
         @unroll for d = 1:dim
-            l_g[ijk, d] = MJijk * metrics[ijk, e].g[dir, d]
+            l_g[ijk, d] = MJijk * metrics[ijk, e].dRdX[dir, d]
         end
 
         @unroll for s = 1:Ns
@@ -599,7 +618,7 @@ end
     q1 = @private FT (Ns,)
     aux1 = @private FT (Naux,)
 
-    l_g = @localmem FT (Nq ^ 3, 3)
+    l_g = @localmem FT (Nq^3, 3)
 
     e = @index(Group, Linear)
     i, j, k = @index(Local, NTuple)
@@ -609,7 +628,7 @@ end
 
         MJijk = MJ[ijk, e]
         @unroll for d = 1:dim
-            l_g[ijk, d] = MJijk * metrics[ijk, e].g[dir, d]
+            l_g[ijk, d] = MJijk * metrics[ijk, e].dRdX[dir, d]
         end
 
         @unroll for s = 1:Ns
@@ -716,7 +735,7 @@ end
     @inbounds begin
         @unroll for d in directions
             @unroll for f = 1:2
-                face = 2(d-1) + f
+                face = 2(d - 1) + f
                 j = i + faceoffsets[face]
                 id⁻ = faceix⁻[j, e⁻]
 

@@ -8,6 +8,8 @@ using KernelAbstractions
 using KernelAbstractions.Extras: @unroll
 using UnPack
 
+import MPI
+
 include("balancelaw.jl")
 include("numericalfluxes.jl")
 include("dgsem.jl")

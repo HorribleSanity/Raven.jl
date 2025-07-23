@@ -40,7 +40,7 @@ mutable struct LSRK{FT,AT,NS,RHS}
 
     function LSRK(rhs!, rka, rkb, rkc, q, dt, t0)
         FT = eltype(eltype(q))
-        dq = fieldarray(q)
+        dq = similar(q)
         fill!(dq, zero(eltype(q)))
         AT = typeof(q)
         RHS = typeof(rhs!)
@@ -85,10 +85,10 @@ mutable struct RLSRK{FT,AT,NS,RHS}
 
     function RLSRK(rhs!, rka, rkb, rkc, q, dt, t0)
         FT = eltype(eltype(q))
-        dq = fieldarray(q)
+        dq = similar(q)
         fill!(dq, zero(eltype(q)))
-        q0 = fieldarray(q)
-        k = fieldarray(q)
+        q0 = similar(q)
+        k = similar(q)
         # construct standard RK b coefficients
         rkb_full = zeros(FT, length(rkb))
         rkb_full[end] = rkb[end]
@@ -276,11 +276,11 @@ mutable struct ARK{FT,RHS,LINRHS,RKA,RKB,RKC,QHAT,K,FAC,QS}
         t0,
         split_rhs = false,
     )
-        Qhat = fieldarray(q)
+        Qhat = similar(q)
         Nstages = length(ex_rkc)
-        qstages = ntuple(_->fieldarray(q), Nstages - 1)
-        ex_K = ntuple(_->fieldarray(q), Nstages)
-        im_K = ntuple(_->fieldarray(q), Nstages)
+        qstages = ntuple(_ -> similar(q), Nstages - 1)
+        ex_K = ntuple(_ -> similar(q), Nstages)
+        im_K = ntuple(_ -> similar(q), Nstages)
         if isnothing(linrhs!)
             fac = nothing
             dt_fac = dt
