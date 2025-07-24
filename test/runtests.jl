@@ -62,11 +62,23 @@ include("sparsearrays.jl")
 
 @testset "Balance Laws" begin
     @testset "Advection" begin
-        @safetestset "wave_2d" begin
+        @safetestset "wave 2d" begin
             include("balancelaws/advection/wave_2d.jl")
         end
-        @safetestset "wave_3d" begin
+        @safetestset "wave 3d" begin
             include("balancelaws/advection/wave_3d.jl")
+        end
+    end
+
+    @testset "Euler" begin
+        @safetestset "isentropic vortex" begin
+            include("balancelaws/euler/isentropicvortex.jl")
+        end
+        @safetestset "wave 2d" begin
+            include("balancelaws/euler/wave_2d.jl")
+        end
+        @safetestset "wave 3d" begin
+            include("balancelaws/euler/wave_3d.jl")
         end
     end
 end
