@@ -16,7 +16,7 @@ struct FluxDifferencingForm{VNF,K} <: AbstractVolumeForm
     end
 end
 
-struct DGSEM{L,G,A1,A2,A3,A4,VF,SNF,CM,DIR}
+struct DGSEM{L,G,A1,A2,A3,A4,VF,SNF,C,CM,DIR}
     law::L
     grid::G
     MJ::A1
@@ -25,12 +25,13 @@ struct DGSEM{L,G,A1,A2,A3,A4,VF,SNF,CM,DIR}
     auxstate::A4
     volume_form::VF
     surface_numericalflux::SNF
+    comm::C
     comm_manager::CM
 end
 
 function directions(
-    ::DGSEM{L,G,A1,A2,A3,A4,VF,SNF,CM,DIR},
-) where {L,G,A1,A2,A3,A4,VF,SNF,CM,DIR}
+    ::DGSEM{L,G,A1,A2,A3,A4,VF,SNF,C,CM,DIR},
+) where {L,G,A1,A2,A3,A4,VF,SNF,C,CM,DIR}
     return DIR
 end
 
@@ -48,12 +49,19 @@ function DGSEM(;
     surface_numericalflux,
     volume_form = WeakForm(),
     directions = 1:ndims(law),
-    auxstate = auxiliary.(Ref(law), points(grid)),
+    auxstate = nothing,
     comm = MPI.COMM_WORLD,
 )
     _, _, MJ = components(first(volumemetrics(grid)))
     MJI = 1 ./ MJ
     _, _, faceMJ = components(first(surfacemetrics(grid)))
+
+    if auxstate === nothing
+        auxstate = auxiliary.(Ref(law), points(grid))
+        aux_comm_manager = commmanager(eltype(auxstate), nodecommpattern(grid); comm)
+        start!(auxstate, aux_comm_manager)
+        finish!(auxstate, aux_comm_manager)
+    end
 
     comm_manager = commmanager(typeofstate(law), nodecommpattern(grid); comm)
 
@@ -66,6 +74,7 @@ function DGSEM(;
         auxstate,
         volume_form,
         surface_numericalflux,
+        comm,
         comm_manager,
     )
     DGSEM{typeof.(args)...,directions}(args...)
@@ -98,7 +107,7 @@ function (dg::DGSEM)(dq, q, time; increment = true)
     surfaceterm!(backend, workgroup_face)(
         dg.law,
         dq,
-        q,
+        viewwithghosts(q),
         Val(Raven.faceoffsets(cell)),
         dg.surface_numericalflux,
         dg.MJI,
@@ -107,7 +116,7 @@ function (dg::DGSEM)(dq, q, time; increment = true)
         dg.faceMJ,
         facenormal,
         boundarycodes(grid),
-        dg.auxstate,
+        viewwithghosts(dg.auxstate),
         Val(directions(dg));
         ndrange,
     )
