@@ -9,6 +9,7 @@ using Raven.StaticArrays
 using Raven.SparseArrays
 using Test
 using Aqua
+using SafeTestsets
 
 Aqua.test_all(Raven; stale_deps = (ignore = [:Requires],))
 
@@ -58,6 +59,17 @@ include("facecode.jl")
 include("gridnumbering.jl")
 include("orientation.jl")
 include("sparsearrays.jl")
+
+@testset "Balance Laws" begin
+    @testset "Advection" begin
+        @safetestset "wave_2d" begin
+            include("balancelaws/advection/wave_2d.jl")
+        end
+        @safetestset "wave_3d" begin
+            include("balancelaws/advection/wave_3d.jl")
+        end
+    end
+end
 
 include("testsuite.jl")
 
