@@ -7,6 +7,8 @@ using Printf
 using StaticArrays: SVector
 using LinearAlgebra: norm
 using MPI
+import CUDA
+import KernelAbstractions as KA
 
 if !@isdefined integration_testing
     const integration_testing =
@@ -79,6 +81,29 @@ let
     A = Array
     FT = Float64
     N = 4
+
+    if CUDA.functional() && CUDA.has_cuda_gpu()
+        CUDA.allowscalar(false)
+        A = CUDA.CuArray
+    end
+
+    backend = Raven.get_backend(A)
+
+    if backend isa KA.GPU
+        local_comm = MPI.Comm_split_type(comm, MPI.COMM_TYPE_SHARED, rank)
+        local_rank = MPI.Comm_rank(local_comm)
+        KA.device!(backend, (local_rank % KA.ndevices(backend)) + 1)
+    end
+
+    if rank == 0
+         @info """Using
+        A       = $A
+        FT      = $FT
+        N       = $N
+        backend = $backend
+        device  = $(KA.device(backend))
+        """
+    end
 
     expected_error = Dict()
 
