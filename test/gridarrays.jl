@@ -14,6 +14,8 @@ function gridarrays_testsuite(AT, FT)
         y = AT(x)
         @test y isa AT
 
+        @test sum(x) ≈ sum(y)
+
         F = Raven.fieldindex(x)
         xp = parent(x)
         nonfielddims = SVector((1:(F-1))..., ((F+1):ndims(xp))...)
