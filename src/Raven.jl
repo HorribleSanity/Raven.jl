@@ -1,5 +1,6 @@
 module Raven
 
+import AcceleratedKernels as AK
 using Adapt
 using Compat
 using GPUArraysCore

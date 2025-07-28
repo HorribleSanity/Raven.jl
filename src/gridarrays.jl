@@ -39,6 +39,11 @@ end
 
 const GridVecOrMat{T} = Union{GridArray{T,1},GridArray{T,2}}
 
+AnyGridArray{T,N} = Union{GridArray{T,N},WrappedArray{T,N,GridArray,GridArray{T,N}}}
+AnyGridVector{T} = AnyGridArray{T,1}
+AnyGridMatrix{T} = AnyGridArray{T,2}
+AnyGridVecOrMat{T} = Union{AnyGridVector{T},AnyGridMatrix{T}}
+
 function GridArray{T}(
     ::UndefInitializer,
     ::Type{A},
@@ -573,3 +578,99 @@ function components(a::GridArray{T,N,A,G,F}) where {T,N,A,G,F}
 
     return comps
 end
+
+# function Base.accumulate!(
+#     op,
+#     B::AnyGridArray,
+#     A::AnyGridArray;
+#     init = zero(eltype(A)),
+#     kwargs...,
+# )
+#     prefer_threads = false
+#     backend = get_backend(A)
+#
+#     if backend isa CPU
+#         backend = KernelAbstractions.get_backend([])
+#         prefer_threads = true
+#     end
+#
+#     AK.accumulate!(op, B, A, backend; init, prefer_threads, kwargs...)
+# end
+#
+# function Base.accumulate(op, A::AnyGridArray; init = zero(eltype(A)), kwargs...)
+#     prefer_threads = false
+#     backend = get_backend(A)
+#
+#     if backend isa CPU
+#         backend = KernelAbstractions.get_backend([])
+#         prefer_threads = true
+#     end
+#
+#     AK.accumulate(op, A, backend; init, prefer_threads, kwargs...)
+# end
+
+# XXX: The following change disables the `@Const` macro for GridArrays to
+# work around a GPU memory error encountered during AcceleratedKernels 1D
+# GPU reduction when running via CUDA. The root cause appears to be related
+# to how the `@Const` macro interacts with GridArrays and CUDA memory
+# management, potentially leading to invalid memory accesses or resource
+# exhaustion. Disabling the macro avoids these issues but may negatively
+# impact performance by preventing certain compiler optimizations.
+#
+# Rationale: This is a temporary workaround to ensure correctness when using
+# GridArrays with CUDA. Performance trade-offs were deemed acceptable given
+# the severity of the memory error.
+#
+# Eventually we should investigate the interaction between `@Const`, GridArrays,
+# and CUDA memory management to identify the root cause of the error.
+KernelAbstractions.constify(a::AnyGridArray) = a
+
+function Base.sum(src::AnyGridArray; kwargs...)
+    prefer_threads = false
+    backend = get_backend(src)
+
+    if backend isa CPU
+        backend = KernelAbstractions.get_backend([])
+        prefer_threads = true
+    end
+
+    AK.sum(src, backend; prefer_threads, kwargs...)
+end
+
+# Base.prod(src::AnyGridArray; kwargs...) = AK.prod(src; kwargs...)
+# Base.maximum(src::AnyGridArray; kwargs...) = AK.maximum(src; kwargs...)
+# Base.minimum(src::AnyGridArray; kwargs...) = AK.minimum(src; kwargs...)
+# Base.count(src::AnyGridArray; kwargs...) = AK.count(src; kwargs...)
+# Base.count(f::Function, src::AnyGridArray; kwargs...) = AK.count(f, src; kwargs...)
+# Base.cumsum(src::AnyGridArray; kwargs...) = AK.cumsum(src; kwargs...)
+# Base.cumprod(src::AnyGridArray; kwargs...) = AK.cumprod(src; kwargs...)
+
+# Base.map!(f, dst::AnyGridArray, src::AnyGridArray; kwargs...) =
+#     AK.map!(f, dst, src; kwargs...)
+# Base.map(f, src::AnyGridArray; kwargs...) = AK.map(f, src; kwargs...)
+
+# Base.any(pred::Function, v::AnyGridArray; kwargs...) = AK.any(pred, v; kwargs...)
+# function Base.all(pred::Function, v::AnyGridArray; kwargs...)
+#     AK.all(pred, v; prefer_threads = true, kwargs...)
+# end
+
+# XXX: The following code causes a `StackOverflowError`.  Something else
+# must be done to hook reductions into `Base`.
+#
+# Base.reduce(op, src::AnyGridArray; init, kwargs...) = AK.reduce(op, src; init, kwargs...)
+# Base.mapreduce(
+#     f,
+#     op,
+#     src::AnyGridArray;
+#     init = Base.mapreduce_empty(f, op, eltype(src)),
+#     kwargs...,
+# ) = AK.mapreduce(f, op, src; init, kwargs...)
+
+# Base.searchsortedfirst(v::AnyGridVector, x::AnyGridVector; kwargs...) =
+#     AK.searchsortedfirst(v::AnyGridVector, x::AnyGridVector; kwargs...)
+# Base.searchsortedlast(v::AnyGridVector, x::AnyGridVector; kwargs...) =
+#     AK.searchsortedlast(v::AnyGridVector, x::AnyGridVector; kwargs...)
+#
+# Base.sort!(x::AnyGridArray; kwargs...) = (AK.sort!(x; kwargs...); return x)
+# Base.sortperm!(ix::AnyGridArray, x::AnyGridArray; kwargs...) =
+#     (AK.sortperm!(ix, x; kwargs...); return ix)
