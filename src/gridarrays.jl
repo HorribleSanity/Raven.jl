@@ -198,6 +198,8 @@ with `A`.
 """
 @inline get_backend(::GridArray{T,N,A}) where {T,N,A} = get_backend(A)
 
+@inline KernelAbstractions.get_backend(::GridArray{T,N,A}) where {T,N,A} = get_backend(A)
+
 """
     arraytype(A::GridArray) -> DataType
 
