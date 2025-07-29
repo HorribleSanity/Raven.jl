@@ -425,7 +425,7 @@ let
 
     # run convergence study using a simple sine field
     rank == 0 && @info "Starting convergence study"
-    numlevels = 5
+    numlevels = @isdefined(_testing) ? 2 : 5
     err = zeros(FT, numlevels)
     for l = 1:numlevels
         L = l - 1
