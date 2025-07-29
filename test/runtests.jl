@@ -95,4 +95,42 @@ if CUDA.functional()
     Testsuite.testsuite(CuArray, Float32)
 end
 
+@testset "examples" begin
+    base_dir = joinpath(@__DIR__, "..")
+
+    test_examples = abspath.(
+        joinpath.(
+            base_dir,
+            [
+                "examples/advection",
+                "examples/balancelaws/euler_gravity",
+                "examples/balancelaws/shallow_water",
+            ],
+        ),
+    )
+
+    for example_dir in test_examples
+        @testset "$example_dir" begin
+            mktempdir() do tmp_dir
+                # Change to temporary directory so that any files created by the
+                # example get cleaned up after execution.
+                cd(tmp_dir)
+                example_project = Pkg.Types.projectfile_path(example_dir)
+                tmp_project = Pkg.Types.projectfile_path(tmp_dir)
+                cp(example_project, tmp_project)
+
+                for script in
+                    filter!(s -> endswith(s, ".jl"), readdir(example_dir, join = true))
+                    cmd =
+                        `$(Base.julia_cmd()) --startup-file=no --project=$tmp_project -e "import Pkg; Pkg.develop(path=raw\"$base_dir\"); Pkg.instantiate()"`
+                    @test success(pipeline(cmd, stderr = stderr, stdout = stdout))
+                    cmd =
+                        `$(mpiexec()) -n 2 $(Base.julia_cmd()) --startup-file=no --project=$tmp_project -e "const _testing = true; include(raw\"$script\")"`
+                    @test success(pipeline(cmd, stderr = stderr, stdout = stdout))
+                end
+            end
+        end
+    end
+end
+
 runmpitests()
