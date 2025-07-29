@@ -8,6 +8,7 @@ function gridarrays_testsuite(AT, FT)
 
         x = points(grid)
         @test x isa GridArray
+        @test Raven.get_backend(x) == KernelAbstractions.get_backend(x)
 
         @test size(x) == (N..., prod(K) * 4^L)
         y = AT(x)
