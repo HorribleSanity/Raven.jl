@@ -1,10 +1,10 @@
-abstract type AbstractCoarseGrid end
-abstract type AbstractBrickGrid <: AbstractCoarseGrid end
+abstract type AbstractCoarseGrid{T,N} end
+abstract type AbstractBrickGrid{T,N} <: AbstractCoarseGrid{T,N} end
 
 isextruded(::AbstractCoarseGrid) = false
 columnlength(::AbstractCoarseGrid) = 1
 
-struct MeshImportCoarseGrid{C,V,L,W,U,M} <: AbstractCoarseGrid
+struct MeshImportCoarseGrid{T,N,C,V,L,W,U,M} <: AbstractCoarseGrid{T,N}
     connectivity::C
     vertices::V
     cells::L
@@ -24,11 +24,17 @@ function coarsegrid(meshfilename::String, warp = identity, unwarp = identity)
     cells = Raven.cells(cg_temp)
     if length(cells[begin]) == 4
         conn = P4estTypes.Connectivity{4}(vertices, cells)
+        N = 2
     elseif length(cells[begin]) == 8
         conn = P4estTypes.Connectivity{8}(vertices, cells)
+        N = 3
+    else
+        conn = nothing
+        N = 0
     end
+    T = eltype(vertices)
     C, V, L, W, U, M = typeof.([conn, vertices, cells, warp, unwarp, meshimport])
-    return MeshImportCoarseGrid{C,V,L,W,U,M}(
+    return MeshImportCoarseGrid{T,N,C,V,L,W,U,M}(
         conn,
         vertices,
         cells,
@@ -38,7 +44,7 @@ function coarsegrid(meshfilename::String, warp = identity, unwarp = identity)
     )
 end
 
-struct CoarseGrid{C,V,L,W,U} <: AbstractCoarseGrid
+struct CoarseGrid{T,N,C,V,L,W,U} <: AbstractCoarseGrid{T,N}
     connectivity::C
     vertices::V
     cells::L
@@ -61,10 +67,20 @@ function CoarseGrid(
     warp = identity,
     unwarp = identity,
 ) where {X}
+    if X == 2
+        N = 1
+    elseif X == 4
+        N = 2
+    elseif X == 8
+        N = 3
+    else
+        N = 0
+    end
 
     conn = P4estTypes.Connectivity{X}(vertices, cells)
+    T = eltype(vertices)
     C, V, L, W, U = typeof.([conn, vertices, cells, warp, unwarp])
-    return CoarseGrid{C,V,L,W,U}(conn, vertices, cells, warp, unwarp)
+    return CoarseGrid{T,N,C,V,L,W,U}(conn, vertices, cells, warp, unwarp)
 end
 
 function coarsegrid(vertices, cells, warp = identity, unwarp = identity)
@@ -214,7 +230,7 @@ function cubeshell2dgrid(R::Real)
     return coarsegrid(vertices, cells, cubespherewarp, cubesphereunwarp)
 end
 
-struct BrickGrid{T,N,C,D,P} <: AbstractBrickGrid
+struct BrickGrid{T,N,C,D,P} <: AbstractBrickGrid{T,N}
     connectivity::C
     coordinates::D
     isperiodic::P
@@ -388,7 +404,7 @@ function brick(
     return brick(T, (l, m, n), (p, q, r))
 end
 
-struct ExtrudedBrickGrid{T,N,B,E} <: AbstractBrickGrid
+struct ExtrudedBrickGrid{T,N,B,E} <: AbstractBrickGrid{T,N}
     basegrid::B
     coordinates::E
     isperiodic::Bool
