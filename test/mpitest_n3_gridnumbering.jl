@@ -453,9 +453,9 @@ let
     @test nodecommpattern_degree_3.recvindices == vcat(recv_1, recv_2)
     @test nodecommpattern_degree_3.recvranks == sendrecv_ranks
     @test nodecommpattern_degree_3.recvrankindices ==
-          UnitRange{Int64}[1:length(recv_1), (1:length(recv_2)).+length(recv_1)]
+          UnitRange{Int64}[1:length(recv_1), (1:length(recv_2)) .+ length(recv_1)]
     @test nodecommpattern_degree_3.sendindices == vcat(send_1, send_2)
     @test nodecommpattern_degree_3.sendranks == sendrecv_ranks
     @test nodecommpattern_degree_3.sendrankindices ==
-          UnitRange{Int64}[1:length(send_1), (1:length(send_2)).+length(send_1)]
+          UnitRange{Int64}[1:length(send_1), (1:length(send_2)) .+ length(send_1)]
 end

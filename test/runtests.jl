@@ -45,7 +45,8 @@ function runmpitests()
         @info "Running MPI tests..."
         @testset "$f" for f in testfiles
             nprocs = parse(Int, first(match(r"_n(\d*)_", f).captures))
-            cmd = `$(mpiexec()) -n $nprocs $(Base.julia_cmd()) --startup-file=no --project=$tmp_project $(joinpath(test_dir, f))`
+            cmd =
+                `$(mpiexec()) -n $nprocs $(Base.julia_cmd()) --startup-file=no --project=$tmp_project $(joinpath(test_dir, f))`
             @test success(pipeline(cmd, stderr = stderr, stdout = stdout))
         end
     end

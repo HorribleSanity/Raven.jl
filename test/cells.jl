@@ -24,9 +24,9 @@ function cells_testsuite(AT, FT)
     @test all(
         Array.(D1d) .==
         setprecision(BigFloat, 2^(max(8, ceil(Int, log2(precision(FT))) + 2))) do
-            Matrix{
-                FT,
-            }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
+            Matrix{FT}.(
+                spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))),
+            )
         end,
     )
     h1d = tohalves_1d(cell)
@@ -65,9 +65,9 @@ function cells_testsuite(AT, FT)
     @test all(
         Array.(D1d) .==
         setprecision(BigFloat, 2^(max(8, ceil(Int, log2(precision(FT))) + 2))) do
-            Matrix{
-                FT,
-            }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
+            Matrix{FT}.(
+                spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))),
+            )
         end,
     )
     h1d = tohalves_1d(cell)
@@ -101,9 +101,9 @@ function cells_testsuite(AT, FT)
     @test all(
         Array.(D1d) .==
         setprecision(BigFloat, 2^(max(8, ceil(Int, log2(precision(FT))) + 2))) do
-            Matrix{
-                FT,
-            }.(spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))))
+            Matrix{FT}.(
+                spectralderivative.(first.(legendregausslobatto.(BigFloat, size(cell)))),
+            )
         end,
     )
     h1d = tohalves_1d(cell)

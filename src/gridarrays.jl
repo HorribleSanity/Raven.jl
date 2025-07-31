@@ -8,7 +8,7 @@ end
 
 @inline function insert(I::NTuple{N,Int}, ::Val{M}, i::Int) where {N,M}
     m = M::Int
-    return (I[1:m-1]..., i, I[m:end]...)::NTuple{N + 1,Int}
+    return (I[1:(m-1)]..., i, I[m:end]...)::NTuple{N + 1,Int}
 end
 
 """
@@ -53,7 +53,10 @@ function GridArray{T}(
     withghosts::Bool,
     fieldindex::Integer,
 ) where {T,A,N}
-    if !(all(dims[1:end-1] .== dimswithghosts[1:end-1]) && dims[end] <= dimswithghosts[end])
+    if !(
+        all(dims[1:(end-1)] .== dimswithghosts[1:(end-1)]) &&
+        dims[end] <= dimswithghosts[end]
+    )
         throw(
             DimensionMismatch(
                 "dims ($dims) must equal to dimswithghosts ($dimswithghosts) in all but the last dimension where it should be less than",
@@ -272,7 +275,7 @@ function Base.similar(
     if M == N
         if (!G && (dims[end] == a.dims[end])) || (G && (dims[end] == a.dimswithghosts[end]))
             # Create ghost layer
-            dimswithghosts = (dims[1:end-1]..., a.dimswithghosts[end])
+            dimswithghosts = (dims[1:(end-1)]..., a.dimswithghosts[end])
         else
             # No ghost layer
             dimswithghosts = dims
@@ -445,8 +448,8 @@ function Base.similar(
     return GridArray{T}(
         undef,
         A,
-        (dims[1:F-1]..., elemdims...),
-        (dims[1:F-1]..., elemdimswithghosts...),
+        (dims[1:(F-1)]..., elemdims...),
+        (dims[1:(F-1)]..., elemdimswithghosts...),
         comm(a),
         G,
         F,

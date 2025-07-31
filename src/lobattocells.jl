@@ -485,9 +485,9 @@ end
     x = zero(t)
     y = zero(t)
     t = 2 * t - 1
-    for i = 1:degree+1
+    for i = 1:(degree+1)
         li = one(t)
-        for j = 1:degree+1
+        for j = 1:(degree+1)
             if i != j
                 li *= (t - n[j]) / (n[i] - n[j])
             end
@@ -505,8 +505,8 @@ end
     t = 2 * t - 1
     w = ones(typeof(t), degree + 1)
 
-    for i = 1:degree+1
-        for j = 1:degree+1
+    for i = 1:(degree+1)
+        for j = 1:(degree+1)
             if i ≠ j
                 w[i] *= (n[i] - n[j])
             end
@@ -514,7 +514,7 @@ end
         w[i] = 1 / w[i]
     end
 
-    for i = 1:degree+1
+    for i = 1:(degree+1)
         if i != 1 || i != degree + 1
             x += w[i] * data[offset+i-1, 1] / (t - n[i])
             y += w[i] * data[offset+i-1, 2] / (t - n[i])
@@ -533,17 +533,17 @@ end
     y = zero(t)
     z = zero(t)
 
-    for i = 1:degree+1
-        for j = 1:degree+1
+    for i = 1:(degree+1)
+        for j = 1:(degree+1)
             li_t = one(t)
             li_s = one(s)
-            for k = 1:degree+1
+            for k = 1:(degree+1)
                 if i != k
                     li_t *= (t - n_t[k]) / (n_t[i] - n_t[k])
                 end
             end
 
-            for k = 1:degree+1
+            for k = 1:(degree+1)
                 if j != k
                     li_s *= (s - n_s[k]) / (n_s[j] - n_s[k])
                 end
@@ -1620,7 +1620,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
         for i in eachindex(IndexCartesian(), dtoc_degree3_local)
             l = dtoc_degree3_local[i]
             I = Tuple(i)
-            node = I[1:end-1]
+            node = I[1:(end-1)]
 
             if 3 ∈ node
                 # These points are just for orientation
@@ -1649,7 +1649,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
         for i in eachindex(IndexCartesian(), dtoc_degree3_local)
             l = dtoc_degree3_local[i]
             I = Tuple(i)
-            node = I[1:end-1]
+            node = I[1:(end-1)]
             quad = I[end]
 
             if 3 ∈ node
@@ -1662,7 +1662,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
             l = dtoc_degree3_local[i]
             offset = offsets[l]
             I = Tuple(i)
-            node = I[1:end-1]
+            node = I[1:(end-1)]
             quad = I[end]
 
             # These points are just for orientation they are not associated
@@ -2065,7 +2065,7 @@ function materializefacemaps(
                 end
                 nctypes[fg][nonconface[fg]] = nctype
 
-                if vmapNC[fg][ntuple((_ -> 1), ndims(cell) - 1)..., 1, ncid] == 0
+                if vmapNC[fg][ntuple((_->1), ndims(cell)-1)..., 1, ncid] == 0
                     # fill the non-conforming group
                     parentface = fs[first(pids)]
                     parentorientation = faceorientations[parentface, parentquadrant]
@@ -2110,14 +2110,13 @@ end
 
 function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern)
     ghostranktompirank = quadrantcommpattern.recvranks
-    ghostranktoindices =
-        expand.(
-            [
-                quadrantcommpattern.recvindices[ids] for
-                ids in quadrantcommpattern.recvrankindices
-            ],
-            length(cell),
-        )
+    ghostranktoindices = expand.(
+        [
+            quadrantcommpattern.recvindices[ids] for
+            ids in quadrantcommpattern.recvrankindices
+        ],
+        length(cell),
+    )
 
     ranktype = eltype(ghostranktompirank)
     indicestype = eltype(eltype(ghostranktoindices))

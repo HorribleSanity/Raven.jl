@@ -24,16 +24,15 @@ function abaqusmeshimport(
     type_boundary,
     type_boundary_map,
 )
-    N, C, F, I, B, D =
-        typeof.([
-            nodes,
-            connectivity,
-            face_iscurved,
-            face_degree,
-            face_interpolation,
-            type_boundary,
-            type_boundary_map,
-        ])
+    N, C, F, I, B, D = typeof.([
+        nodes,
+        connectivity,
+        face_iscurved,
+        face_degree,
+        face_interpolation,
+        type_boundary,
+        type_boundary_map,
+    ])
     return AbaqusMeshImport{N,C,F,I,B,D}(
         nodes,
         connectivity,
@@ -78,10 +77,10 @@ function abaqusmeshimport(filename::String)
     IT = Int
     # Extract node coords
     nodes = Vector{SVector{dims,FT}}(undef, node_count)
-    for nodeline in filelines[nodes_linenum+1:elements_linenum-1]
+    for nodeline in filelines[(nodes_linenum+1):(elements_linenum-1)]
         temp_data = split(nodeline, ", ")
         nodenumber = parse(IT, temp_data[1])
-        nodes[nodenumber] = SVector{dims,FT}(parse.(FT, temp_data[2:dims+1]))
+        nodes[nodenumber] = SVector{dims,FT}(parse.(FT, temp_data[2:(dims+1)]))
     end
 
     # Extract element coords
@@ -89,7 +88,7 @@ function abaqusmeshimport(filename::String)
     nodes_per_element = (dims == 2) ? 4 : 8
     perm = (dims == 2) ? [1, 2, 4, 3] : [1, 2, 4, 3, 5, 6, 8, 7]
     connectivity = Vector{NTuple{nodes_per_element,IT}}(undef, element_count)
-    for elementline in filelines[elements_linenum+1:curvature_linenum-1]
+    for elementline in filelines[(elements_linenum+1):(curvature_linenum-1)]
         temp_data = split(elementline, ", ")
         elementnumber = parse(IT, temp_data[1])
         connectivity[elementnumber] = Tuple(parse.(IT, temp_data[2:end]))[perm]
@@ -116,7 +115,7 @@ function abaqusmeshimport(filename::String)
         scanningidx += 2
         for node = 1:(sum(face_iscurved[i])*(face_degree+1)^(dims-1))
             face_interpolation[idx] =
-                Tuple(parse.(FT, split(filelines[scanningidx])[2:dims+1]))
+                Tuple(parse.(FT, split(filelines[scanningidx])[2:(dims+1)]))
             idx += 1
             scanningidx += 1
         end
@@ -134,7 +133,7 @@ function abaqusmeshimport(filename::String)
     end
 
     key = unique(temp_key)
-    type_boundary_map = Dict(zip(key, 0:length(key)-1))
+    type_boundary_map = Dict(zip(key, 0:(length(key)-1)))
     for (element, line) in enumerate(filelines[type_boundary_linenum:end])
         data = split(line)[2:end]
         type_boundary[element] = Tuple([type_boundary_map[word] for word in data])

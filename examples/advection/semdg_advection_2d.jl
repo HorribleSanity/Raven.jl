@@ -441,7 +441,7 @@ let
             )
         end
     end
-    rates = log2.(err[1:numlevels-1] ./ err[2:numlevels])
+    rates = log2.(err[1:(numlevels-1)] ./ err[2:numlevels])
     if rank == 0
         @info "Convergence rates:\n" * join(
             ["rate for levels $l → $(l + 1) = $(rates[l])" for l = 1:(numlevels-1)],

@@ -134,7 +134,7 @@ generate(gm::GridManager) = generate(identity, gm)
 function _offsets_to_ranges(offsets; by = identity)
     indices = Cint[]
     ranges = UnitRange{Int}[]
-    for r = 1:length(offsets)-1
+    for r = 1:(length(offsets)-1)
         if offsets[r+1] - offsets[r] > 0
             ids = by(r - 1)
             push!(indices, ids)
@@ -276,7 +276,7 @@ function materializequadranttoglobalid(forest, ghost)
             globalquadrantids[i+localnumberofquadrants] =
                 P4estTypes.unsafe_local_num(ghosts[i])
         end
-        for r = 1:length(proc_offsets)-1
+        for r = 1:(length(proc_offsets)-1)
             for o = (proc_offsets[r]+1):proc_offsets[r+1]
                 globalquadrantids[o+localnumberofquadrants] += global_first_quadrant[r]
             end
@@ -310,11 +310,11 @@ function materializedtoc(forest, ghost, nodes, quadrantcommpattern, comm)
     totalnumberofquadrants = localnumberofquadrants + ghostnumberofquadrants
 
     dtoc_owned = P4estTypes.unsafe_element_nodes(nodes)
-    dtoc = zeros(eltype(dtoc_owned), size(dtoc_owned)[1:end-1]..., totalnumberofquadrants)
+    dtoc = zeros(eltype(dtoc_owned), size(dtoc_owned)[1:(end-1)]..., totalnumberofquadrants)
     dtoc[1:length(dtoc_owned)] .= vec(dtoc_owned)
     dtoc_global = P4estTypes.globalid.(Ref(nodes), dtoc) .+ 0x1
 
-    pattern = expand(quadrantcommpattern, prod(size(dtoc_owned)[1:end-1]))
+    pattern = expand(quadrantcommpattern, prod(size(dtoc_owned)[1:(end-1)]))
 
     cm = commmanager(eltype(dtoc_global), pattern; comm)
 

@@ -290,25 +290,26 @@ function grids_testsuite(AT, FT)
             map(g -> SA[-g[2, 2], g[1, 2]], uJ[1, :, :]),
         )
         @test all(
-            a[M.+(1:M), :] ./ vec(ws) .≈ map(g -> SA[g[2, 2], -g[1, 2]], uJ[end, :, :]),
+            a[M .+ (1:M), :] ./ vec(ws) .≈ map(g -> SA[g[2, 2], -g[1, 2]], uJ[end, :, :]),
         )
         @test all(
-            a[2M.+(1:L), 1:numcells(grid)] ./ vec(wr) .≈
+            a[2M .+ (1:L), 1:numcells(grid)] ./ vec(wr) .≈
             map(g -> SA[g[2, 1], -g[1, 1]], uJ[:, 1, :]),
         )
         @test all(
-            a[2M.+L.+(1:L), 1:numcells(grid)] ./ vec(wr) .≈
+            a[2M .+ L .+ (1:L), 1:numcells(grid)] ./ vec(wr) .≈
             map(g -> SA[-g[2, 1], g[1, 1]], uJ[:, end, :]),
         )
 
         a = n .* sJ
         @test all(a[1:M, 1:numcells(grid)] .≈ map(g -> SA[-g[2, 2], g[1, 2]], uJ[1, :, :]))
-        @test all(a[M.+(1:M), :] .≈ map(g -> SA[g[2, 2], -g[1, 2]], uJ[end, :, :]))
+        @test all(a[M .+ (1:M), :] .≈ map(g -> SA[g[2, 2], -g[1, 2]], uJ[end, :, :]))
         @test all(
-            a[2M.+(1:L), 1:numcells(grid)] .≈ map(g -> SA[g[2, 1], -g[1, 1]], uJ[:, 1, :]),
+            a[2M .+ (1:L), 1:numcells(grid)] .≈
+            map(g -> SA[g[2, 1], -g[1, 1]], uJ[:, 1, :]),
         )
         @test all(
-            a[2M.+L.+(1:L), 1:numcells(grid)] .≈
+            a[2M .+ L .+ (1:L), 1:numcells(grid)] .≈
             map(g -> SA[-g[2, 1], g[1, 1]], uJ[:, end, :]),
         )
 
@@ -454,56 +455,60 @@ function grids_testsuite(AT, FT)
 
         a = n .* wsJ
         @test all(
-            reshape(a[1:M*N, 1:numcells(grid)], (M, N, numcells(grid))) ./
+            reshape(a[1:(M*N), 1:numcells(grid)], (M, N, numcells(grid))) ./
             (vec(ws) .* vec(wt)') .≈ map(g -> -g[1, :], b[1, :, :, :]),
         )
         @test all(
-            reshape(a[M*N.+(1:M*N), 1:numcells(grid)], (M, N, numcells(grid))) ./
+            reshape(a[M*N .+ (1:(M*N)), 1:numcells(grid)], (M, N, numcells(grid))) ./
             (vec(ws) .* vec(wt)') .≈ map(g -> g[1, :], b[end, :, :, :]),
         )
         @test all(
-            reshape(a[2*M*N.+(1:L*N), 1:numcells(grid)], (L, N, numcells(grid))) ./
+            reshape(a[2*M*N .+ (1:(L*N)), 1:numcells(grid)], (L, N, numcells(grid))) ./
             (vec(wr) .* vec(wt)') .≈ map(g -> -g[2, :], b[:, 1, :, :]),
         )
         @test all(
-            reshape(a[2*M*N.+L*N.+(1:L*N), 1:numcells(grid)], (L, N, numcells(grid))) ./
-            (vec(wr) .* vec(wt)') .≈ map(g -> g[2, :], b[:, end, :, :]),
+            reshape(
+                a[2*M*N .+ L*N .+ (1:(L*N)), 1:numcells(grid)],
+                (L, N, numcells(grid)),
+            ) ./ (vec(wr) .* vec(wt)') .≈ map(g -> g[2, :], b[:, end, :, :]),
         )
         @test all(
-            reshape(a[2*L*N+2*M*N.+(1:L*M), 1:numcells(grid)], (L, M, numcells(grid))) ./
+            reshape(a[2*L*N+2*M*N .+ (1:(L*M)), 1:numcells(grid)], (L, M, numcells(grid))) ./
             (vec(wr) .* vec(ws)') .≈ map(g -> -g[3, :], b[:, :, 1, :]),
         )
         @test all(
             reshape(
-                a[2*L*N+2*M*N.+L*M.+(1:L*M), 1:numcells(grid)],
+                a[2*L*N+2*M*N .+ L*M .+ (1:(L*M)), 1:numcells(grid)],
                 (L, M, numcells(grid)),
             ) ./ (vec(wr) .* vec(ws)') .≈ map(g -> g[3, :], b[:, :, end, :]),
         )
 
         a = n .* sJ
         @test all(
-            reshape(a[1:M*N, 1:numcells(grid)], (M, N, numcells(grid))) .≈
+            reshape(a[1:(M*N), 1:numcells(grid)], (M, N, numcells(grid))) .≈
             map(g -> -g[1, :], b[1, :, :, :]),
         )
         @test all(
-            reshape(a[M*N.+(1:M*N), 1:numcells(grid)], (M, N, numcells(grid))) .≈
+            reshape(a[M*N .+ (1:(M*N)), 1:numcells(grid)], (M, N, numcells(grid))) .≈
             map(g -> g[1, :], b[end, :, :, :]),
         )
         @test all(
-            reshape(a[2*M*N.+(1:L*N), 1:numcells(grid)], (L, N, numcells(grid))) .≈
+            reshape(a[2*M*N .+ (1:(L*N)), 1:numcells(grid)], (L, N, numcells(grid))) .≈
             map(g -> -g[2, :], b[:, 1, :, :]),
         )
         @test all(
-            reshape(a[2*M*N.+L*N.+(1:L*N), 1:numcells(grid)], (L, N, numcells(grid))) .≈
-            map(g -> g[2, :], b[:, end, :, :]),
+            reshape(
+                a[2*M*N .+ L*N .+ (1:(L*N)), 1:numcells(grid)],
+                (L, N, numcells(grid)),
+            ) .≈ map(g -> g[2, :], b[:, end, :, :]),
         )
         @test all(
-            reshape(a[2*L*N+2*M*N.+(1:L*M), 1:numcells(grid)], (L, M, numcells(grid))) .≈
+            reshape(a[2*L*N+2*M*N .+ (1:(L*M)), 1:numcells(grid)], (L, M, numcells(grid))) .≈
             map(g -> -g[3, :], b[:, :, 1, :]),
         )
         @test all(
             reshape(
-                a[2*L*N+2*M*N.+L*M.+(1:L*M), 1:numcells(grid)],
+                a[2*L*N+2*M*N .+ L*M .+ (1:(L*M)), 1:numcells(grid)],
                 (L, M, numcells(grid)),
             ) .≈ map(g -> g[3, :], b[:, :, end, :]),
         )
