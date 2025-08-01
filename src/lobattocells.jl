@@ -692,6 +692,112 @@ end
     end
 end
 
+@kernel function linebrickpoints!(
+    points,
+    ri,
+    coarsegridcells,
+    coarsegridvertices,
+    numberofquadrants,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    ::Val{I},
+    ::Val{Q},
+) where {I,Q}
+    i, q1 = @index(Local, NTuple)
+    _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(eltype(points))
+
+    treecoords = @localmem eltype(points) (2, Q)
+    rl = @localmem eltype(ri) (I,)
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            if q1 == 1
+                rl[i] = ri[i]
+            end
+
+            if i ≤ 2
+                treeid = quadranttotreeid[q]
+                vids = coarsegridcells[treeid]
+                treecoords[i, q1] = coarsegridvertices[vids[i]]
+            end
+        end
+    end
+
+    @synchronize
+
+    @inbounds begin
+        if q ≤ numberofquadrants
+            treeid = quadranttotreeid[q]
+            level = quadranttolevel[q]
+            ix = quadranttocoordinate[q]
+
+            P4EST_MAXLEVEL = 30
+            P4EST_ROOT_LEN = 1 << P4EST_MAXLEVEL
+
+            cr = T(ix) / P4EST_ROOT_LEN
+
+            h = one(T) / (1 << (level + 1))
+
+            r = muladd(h, (rl[i] + 1), cr)
+
+            c1 = treecoords[1, q1]
+            c2 = treecoords[2, q1]
+
+            dx = c2[1] - c1[1]
+
+            points[i, q] = SVector(muladd(dx, r, c1[1]))
+        end
+    end
+end
+
+function materializebrickpoints(
+    referencecell::LobattoLine,
+    coarsegridcells,
+    coarsegridvertices,
+    quadranttolevel,
+    quadranttotreeid,
+    quadranttocoordinate,
+    localnumberofquadrants,
+    comm,
+)
+    r = vec.(points_1d(referencecell))
+    Q = max(512 ÷ prod(length.(r)), 1)
+
+    IntType = typeof(length(r))
+    num_local = IntType(localnumberofquadrants)
+    points = GridArray{eltype(coarsegridvertices)}(
+        undef,
+        arraytype(referencecell),
+        (length.(r)..., num_local),
+        (length.(r)..., length(quadranttolevel)),
+        comm,
+        false,
+        length(r) + 1,
+    )
+
+    backend = get_backend(points)
+
+    kernel! = linebrickpoints!(backend, (length.(r)..., Q))
+    kernel!(
+        points,
+        r...,
+        coarsegridcells,
+        coarsegridvertices,
+        length(quadranttolevel),
+        quadranttolevel,
+        quadranttotreeid,
+        quadranttocoordinate,
+        Val.(length.(r))...,
+        Val(Q);
+        ndrange = size(points),
+    )
+
+    return points
+end
+
 @kernel function quadbrickpoints!(
     points,
     ri,
@@ -2253,6 +2359,217 @@ function materializeparentnodes(
     end
 
     return reshape(parentdofs, size(cell)..., :)
+end
+
+@kernel function linevolumemetrics!(
+    firstordermetrics,
+    secondordermetrics,
+    points,
+    Dr,
+    wr,
+    ::Val{IR},
+    ::Val{Q},
+) where {IR,Q}
+    i, p = @index(Local, NTuple)
+    _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(points)
+
+    X = @localmem T (IR, Q)
+    dXdr = @private T (1,)
+    dXds = @private T (1,)
+
+    @inbounds begin
+        X[i, p] = points[i, q]
+
+        @synchronize
+
+        dXdr[] = -zero(T)
+
+        @unroll for m = 1:IR
+            dXdr[] += Dr[i, m] * X[m, p]
+        end
+
+        G = dXdr[] * dXdr[]
+        invG = inv(G)
+
+        dRdX = invG * dXdr[]
+
+        J = norm(dXdr[])
+
+        wJ = wr[i] * J
+
+        wJinvG = wJ * invG
+
+        firstordermetrics[i, j, q] = (; dRdX, J, wJ)
+        secondordermetrics[i, j, q] = (; wJinvG, wJ)
+    end
+end
+
+@kernel function linevolumebrickmetrics!(
+    firstordermetrics,
+    secondordermetrics,
+    points,
+    wr,
+    ::Val{IR},
+    ::Val{Q},
+) where {IR,Q}
+    i, p = @index(Local, NTuple)
+    _, q = @index(Global, NTuple)
+
+    @uniform T = eltype(points)
+
+    X = @localmem T (IR, Q)
+
+    @inbounds begin
+        X[i, p] = points[i, q]
+
+        @synchronize
+
+        dx = X[end, p][1] - X[1, p][1]
+        dr = 2
+
+        drdx = dr / dx
+
+        dRdX = drdx
+
+        J = (dx / dr)
+
+        wJ = wr[i] * J
+
+        # invwJ = inv(wJ)
+
+        wJinvG = wJ * (drdx)^2
+
+        firstordermetrics[i, q] = (; dRdX, J, wJ)
+        secondordermetrics[i, q] = (; wJinvG, wJ)
+    end
+end
+
+@kernel function linesurfacemetrics!(
+    surfacemetrics,
+    dRdXs,
+    Js,
+    _,
+    vmapM,
+    w,
+    fg,
+    facegroupsize,
+    facegroupoffsets,
+)
+    j, fn, _ = @index(Local, NTuple)
+    _, _, q = @index(Global, NTuple)
+
+    @inbounds begin
+        si =
+            facegroupoffsets[end] * (q - 1) +
+            facegroupoffsets[fg] +
+            (fn - 1) * facegroupsize[1] +
+            j
+        i = vmapM[si]
+        dRdX = dRdXs[i]
+        J = Js[i]
+
+        sn = fn == 1 ? -1 : 1
+
+        n = sn * J * dRdX
+        sJ = norm(n)
+        n = SA[n/sJ]
+
+        wsJ = sJ # weight is 1 for faces with one point
+
+        surfacemetrics[si] = (; n, sJ, wsJ)
+    end
+end
+
+function materializemetrics(
+    cell::LobattoLine,
+    points::AbstractArray{SVector{N,FT}},
+    facemaps,
+    comm,
+    nodecommpattern,
+    isunwarpedbrick,
+) where {N,FT}
+    Q = max(512 ÷ prod(size(cell)), 1)
+
+    D = derivatives_1d(cell)
+    w = vec.(weights_1d(cell))
+
+    T1 = NamedTuple{(:dRdX, :J, :wJ),Tuple{FT,FT,FT}}
+    firstordermetrics = similar(points, T1)
+
+    T2 = NamedTuple{(:wJinvG, :wJ),Tuple{FT,FT}}
+    secondordermetrics = similar(points, T2)
+
+    backend = get_backend(points)
+
+    if isunwarpedbrick
+        kernel! = linevolumebrickmetrics!(backend, (size(cell)..., Q))
+        kernel!(
+            firstordermetrics,
+            secondordermetrics,
+            points,
+            w...,
+            Val.(size(cell))...,
+            Val(Q);
+            ndrange = size(points),
+        )
+    else
+        kernel! = linevolumemetrics!(backend, (size(cell)..., Q))
+        kernel!(
+            firstordermetrics,
+            secondordermetrics,
+            points,
+            D...,
+            w...,
+            Val.(size(cell))...,
+            Val(Q);
+            ndrange = size(points),
+        )
+    end
+
+    fcm = commmanager(eltype(firstordermetrics), nodecommpattern; comm)
+    share!(firstordermetrics, fcm)
+
+    volumemetrics = (firstordermetrics, secondordermetrics)
+
+    TS = NamedTuple{(:n, :sJ, :wsJ),Tuple{SVector{N,FT},FT,FT}}
+
+    # TODO move this to cell
+    cellfacedims = (1,)
+    facegroupsize = cellfacedims
+    facegroupoffsets = (0, cumsum(2 .* prod.(cellfacedims))...)
+
+    surfacemetrics = GridArray{TS}(
+        undef,
+        arraytype(points),
+        (facegroupoffsets[end], sizewithoutghosts(points)[end]),
+        (facegroupoffsets[end], sizewithghosts(points)[end]),
+        Raven.comm(points),
+        true,
+        1,
+    )
+
+    for n in eachindex(cellfacedims)
+        J = cellfacedims[n]
+        Q = max(512 ÷ 2prod(J), 1)
+
+        kernel! = linesurfacemetrics!(backend, (J..., 2, Q))
+        kernel!(
+            surfacemetrics,
+            components(viewwithghosts(firstordermetrics))...,
+            facemaps.vmapM,
+            w,
+            n,
+            facegroupsize[n],
+            facegroupoffsets,
+            ndrange = (J..., 2, last(size(surfacemetrics))),
+        )
+    end
+
+    surfacemetrics = (viewwithoutghosts(surfacemetrics), nothing)
+
+    return (volumemetrics, surfacemetrics)
 end
 
 @kernel function quadvolumemetrics!(

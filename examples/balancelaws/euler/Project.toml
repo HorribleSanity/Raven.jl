@@ -1,0 +1,21 @@
+[deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+Raven = "cfd3f2ab-0fb0-4d51-9553-03e53d33f144"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
+
+[compat]
+Adapt = "4"
+CUDA = "5.3"
+KernelAbstractions = "0.9"
+LinearAlgebra = "1"
+MPI = "0.20"
+StaticArrays = "1"
+WriteVTK = "1"
+
+[sources.Raven]
+path = "../../.."

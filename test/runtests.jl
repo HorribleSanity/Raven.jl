@@ -63,6 +63,12 @@ include("sparsearrays.jl")
 
 @testset "Balance Laws" begin
     @testset "Advection" begin
+        @safetestset "entropy conservation 1d" begin
+            include("balancelaws/advection/entropy_conservation_1d.jl")
+        end
+        @safetestset "wave 1d" begin
+            include("balancelaws/advection/wave_1d.jl")
+        end
         @safetestset "wave 2d" begin
             include("balancelaws/advection/wave_2d.jl")
         end
@@ -74,6 +80,12 @@ include("sparsearrays.jl")
     @testset "Euler" begin
         @safetestset "isentropic vortex" begin
             include("balancelaws/euler/isentropicvortex.jl")
+        end
+        @safetestset "entropy conservation 1d" begin
+            include("balancelaws/euler/entropy_conservation_1d.jl")
+        end
+        @safetestset "wave 1d" begin
+            include("balancelaws/euler/wave_1d.jl")
         end
         @safetestset "wave 2d" begin
             include("balancelaws/euler/wave_2d.jl")
@@ -104,6 +116,7 @@ end
             base_dir,
             [
                 "examples/advection",
+                "examples/balancelaws/euler",
                 "examples/balancelaws/euler_gravity",
                 "examples/balancelaws/shallow_water",
             ],

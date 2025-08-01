@@ -21,6 +21,48 @@ function grids_testsuite(AT, FT)
     rng = StableRNG(37)
 
     let
+        N = (2,)
+        K = (5,)
+        grid =
+            generate(GridManager(LobattoCell{Float64}(N...), Raven.brick(K); min_level = 1))
+        @test grid isa Raven.Grid
+
+        mktempdir() do tmpdir
+            vtk_grid("$tmpdir/grid", grid) do vtk
+                vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
+                P = toequallyspaced(referencecell(grid))
+                x = P * points(grid)
+                vtk["x"] = Adapt.adapt(Array, x)
+            end
+            @test isfile("$tmpdir/grid.pvtu")
+            @test isdir("$tmpdir/grid")
+            @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
+        end
+
+    end
+
+    let
+        N = (8,)
+        K = (5,)
+        grid = generate(
+            GridManager(LobattoCell{Float64}(N...), Raven.brick(K, (true,)); min_level = 1),
+        )
+        @test grid isa Raven.Grid
+
+        mktempdir() do tmpdir
+            vtk_grid("$tmpdir/grid", grid) do vtk
+                vtk["CellNumber"] = (1:length(grid)) .+ offset(grid)
+                P = toequallyspaced(referencecell(grid))
+                x = P * points(grid)
+                vtk["x"] = Adapt.adapt(Array, x)
+            end
+            @test isfile("$tmpdir/grid.pvtu")
+            @test isdir("$tmpdir/grid")
+            @test_nowarn VTKFile("$tmpdir/grid/grid_1.vtu")
+        end
+    end
+
+    let
         N = (3, 2)
         K = (2, 3)
         coordinates =
