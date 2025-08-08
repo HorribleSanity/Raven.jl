@@ -17,7 +17,7 @@ do
   TEMPFILE_FORMATTED=$(mktemp -t "$MKTEMPLATE") || exit 1
   git show :"$JLFILE" > "$TEMPFILE"
   git show :"$JLFILE" > "$TEMPFILE_FORMATTED"
-  julia --startup-file=no --color=no -e "using JuliaFormatter; format(\"$TEMPFILE_FORMATTED\")"
+  julia --startup-file=no --project=@formatter --color=no -e "using JuliaFormatter; format(\"$TEMPFILE_FORMATTED\")"
   if diff --color -u "$TEMPFILE" "$TEMPFILE_FORMATTED"
   then
     rm -f "$TEMPFILE" "$TEMPFILE_FORMATTED"
@@ -25,7 +25,7 @@ do
     rm -f "$TEMPFILE" "$TEMPFILE_FORMATTED"
     NEEDS_FORMAT=1
     echo >&2 "$JLFILE needs to be indented with:"
-    echo >&2 "   julia -e \"using JuliaFormatter; format(\\\"$GIT_DIR/../$JLFILE\\\")\""
+    echo >&2 "   julia --startup-file=no --project=@formatter -- -e \"using JuliaFormatter; format(\\\"$GIT_DIR/../$JLFILE\\\")\""
   fi
 done
 if [ -z "$NEEDS_FORMAT" ]
