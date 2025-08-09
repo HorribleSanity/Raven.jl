@@ -93,33 +93,36 @@ function (dg::DGSEM)(dq, q, time; increment = true)
     @assert(length(eltype(q)) == numberofstates(dg.law))
 
     start!(q, dg.comm_manager)
-
-    launch_volumeterm(dg.volume_form, dq, q, dg; increment)
+    if length(dg.grid) > 0
+        launch_volumeterm(dg.volume_form, dq, q, dg; increment)
+    end
 
     finish!(q, dg.comm_manager)
 
-    Nfp = Nq^(dim - 1)
-    workgroup_face = (Nfp,)
-    ndrange = (Nfp * length(grid),)
-    fm = facemaps(grid)
-    faceix⁻, faceix⁺ = fm.vmapM, fm.vmapP
-    facenormal, _, _ = components(first(surfacemetrics(grid)))
-    surfaceterm!(backend, workgroup_face)(
-        dg.law,
-        dq,
-        viewwithghosts(q),
-        Val(Raven.faceoffsets(cell)),
-        dg.surface_numericalflux,
-        dg.MJI,
-        faceix⁻,
-        faceix⁺,
-        dg.faceMJ,
-        facenormal,
-        boundarycodes(grid),
-        viewwithghosts(dg.auxstate),
-        Val(directions(dg));
-        ndrange,
-    )
+    if length(dg.grid) > 0
+        Nfp = Nq^(dim - 1)
+        workgroup_face = (Nfp,)
+        ndrange = (Nfp * length(grid),)
+        fm = facemaps(grid)
+        faceix⁻, faceix⁺ = fm.vmapM, fm.vmapP
+        facenormal, _, _ = components(first(surfacemetrics(grid)))
+        surfaceterm!(backend, workgroup_face)(
+            dg.law,
+            dq,
+            viewwithghosts(q),
+            Val(Raven.faceoffsets(cell)),
+            dg.surface_numericalflux,
+            dg.MJI,
+            faceix⁻,
+            faceix⁺,
+            dg.faceMJ,
+            facenormal,
+            boundarycodes(grid),
+            viewwithghosts(dg.auxstate),
+            Val(directions(dg));
+            ndrange,
+        )
+    end
 end
 
 function launch_volumeterm(::WeakForm, dq, q, dg; increment)
