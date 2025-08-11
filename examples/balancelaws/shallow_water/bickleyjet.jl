@@ -135,5 +135,5 @@ let
        """
     end
 
-    run(A, FT, N, K)
+    run(A, FT, N, K; comm)
 end
