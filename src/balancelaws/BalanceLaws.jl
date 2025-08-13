@@ -19,6 +19,7 @@ include("odesolvers.jl")
 
 include("balancelaws/advection.jl")
 include("balancelaws/shallow_water.jl")
+include("balancelaws/multilayer_shallow_water.jl")
 include("balancelaws/euler.jl")
 include("balancelaws/euler_gravity.jl")
 
