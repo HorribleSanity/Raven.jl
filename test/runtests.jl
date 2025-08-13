@@ -94,6 +94,15 @@ include("sparsearrays.jl")
             include("balancelaws/euler/wave_3d.jl")
         end
     end
+
+    @testset "Multilayer Shallow Water" begin
+        @safetestset "well balanced 1d" begin
+            include("balancelaws/multilayer_shallow_water/well_balanced_1d.jl")
+        end
+        @safetestset "manufactured 1d" begin
+            include("balancelaws/multilayer_shallow_water/manufactured_1d.jl")
+        end
+    end
 end
 
 include("testsuite.jl")
