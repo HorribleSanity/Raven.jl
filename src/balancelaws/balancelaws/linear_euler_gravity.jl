@@ -58,7 +58,7 @@ end
 
 BalanceLaws.wavespeed(law::LinearEulerGravityLaw, n⃗, q, aux) = soundspeed(law, aux)
 
-function BalanceLaws.source!(law::LinearEulerGravityLaw, dq, q, aux, dim, directions)
+function BalanceLaws.source!(law::LinearEulerGravityLaw, dq, q, aux, dim, directions, _)
     if dim ∈ directions
         ix_ρ, ix_ρu⃗, _ = varsindices(law)
 
