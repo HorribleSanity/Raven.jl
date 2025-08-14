@@ -94,7 +94,7 @@ function (dg::DGSEM)(dq, q, time; increment = true)
 
     start!(q, dg.comm_manager)
     if length(dg.grid) > 0
-        launch_volumeterm(dg.volume_form, dq, q, dg; increment)
+        launch_volumeterm(dg.volume_form, dq, q, dg, time; increment)
     end
 
     finish!(q, dg.comm_manager)
@@ -125,7 +125,7 @@ function (dg::DGSEM)(dq, q, time; increment = true)
     end
 end
 
-function launch_volumeterm(::WeakForm, dq, q, dg; increment)
+function launch_volumeterm(::WeakForm, dq, q, dg, time; increment)
     backend = Raven.get_backend(dg)
     cell = referencecell(dg)
     Nq = size(cell)[1]
@@ -145,6 +145,7 @@ function launch_volumeterm(::WeakForm, dq, q, dg; increment)
         dg.law,
         dq,
         q,
+        time,
         derivatives_1d(cell)[1],
         metrics,
         MJ,
@@ -159,7 +160,7 @@ function launch_volumeterm(::WeakForm, dq, q, dg; increment)
     )
 end
 
-function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment)
+function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg, time; increment)
     cell = referencecell(dg)
     backend = Raven.get_backend(dg)
     Nq = size(cell)[1]
@@ -184,6 +185,7 @@ function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment)
             dg.law,
             dq,
             q,
+            time,
             derivatives_1d(cell)[1],
             form.volume_numericalflux,
             metrics,
@@ -207,6 +209,7 @@ function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment)
                 dg.law,
                 dq,
                 q,
+                time,
                 derivatives_1d(cell)[1],
                 form.volume_numericalflux,
                 metrics,
@@ -230,6 +233,7 @@ function launch_volumeterm(form::FluxDifferencingForm, dq, q, dg; increment)
                 dg.law,
                 dq,
                 q,
+                time,
                 derivatives_1d(cell)[1],
                 form.volume_numericalflux,
                 metrics,
@@ -254,6 +258,7 @@ end
     law,
     dq,
     q,
+    time,
     D,
     metrics,
     MJ,
@@ -305,8 +310,8 @@ end
         @unroll for s = 1:Ns
             dqijk[s] = -zero(FT)
         end
-        source!(law, dqijk, qijk, auxijk, dim, directions)
-        source!(law, problem(law), dqijk, qijk, auxijk, dim, directions)
+        source!(law, dqijk, qijk, auxijk, dim, directions, time)
+        source!(law, problem(law), dqijk, qijk, auxijk, dim, directions, time)
         nonconservative_term!(law, dqijk, qijk, auxijk, directions, dim)
 
         @synchronize
@@ -346,6 +351,7 @@ end
     law,
     dq,
     q,
+    time,
     D,
     volume_numericalflux,
     metrics,
@@ -436,8 +442,8 @@ end
                 aux1[s] = l_aux[i, j, s]
             end
 
-            source!(law, dqijk, q1, aux1, dim, directions)
-            source!(law, problem(law), dqijk, q1, aux1, dim, directions)
+            source!(law, dqijk, q1, aux1, dim, directions, time)
+            source!(law, problem(law), dqijk, q1, aux1, dim, directions, time)
 
             MJIijk = 1 / pencil_MJ[k]
             @unroll for n = 1:Nq
@@ -509,6 +515,7 @@ end
     law,
     dq,
     q,
+    time,
     D,
     volume_numericalflux,
     metrics,
@@ -558,8 +565,8 @@ end
             aux1[s] = auxstate[ijk, e][s]
         end
 
-        source!(law, dqijk, q1, aux1, dim, (dir,))
-        source!(law, problem(law), dqijk, q1, aux1, dim, (dir,))
+        source!(law, dqijk, q1, aux1, dim, (dir,), time)
+        source!(law, problem(law), dqijk, q1, aux1, dim, (dir,), time)
 
         @synchronize
 
@@ -604,6 +611,7 @@ end
     law,
     dq,
     q,
+    time,
     D,
     volume_numericalflux,
     metrics,
@@ -655,8 +663,8 @@ end
             aux1[s] = auxstate[ijk, e][s]
         end
 
-        source!(law, dqijk1, q1, aux1, dim, (dir,))
-        source!(law, problem(law), dqijk1, q1, aux1, dim, (dir,))
+        source!(law, dqijk1, q1, aux1, dim, (dir,), time)
+        source!(law, problem(law), dqijk1, q1, aux1, dim, (dir,), time)
 
         @synchronize
 

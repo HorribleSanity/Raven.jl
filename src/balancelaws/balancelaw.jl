@@ -20,8 +20,10 @@ auxiliary(::AbstractBalanceLaw{FT}, x⃗) where {FT} = SVector{0,FT}()
 function flux end
 function wavespeed end
 boundarystate(::AbstractBalanceLaw, ::AbstractProblem, n⃗, q⁻, aux⁻, tag) = q⁻, aux⁻
-source!(::AbstractBalanceLaw, dq, q, aux, dim, directions) = nothing
-source!(::AbstractBalanceLaw, ::AbstractProblem, dq, q, aux, dim, directions) = nothing
+source!(::AbstractBalanceLaw, dq, q, aux, dim, directions, time) = nothing
+function source!(::AbstractBalanceLaw, ::AbstractProblem, dq, q, aux, dim, directions, time)
+    return
+end
 nonconservative_term!(::AbstractBalanceLaw, dq, q, aux, directions, dim) = nothing
 function Raven.GridArray(init, law::AbstractBalanceLaw, grid::Raven.Grid)
     return GridArray{typeofstate(law)}(init, grid)
