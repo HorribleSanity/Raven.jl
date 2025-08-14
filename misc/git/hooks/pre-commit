@@ -25,7 +25,7 @@ do
     rm -f "$TEMPFILE" "$TEMPFILE_FORMATTED"
     NEEDS_FORMAT=1
     echo >&2 "$JLFILE needs to be indented with:"
-    echo >&2 "   julia --startup-file=no --project=@formatter -- -e \"using JuliaFormatter; format(\\\"$GIT_DIR/../$JLFILE\\\")\""
+    echo >&2 "   julia --startup-file=no --project=@formatter -e \"using JuliaFormatter; format(\\\"$GIT_DIR/../$JLFILE\\\")\""
   fi
 done
 if [ -z "$NEEDS_FORMAT" ]
