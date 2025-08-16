@@ -840,17 +840,20 @@ function _get_quadrant_data(gm::Any1DBrickGridManager)
     quadranttofacecode = zeros(Int8, localnumberofquadrants)
 
     quadranttoboundary = zeros(Int, 2, localnumberofquadrants)
-    # Mark -x boundary 1
-    if quadranttoglobalid[1] == 1 &&
-       quadranttoquadrant[1, 1] == 1 &&
-       quadranttoface[1, 1] == 1
-        quadranttoboundary[1, 1] = 1
-    end
-    # Mark +x boundary 2
-    if quadranttoglobalid[localnumberofquadrants] == globalnumberofquadrants &&
-       quadranttoquadrant[2, localnumberofquadrants] == localnumberofquadrants &&
-       quadranttoface[1, localnumberofquadrants] == 2
-        quadranttoboundary[2, localnumberofquadrants] = 2
+
+    if localnumberofquadrants > 0
+        # Mark -x boundary 1
+        if quadranttoglobalid[1] == 1 &&
+           quadranttoquadrant[1, 1] == 1 &&
+           quadranttoface[1, 1] == 1
+            quadranttoboundary[1, 1] = 1
+        end
+        # Mark +x boundary 2
+        if quadranttoglobalid[localnumberofquadrants] == globalnumberofquadrants &&
+           quadranttoquadrant[2, localnumberofquadrants] == localnumberofquadrants &&
+           quadranttoface[1, localnumberofquadrants] == 2
+            quadranttoboundary[2, localnumberofquadrants] = 2
+        end
     end
 
     continuoustodiscontinuous = materializectod(discontinuoustocontinuous)
