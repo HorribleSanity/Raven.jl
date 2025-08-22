@@ -102,6 +102,9 @@ include("sparsearrays.jl")
         @safetestset "manufactured 1d" begin
             include("balancelaws/multilayer_shallow_water/manufactured_1d.jl")
         end
+        @safetestset "manufactured 2d" begin
+            include("balancelaws/multilayer_shallow_water/manufactured_2d.jl")
+        end
     end
 end
 
