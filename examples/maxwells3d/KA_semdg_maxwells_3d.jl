@@ -17,8 +17,9 @@ using Pkg
 
 using ProgressBars
 
-const outputvtk = true
-const convergetest = true
+const outputvtk = false
+const bigrun = true
+const convergetest = false
 
 
 function solution(x::SVector{3}, t)
@@ -34,7 +35,7 @@ end
 
 initialcondition(x::SVector{3}) = solution(x,0.0)
 
-@kernel function rhs_surface!(
+@kernel inbounds=true unsafe_indices=false function rhs_surface!(
     dq,
     q,
     vmapM,
@@ -49,7 +50,6 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
 ) where {N, C, S}
     ijk, cl = @index(Local, NTuple)
     _, wg_idx = @index(Group, NTuple)
-    @infiltrate
     c = (wg_idx-0x1)*C + cl
 
     Hxflux = @localmem eltype(dq) (N..., C)
@@ -60,7 +60,7 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
     Eyflux = @localmem eltype(dq) (N..., C)
     Ezflux = @localmem eltype(dq) (N..., C)
 
-    @inbounds if ijk <= N[0x1] * N[0x2] && c <= S
+    if ijk <= N[0x1] * N[0x2] && c <= S
         ij = ijk
         j, i = fldmod1(ij, N[0x1])
 
@@ -78,7 +78,7 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
     @synchronize
 
     c = (wg_idx-0x1)*C + cl
-    @inbounds if ijk <= N[0x2]*N[0x3] && c <= S
+    if ijk <= N[0x2]*N[0x3] && c <= S
         alpha = 1.0
         # face with r = -1
         jk = ijk
@@ -184,7 +184,7 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
     @synchronize
 
     c = (wg_idx-0x1)*C + cl
-    @inbounds if ijk <= N[0x1]*N[0x3] && c <= S
+    if ijk <= N[0x1]*N[0x3] && c <= S
         alpha = 1.0
         # face with s = -1
         ik = ijk
@@ -291,7 +291,7 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
     @synchronize
 
     c = (wg_idx-0x1)*C + cl
-    @inbounds if ijk <= N[0x1]*N[0x2] && c <= S
+    if ijk <= N[0x1]*N[0x2] && c <= S
         alpha = 1.0
         # face with t = -1
         ij = ijk
@@ -398,7 +398,7 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
 
     c = (wg_idx-0x1)*C + cl
     ij = ijk
-    @inbounds if ij <= N[0x1] * N[0x2] && c <= S
+    if ij <= N[0x1] * N[0x2] && c <= S
         j, i = fldmod1(ij, N[0x1])
 
         for k = 1:N[0x3]
@@ -412,7 +412,7 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
     end
 end
 
-@kernel function rhs_volume_vertical!(
+@kernel inbounds=true unsafe_indices=false  function rhs_volume_vertical!(
     dq,
     q,
     dRdX,
@@ -437,7 +437,7 @@ end
     lEʸ = @localmem eltype(dq) (ISTRIDE, N[0x2], N[0x3])
     lEᶻ = @localmem eltype(dq) (ISTRIDE, N[0x2], N[0x3])
 
-    @inbounds if i <= G[0x1]
+    if i <= G[0x1]
         for sj = 0x0:N[0x2]:(N[0x3]-0x1)
             if j+sj <= N[0x3] && il == 1
                 lDT3[j+sj, k] = DT[0x3][j+sj, k]
@@ -455,7 +455,7 @@ end
     @synchronize
 
     i = (iblockidx-0x1)*ISTRIDE + il
-    @inbounds  if i <= G[0x1]
+     if i <= G[0x1]
         dHˣijkc_update = -zero(eltype(dq))
         dHʸijkc_update = -zero(eltype(dq))
         dHᶻijkc_update = -zero(eltype(dq))
@@ -499,7 +499,7 @@ end
     end
 end
 
-@kernel function rhs_volume_horizontal!(
+@kernel inbounds=true unsafe_indices=false  function rhs_volume_horizontal!(
     dq,
     q,
     dRdX,
@@ -525,7 +525,7 @@ end
     lEʸ = @localmem eltype(dq) (N[0x1], N[0x2], KSTRIDE)
     lEᶻ = @localmem eltype(dq) (N[0x1], N[0x2], KSTRIDE)
 
-    @inbounds if k <= G[0x3]
+    if k <= G[0x3]
         @unroll for sj = 0x0:N[0x2]:(N[0x1]-0x1)
             if j+sj <= N[0x1]
                 lDT1[i, j+sj] = DT[0x1][i, j+sj]
@@ -549,7 +549,7 @@ end
     @synchronize
 
     k = (kblockidx - 0x1) * KSTRIDE + kl
-    @inbounds if k <= G[0x3]
+    if k <= G[0x3]
         dHˣijkc_update = -zero(eltype(dq))
         dHʸijkc_update = -zero(eltype(dq))
         dHᶻijkc_update = -zero(eltype(dq))
@@ -630,7 +630,6 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
 
     start!(q, cm)
 
-    #TODO: Am I wasting lots of threads here?
     KSTRIDE = max(256 ÷ (S[1]*S[2]), 1)
     workgroup = (S[1], S[2], 1, KSTRIDE)
     blocks = (1, 1, size(dq, 4), cld(S[3], KSTRIDE))
@@ -703,7 +702,7 @@ function run(
     gm = GridManager(cell, brick(coordinates, periodicity); comm = comm, min_level = L)
     grid = generate(gm)
 
-    timeend = 0.05
+    timeend = 5.00
 
     #jl # crude dt estimate
     cfl = 1 // 2
@@ -829,29 +828,27 @@ function run(
         end
     end
 
-    # compute error
-    _, _, wJ = components(first(volumemetrics(grid)))
-    qexact = solution.(points(grid), timeend)
+    if !bigrun
+        # compute error
+        _, _, wJ = components(first(volumemetrics(grid)))
+        qexact = solution.(points(grid), timeend)
 
-    #jl # TODO add sum to GridArray so the following reduction is on the device
-    errf1 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 1).^2)), +, comm))
-    errf2 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 2).^2)), +, comm))
-    errf3 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 3).^2)), +, comm))
-    errf4 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 4).^2)), +, comm))
-    errf5 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 5).^2)), +, comm))
-    errf6 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 6).^2)), +, comm))
+        #jl # TODO add sum to GridArray so the following reduction is on the device
+        errf1 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 1).^2)), +, comm))
+        errf2 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 2).^2)), +, comm))
+        errf3 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 3).^2)), +, comm))
+        errf4 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 4).^2)), +, comm))
+        errf5 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 5).^2)), +, comm))
+        errf6 = sqrt(MPI.Allreduce(sum(Adapt.adapt(Array, wJ .* getindex.(q .- qexact, 6).^2)), +, comm))
 
-    errf = maximum([errf1, errf2, errf3, errf4, errf5, errf6])
-    return errf
+        errf = maximum([errf1, errf2, errf3, errf4, errf5, errf6])
+        return errf
+    end
 end
 
 let
     FT = Float64
     AT = CUDA.functional() && CUDA.has_cuda_gpu() ? CuArray : Array
-
-    N = (7, 7, 7)
-    K = 4
-    L = 3
 
     if !MPI.Initialized()
         MPI.Init()
@@ -865,36 +862,33 @@ let
         CUDA.allowscalar(false)
     end
 
-    if rank == 0
-        @info """Configuration:
-            precision        = $FT
-            array type       = $AT
-            outputvtx        = $outputvtk
-            convergetest     = $convergetest
-        """
-    end
+    if bigrun || outputvtk
+        N = (8, 8, 8)
+        K = 4
+        L = 3
 
-    vtkdir = "vtk_semdg_maxwells_3d$(K)x$(K)x$(K)_L$(L)"
+        vtkdir = "vtk_semdg_maxwells_3d$(K)x$(K)x$(K)_L$(L)"
 
-    if outputvtk
+        totalcells = (K * 2^L, K * 2^L, K * 2^L)
+        dofs = prod(totalcells)*prod(1 .+ N)*6
+        if rank == 0
+            @info @sprintf(
+                "Level %d, cells = (%2d, %2d, %2d), dof = %1.2e, size of q = %1.2f GB",
+                L,
+                totalcells...,
+                dofs,
+                dofs*sizeof(FT)*1e-9,
+            )
+
+            @info """Configuration:
+                precision        = $FT
+                array type       = $AT
+                outputvtx        = $outputvtk
+                convergetest     = $convergetest
+            """
+        end
         run(initialcondition, FT, AT, N, K, L; outputvtk = outputvtk, vtkdir, comm)
     end
-
-    #=
-    totalcells = (K * 2^L, K * 2^L, K * 2^L)
-    dofs = prod(totalcells)*prod(1 .+ N)
-    err = run(initialcondition, FT, AT, N, K, L; outputvtk=false, comm)
-
-    if rank == 0
-        @info @sprintf(
-            "Level %d, cells = (%2d, %2d, %2d), dof = %d, error = %.16e",
-            L,
-            totalcells...,
-            dofs,
-            err
-        )
-    end
-    =#
 
     #jl # run convergence study
     if convergetest
