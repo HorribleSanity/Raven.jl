@@ -35,7 +35,7 @@ end
 
 initialcondition(x::SVector{3}) = solution(x,0.0)
 
-@kernel inbounds=true unsafe_indices=false function rhs_surface!(
+@kernel inbounds=true unsafe_indices=true function rhs_surface!(
     dq,
     q,
     vmapM,
@@ -412,7 +412,7 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
     end
 end
 
-@kernel inbounds=true unsafe_indices=false  function rhs_volume_vertical!(
+@kernel inbounds=true unsafe_indices=true  function rhs_volume_vertical!(
     dq,
     q,
     dRdX,
@@ -423,8 +423,8 @@ end
     ::Val{N},
     ::Val{ISTRIDE},
 ) where {G, N, ISTRIDE}
-    il, j, k, _ = @index(Local, NTuple)
-    iblockidx, _, _, c = @index(Group, NTuple)
+    il, j, k = @index(Local, NTuple)
+    iblockidx, c, _ = @index(Group, NTuple)
     i = (iblockidx-0x1)*ISTRIDE + il
 
     lDT3 = @localmem eltype(dq) (N[0x3], N[0x3])
@@ -499,7 +499,7 @@ end
     end
 end
 
-@kernel inbounds=true unsafe_indices=false  function rhs_volume_horizontal!(
+@kernel inbounds=true unsafe_indices=true  function rhs_volume_horizontal!(
     dq,
     q,
     dRdX,
@@ -510,8 +510,8 @@ end
     ::Val{N},
     ::Val{KSTRIDE},
 ) where {G, N, KSTRIDE}
-    i, j, _, kl = @index(Local, NTuple)
-    _, _, c, kblockidx = @index(Group, NTuple)
+    i, j, kl = @index(Local, NTuple)
+    c, kblockidx = @index(Group, NTuple)
     k = (kblockidx - 0x1) * KSTRIDE + kl
 
     lDT1 = @localmem eltype(dq) (N[0x1], N[0x1])
@@ -631,8 +631,8 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
     start!(q, cm)
 
     KSTRIDE = max(256 ÷ (S[1]*S[2]), 1)
-    workgroup = (S[1], S[2], 1, KSTRIDE)
-    blocks = (1, 1, size(dq, 4), cld(S[3], KSTRIDE))
+    workgroup = (S[1], S[2], KSTRIDE)
+    blocks = (size(dq, 4), cld(S[3], KSTRIDE),1)
     rhs_volume_horizontal!(backend, workgroup)(
         parent(dq),
         parent(q),
@@ -647,8 +647,8 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
     )
 
     ISTRIDE = max(256 ÷ (S[2]*S[3]), 1)
-    workgroup = (ISTRIDE, S[2], S[3], 1)
-    blocks = (cld(S[1], ISTRIDE), 1, 1, size(dq,4))
+    workgroup = (ISTRIDE, S[2], S[3])
+    blocks = (cld(S[1], ISTRIDE), size(dq,4), 1)
     rhs_volume_vertical!(backend, workgroup)(
         parent(dq),
         parent(q),
@@ -702,7 +702,7 @@ function run(
     gm = GridManager(cell, brick(coordinates, periodicity); comm = comm, min_level = L)
     grid = generate(gm)
 
-    timeend = 5.00
+    timeend = 0.05
 
     #jl # crude dt estimate
     cfl = 1 // 2
@@ -863,7 +863,7 @@ let
     end
 
     if bigrun || outputvtk
-        N = (8, 8, 8)
+        N = (7, 7, 7)
         K = 4
         L = 3
 
