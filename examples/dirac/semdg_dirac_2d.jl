@@ -31,12 +31,15 @@ using MAT
 using NVTX
 using SpecialFunctions
 
+#https://github.com/guiyrt/MLinJulia/blob/5b0cf79258848e2723dc270b550066cac07af5a9/src/calodiffusion/profile_cuda.jl#L3
+NVTX.enable_gc_hooks(; gc=true, alloc=true, free=true)
+NVTX.enable_inference_hook()
 import Base.abs2
 
-const convergetest = true
+const convergetest = false
 const empericalconvergetest = false
 const outputvtk = true
-const numlevels = 2
+const numlevels = 4
 const Lout = 0
 const m = 35.0 # -70.0
 const BC = :crbc_tb # options:crbc_tb :crbc_lr :forbc :reflect :periodic
@@ -54,7 +57,7 @@ const f(x, y) = y > 0 ? m : -m                   # disc_h
 const K = 16
 const delta_x = 1.0
 const delta_y = 1.0
-const timeend = 0.1
+const timeend = 1.0
 const polydegree = 4
 const N = (polydegree, polydegree)
 
@@ -136,6 +139,20 @@ function exactwithoutinterface(x::SVector{2}, t)
     f1 = (1 + im) * XY * (-temp * cosh(t * temp) + im * m * sinh(t * temp)) / π
     f2 = 2 * XY * sinh(t * temp)
     return SVector{2,CT}(f1, f2)
+end
+
+@kernel function idxcopyP!(
+    qto,
+    qto_idx,
+    qfrom,
+    qfrom_idx,
+    P,
+)
+    i = @index(Global, Linear)
+
+    if i <= length(qto_idx)
+        qto[qto_idx[i]] = P * qfrom[qfrom_idx[i]]
+    end
 end
 
 # ∂ₜψ = -σ₁∂ₓψ-im(y)σ₃ψ
@@ -838,66 +855,13 @@ function coefmap!(materialparams, gridpoints, f)
     end
 end
 
-# ∂ₜψ = -σ₁∂ₓψ-im(y)σ₃ψ
-#
-# P∂ₜψ = -Pσ₁∂ₓψ-im(y)Pσ₃ψ              : Bottom
-#      = -Pσ₁PinvP ∂ₓψ-im(y)Pσ₃PinvPψ   : Bottom
-#      =  σ₂∂ₓω-im(y)σ₁ω                : Bottom
-#      =  -i∂ₓω2-im(y)ω2                : Bottom
-#      =  i∂ₓω1-im(y)ω1                 : Bottom
-function crbc_recursion_bottom!(dwdn, dqdtan, q, grid, m, a, sig)
-    cell = referencecell(grid)
-    Q = size(cell, 2) - 1
-    S = size(points(grid))
-
-    q1, q2 = components(q)
-    dw1dn, dw2dn = components(dwdn)
-    dq1dtan, dq2dtan = components(dqdtan)
-
-    for e = 1:S[3]
-        for x = 1:size(cell, 1)
-            for (j, i) in zip(2:Q+1, Q:1)
-                dw1dn[x, i, e] = (a[2*(j-1)-1] - 1) * dw1dn[x, i+1, e]
-
-                dw1dn[x, i, e] -= a[2*(j-1)] * (dq1dtan[x, i, e] + im * dq2dtan[x, i, e])
-                dw1dn[x, i, e] +=
-                    a[2*(j-1)-1] * (dq1dtan[x, i+1, e] + im * dq2dtan[x, i+1, e])
-
-                dw1dn[x, i, e] += sig[2*(j-1)] * (q1[x, i, e] + im * q2[x, i, e])
-                dw1dn[x, i, e] -= sig[2*(j-1)-1] * (q1[x, i+1, e] + im * q2[x, i+1, e])
-
-                dw1dn[x, i, e] /= (a[2*(j-1)] + 1)
-            end
-
-            dw2dn[x, 1, e] = zero(eltype(dw2dn))
-
-            for (j, i) in zip(Q+1:-1:2, 1:Q)
-                dw2dn[x, i+1, e] = (a[2*(j-1)] - 1) * dw2dn[x, i, e]
-
-                dw2dn[x, i+1, e] -= a[2*(j-1)] * (dq1dtan[x, i, e] - im * dq2dtan[x, i, e])
-                dw2dn[x, i+1, e] +=
-                    a[2*(j-1)-1] * (dq1dtan[x, i+1, e] - im * dq2dtan[x, i+1, e])
-
-                dw2dn[x, i+1, e] += sig[2*(j-1)] * (q1[x, i, e] - im * q2[x, i, e])
-                dw2dn[x, i+1, e] -= sig[2*(j-1)-1] * (q1[x, i+1, e] - im * q2[x, i+1, e])
-
-                dw2dn[x, i+1, e] /= (a[2*(j-1)-1] + 1)
-            end
-        end
-    end
-
-    return dwdn
-end
-
-
-@kernel function crbc_recursion_top_kernel!(
+@kernel function crbc_recursion_bottom_kernel!(
     dw1dn,
     dw2dn,
     dq1dtan,
     dq2dtan,
     q1,
     q2,
-    grid,
     m,
     a,
     sig,
@@ -906,84 +870,95 @@ end
     i, _ = @index(Local, NTuple)
     _, c = @index(Global, NTuple)
 
-    #TODO: check bounds and inbounds flag
-    @unroll for j = 2:Q+1
-        dw1dn_ijc = dw1dn[i, j, c]
+    @unroll for j = Q:1
+        dw1dn_ijc = dw1dn[i, j+1, c]
 
         aodd = a[2*(j-1)-1]
         aeven = a[2*(j-1)]
-        dw1dn_ijc = (aodd - 1) * dw1dn[i, j-1, c]
-        dw1dn_ijc += aeven * (dq1dtan[i, j, c] - im * dq2dtan[i, j, c])
-        dw1dn_ijc -= aodd * (dq1dtan[i, j-1, c] - im * dq2dtan[i, j-1, c])
-        dw1dn_ijc += sig[2*(j-1)] * (q1[i, j, c] - im * q2[i, j, c])
-        dw1dn_ijc -= sig[2*(j-1)-1] * (q1[i, j-1, c] - im * q2[i, j-1, c])
+
+        dw1dn_ijc = (aodd - 1) * dw1dn[i, j+1, c]
+        dw1dn_ijc -= aeven * (dq1dtan[i, j, c] + im * dq2dtan[i, j, c])
+        dw1dn_ijc += aodd * (dq1dtan[i, j+1, c] + im * dq2dtan[i, j+1, c])
+        dw1dn_ijc += sig[2*(j-1)] * (q1[i, j, c] + im * q2[i, j, c])
+        dw1dn_ijc -= sig[2*(j-1)-1] * (q1[i, j+1, c] - im * q2[i, j+1, c])
         dw1dn_ijc /= (aeven + 1)
 
         dw1dn[i, j, c] = dw1dn_ijc
     end
 
-    dw2dn[i, Q+1, c] = zero(eltype(dw2dn))
+    dw2dn[i, 1, c] = zero(eltype(dw2dn))
 
-    @unroll for j = Q+1:-1:2
-        dw2dn_ijc = dw2dn[i, j-1, c]
+    @unroll for j = 1:Q
+        dw2dn_ijc = dw2dn[i, j+1, c]
 
-        aodd = a[2*(j-1)-1]
+        pidx = Q + 2 - j
+        aodd = a[2*(pidx-1)-1]
+        aeven = a[2*(pidx-1)]
+        sigeven = sig[2*(pidx-1)]
+        sigodd = sig[2*(pidx-1)-1]
+
         dw2dn_ijc = (aodd - 1) * dw2dn[i, j, c]
-        dw2dn_ijc += a[2*(j-1)] * (dq1dtan[i, j, c] + im * dq2dtan[i, j, c])
-        dw2dn_ijc -= aodd * (dq1dtan[i, j-1, c] + im * dq2dtan[i, j-1, c])
-        dw2dn_ijc += sig[2*(j-1)] * (q1[i, j, c] + im * q2[i, j, c])
-        dw2dn_ijc -= sig[2*(j-1)-1] * (q1[i, j-1, c] + im * q2[i, j-1, c])
+        dw2dn_ijc -= aeven * (dq1dtan[i, j, c] - im * dq2dtan[i, j, c])
+        dw2dn_ijc += aodd * (dq1dtan[i, j+1, c] - im * dq2dtan[i, j+1, c])
+        dw2dn_ijc += sigeven * (q1[i, j, c] - im * q2[i, j, c])
+        dw2dn_ijc -= sigodd * (q1[i, j+1, c] - im * q2[i, j+1, c])
         dw2dn_ijc /= (aodd + 1)
 
-        dw2dn[i, j, c] = dw2dn_ijc
+        dw2dn[i, j+1, c] = dw2dn_ijc
     end
 end
-# P∂ₜψ = -Pσ₁∂ₓψ-im(y)Pσ₃ψ          : Top
-#      = -σ₂∂ₓω-im(y)σ₁ω            : Top
-#      = i∂ₓω2-im(y)ω2              : Top
-#      = -i∂ₓω1-im(y)ω1             : Top
-function crbc_recursion_top!(dwdn, dqdtan, q, grid, m, a, sig)
-    cell = referencecell(grid)
-    Q = size(cell, 2) - 1
-    S = size(points(grid))
 
-    q1, q2 = components(q)
-    dw1dn, dw2dn = components(dwdn)
-    dq1dtan, dq2dtan = components(dqdtan)
+@kernel function crbc_recursion_top_kernel!(
+    dw1dn,
+    dw2dn,
+    dq1dtan,
+    dq2dtan,
+    q1,
+    q2,
+    m,
+    a,
+    sig,
+    ::Val{I},
+    ::Val{Q},
+) where {I, Q}
+    i, _ = @index(Local, NTuple)
+    _, c = @index(Global, NTuple)
 
-    for e = 1:S[3]
-        for x = 1:size(cell, 1)
-            for j = 2:Q+1
-                dw1dn[x, j, e] = (a[2*(j-1)-1] - 1) * dw1dn[x, j-1, e]
+    #TODO: check bounds and inbounds flag
+    @inbounds if i <= I
+        @unroll for j = 2:Q+1
+            dw1dn_ijc = dw1dn[i, j, c]
 
-                dw1dn[x, j, e] += a[2*(j-1)] * (dq1dtan[x, j, e] - im * dq2dtan[x, j, e])
-                dw1dn[x, j, e] -=
-                    a[2*(j-1)-1] * (dq1dtan[x, j-1, e] - im * dq2dtan[x, j-1, e])
+            aodd = a[2*(j-1)-1]
+            aeven = a[2*(j-1)]
+            dw1dn_ijc = (aodd - 1) * dw1dn[i, j-1, c]
+            dw1dn_ijc += aeven * (dq1dtan[i, j, c] - im * dq2dtan[i, j, c])
+            dw1dn_ijc -= aodd * (dq1dtan[i, j-1, c] - im * dq2dtan[i, j-1, c])
+            dw1dn_ijc += sig[2*(j-1)] * (q1[i, j, c] - im * q2[i, j, c])
+            dw1dn_ijc -= sig[2*(j-1)-1] * (q1[i, j-1, c] - im * q2[i, j-1, c])
+            dw1dn_ijc /= (aeven + 1)
 
-                dw1dn[x, j, e] += sig[2*(j-1)] * (q1[x, j, e] - im * q2[x, j, e])
-                dw1dn[x, j, e] -= sig[2*(j-1)-1] * (q1[x, j-1, e] - im * q2[x, j-1, e])
-
-                dw1dn[x, j, e] /= (a[2*(j-1)] + 1)
-            end
-
-            dw2dn[x, Q+1, e] = zero(eltype(dw2dn))
-
-            for j = Q+1:-1:2
-                dw2dn[x, j-1, e] = (a[2*(j-1)] - 1) * dw2dn[x, j, e]
-
-                dw2dn[x, j-1, e] += a[2*(j-1)] * (dq1dtan[x, j, e] + im * dq2dtan[x, j, e])
-                dw2dn[x, j-1, e] -=
-                    a[2*(j-1)-1] * (dq1dtan[x, j-1, e] + im * dq2dtan[x, j-1, e])
-
-                dw2dn[x, j-1, e] += sig[2*(j-1)] * (q1[x, j, e] + im * q2[x, j, e])
-                dw2dn[x, j-1, e] -= sig[2*(j-1)-1] * (q1[x, j-1, e] + im * q2[x, j-1, e])
-
-                dw2dn[x, j-1, e] /= (a[2*(j-1)-1] + 1)
-            end
+            dw1dn[i, j, c] = dw1dn_ijc
         end
     end
 
-    return dwdn
+    dw2dn[i, Q+1, c] = zero(eltype(dw2dn))
+
+    @inbounds if i <= I
+        @unroll for j = Q+1:-1:2
+            dw2dn_ijc = dw2dn[i, j-1, c]
+
+            aodd = a[2*(j-1)-1]
+            dw2dn_ijc = (aodd - 1) * dw2dn[i, j, c]
+            dw2dn_ijc += a[2*(j-1)] * (dq1dtan[i, j, c] + im * dq2dtan[i, j, c])
+            dw2dn_ijc -= aodd * (dq1dtan[i, j-1, c] + im * dq2dtan[i, j-1, c])
+            dw2dn_ijc += sig[2*(j-1)] * (q1[i, j, c] + im * q2[i, j, c])
+            dw2dn_ijc -= sig[2*(j-1)-1] * (q1[i, j-1, c] + im * q2[i, j-1, c])
+            dw2dn_ijc /= (aodd + 1)
+
+            dw2dn[i, j, c] = dw2dn_ijc
+        end
+    end
 end
 
 #TODO: Need to sort out dqdtan matrix P stuff same for recursion right
@@ -1169,14 +1144,13 @@ function crbc_rhs!(
             components(dqdtan)[2],
             components(q)[1],
             components(q)[2],
-            grid,
             m,
             a,
             sig,
+            Val(size(cell,1)),
             Val(size(cell, 2) - 1);
             ndrange = (I, last(size(dq))),
         )
-        #FIXME: end
 
         C = max(512 ÷ prod(size(cell)), 1)
         crbc_volume_kernel_top!(backend, (size(cell)..., C))(
@@ -1190,9 +1164,20 @@ function crbc_rhs!(
         )
     elseif orient == "bottom"
         @assert BC == :crbc_tb
-        #FIXME: AHHHHH this is real bad
-        dwdn .= crbc_recursion_bottom!(dwdn, dqdtan, q, grid, m, a, sig)
-        #FIXME: end
+        I = first(size(cell))
+        crbc_recursion_bottom_kernel!(backend, (I, 1))(
+            components(dwdn)[1],
+            components(dwdn)[2],
+            components(dqdtan)[1],
+            components(dqdtan)[2],
+            components(q)[1],
+            components(q)[2],
+            m,
+            a,
+            sig,
+            Val(size(cell, 2) - 1);
+            ndrange = (I, last(size(dq))),
+        )
 
         C = max(512 ÷ prod(size(cell)), 1)
         crbc_volume_kernel_bottom!(backend, (size(cell)..., C))(
@@ -1314,7 +1299,7 @@ function run(
 
 
     #jl # crude dt estimate
-    cfl = 1 // 20
+    cfl = 1 // 2
     dx = Base.step(first(coordinates)) / 2^L
     dt = cfl * dx / (maximum(N) + 1)^2
     @info "dt = $(dt) w/ dx = $(dx)"
@@ -1444,8 +1429,8 @@ function run(
     #%%%%%%%%%%%%%#
 
     matlabdata = MAT.matread("optimal_cosines_data.mat")
-    a = matlabdata["a"]
-    sig = matlabdata["sig"]
+    a = SVector(matlabdata["a"]...)
+    sig = SVector(matlabdata["sig"]...)
 
     data = similar(q)
     data .= Ref(zero(eltype(q)))
@@ -1488,8 +1473,8 @@ function run(
 
         #FIXME: AHHHHH this is real bad
         crbc_interface_left =
-            findall(≈(-delta_x), adapt(Array, first.(points(crbc_grid_left))))
-        bulk_interface_left = findall(≈(-delta_x), adapt(Array, first.(points(grid))))
+            SVector(findall(≈(-delta_x), adapt(Array, first.(points(crbc_grid_left))))...)
+        bulk_interface_left = SVector(findall(≈(-delta_x), adapt(Array, first.(points(grid))))...)
         #FIXME: end
 
         # RIGHT
@@ -1560,10 +1545,9 @@ function run(
         crbc_materialparams_top = adapt(AT, crbc_materialparams_top_H)
 
 
-
         #FIXME: AHHHHH this is real bad
-        crbc_interface_top = findall(≈(delta_y), adapt(Array, last.(points(crbc_grid_top))))
-        bulk_interface_top = findall(≈(delta_y), adapt(Array, last.(points(grid))))
+        crbc_interface_top = SVector(findall(≈(delta_y), adapt(Array, last.(points(crbc_grid_top))))...)
+        bulk_interface_top = SVector(findall(≈(delta_y), adapt(Array, last.(points(grid))))...)
         #FIXME: end
 
         # BOTTOM
@@ -1595,8 +1579,8 @@ function run(
 
         #FIXME: AHHHHH this is real bad
         crbc_interface_bottom =
-            findall(≈(-delta_y), adapt(Array, last.(points(crbc_grid_bottom))))
-        bulk_interface_bottom = findall(≈(-delta_y), adapt(Array, last.(points(grid))))
+            SVector(findall(≈(-delta_y), adapt(Array, last.(points(crbc_grid_bottom))))...)
+        bulk_interface_bottom = SVector(findall(≈(-delta_y), adapt(Array, last.(points(grid))))...)
         #FIXME: end
     end # crbc initialization
 
@@ -1608,6 +1592,8 @@ function run(
 
     progress_stepwidth = cld(numberofsteps, progresswidth)
     elapsed_time = @elapsed begin
+
+        NVTX.@range "timestep" begin
         for step = 1:numberofsteps
             if rank == 0 && progress && mod(step, progress_stepwidth) == 0
                 print(
@@ -1624,16 +1610,6 @@ function run(
                 dt = timeend - time
             end
 
-            if BC == :crbc_tb || BC == :crbc_lr
-                crbc_dwdn_top_h = Adapt.adapt(Array, crbc_dwdn_top)
-                crbc_dwdn_bottom_h = Adapt.adapt(Array, crbc_dwdn_bottom)
-                crbc_dwdn_left_h = Adapt.adapt(Array, crbc_dwdn_left)
-                crbc_dwdn_right_h = Adapt.adapt(Array, crbc_dwdn_right)
-            end
-
-            data_h = Adapt.adapt(Array, data)
-            q_h = Adapt.adapt(Array, q)
-
             for stage in eachindex(RKA, RKB)
                 @. dq *= RKA[stage]
                 if BC == :crbc_tb || BC == :crbc_lr
@@ -1642,30 +1618,50 @@ function run(
                     @. crbc_dq_left *= RKA[stage]
                     @. crbc_dq_right *= RKA[stage]
 
-                    #FIXME: AHHHHH this is real bad
-                    P = SA[1 -im; 1 im]
-                    crbc_dwdn_top_h[crbc_interface_top] .=
-                        [P * i for i in q_h[bulk_interface_top]]
+                    if BC == :crbc_tb
 
-                    P = SA[-1 -im; -1 im]
-                    crbc_dwdn_bottom_h[crbc_interface_bottom] .=
-                        [P * i for i in q_h[bulk_interface_bottom]]
+                    NVTX.@range "copy 1" begin
+                        T = 256
+                        idxcopyP!(backend, T)(
+                            crbc_dwdn_top,
+                            crbc_interface_top,
+                            q,
+                            bulk_interface_top,
+                            Complex{FT}.(SA[1 -im; 1 im]);
+                            ndrange = size(crbc_interface_top,1)
+                        )
 
-                    P = SA[1 -1; 1 1]
-                    crbc_dwdn_left_h[crbc_interface_left] .=
-                        [P * i for i in q_h[bulk_interface_left]]
+                        idxcopyP!(backend, T)(
+                            crbc_dwdn_bottom,
+                            crbc_interface_bottom,
+                            q,
+                            bulk_interface_bottom,
+                            Complex{FT}.(SA[-1 -im; -1 im]);
+                            ndrange = size(crbc_interface_top,1)
+                        )
+                    end # copy 1
+                    elseif BC == :crbc_lr
+                        idxcopyP!(backend, T)(
+                            crbc_dwdn_left,
+                            crbc_interface_left,
+                            q,
+                            bulk_interface_left,
+                            Complex{FT}.(SA[1 -1; 1 1]);
+                            ndrange = size(crbc_interface_top,1)
+                        )
 
-                    P = SA[1 1; 1 -1]
-                    crbc_dwdn_right_h[crbc_interface_right] .=
-                        [P * i for i in q_h[bulk_interface_right]]
-
-                    crbc_dwdn_top = Adapt.adapt(AT, crbc_dwdn_top_h)
-                    crbc_dwdn_bottom = Adapt.adapt(AT, crbc_dwdn_bottom_h)
-                    crbc_dwdn_left = Adapt.adapt(AT, crbc_dwdn_left_h)
-                    crbc_dwdn_right = Adapt.adapt(AT, crbc_dwdn_right_h)
-                    #FIXME: end
+                        idxcopyP!(backend, T)(
+                            crbc_dwdn_right,
+                            crbc_interface_right,
+                            q,
+                            bulk_interface_right,
+                            Complex{FT}.(SA[1 1; 1 -1]);
+                            ndrange = size(crbc_interface_top,1)
+                        )
+                    end
 
                     if BC == :crbc_tb
+                     NVTX.@range "crbc rhs" begin
                         crbc_rhs!(
                             crbc_dq_top,
                             crbc_q_top,
@@ -1695,6 +1691,7 @@ function run(
                             cm;
                             orient = "bottom",
                         )
+                        end # crbc rhs
                     elseif BC == :crbc_lr
                         crbc_rhs!(
                             crbc_dq_left,
@@ -1727,33 +1724,46 @@ function run(
                         )
                     end
 
-                    #FIXME: AHHHH this is real bad
-                    crbc_dwdn_top_h = Adapt.adapt(Array, crbc_dwdn_top)
-                    crbc_dwdn_bottom_h = Adapt.adapt(Array, crbc_dwdn_bottom)
-
-                    crbc_dwdn_left_h = Adapt.adapt(Array, crbc_dwdn_left)
-                    crbc_dwdn_right_h = Adapt.adapt(Array, crbc_dwdn_right)
-
                     if BC == :crbc_tb
-                        Pinv = SA[0.5 0.5; 0.5*im -0.5*im]
-                        data_h[bulk_interface_top] .=
-                            [Pinv * i for i in crbc_dwdn_top_h[crbc_interface_top]]
 
-                        Pinv = SA[-0.5 -0.5; 0.5*im -0.5*im]
-                        data_h[bulk_interface_bottom] .= [
-                            Pinv * i for i in crbc_dwdn_bottom_h[crbc_interface_bottom]
-                        ]
+                     NVTX.@range "copy 2" begin
+                        idxcopyP!(backend, T)(
+                            data,
+                            bulk_interface_top,
+                            crbc_dwdn_top,
+                            crbc_interface_top,
+                            Complex{FT}.(SA[0.5 0.5; 0.5*im -0.5*im]);
+                            ndrange = size(crbc_interface_top,1)
+                        )
 
+                        idxcopyP!(backend, T)(
+                            data,
+                            bulk_interface_bottom,
+                            crbc_dwdn_bottom,
+                            crbc_interface_bottom,
+                            Complex{FT}.(SA[-0.5 -0.5; 0.5*im -0.5*im]);
+                            ndrange = size(crbc_interface_top,1)
+                        )
+                    end # copy 2
                     elseif BC == :crbc_lr
-                        Pinv = SA[0.5 0.5; -0.5 0.5]
-                        data_h[bulk_interface_left] .=
-                            [Pinv * i for i in crbc_dwdn_left_h[crbc_interface_left]]
+                        idxcopyP!(backend, T)(
+                            data,
+                            bulk_interface_left,
+                            crbc_dwdn_left,
+                            crbc_interface_left,
+                            Complex{FT}.(SA[0.5 0.5; -0.5 0.5]);
+                            ndrange = size(crbc_interface_top,1)
+                        )
 
-                        Pinv = SA[0.5 0.5; 0.5 -0.5]
-                        data_h[bulk_interface_right] .=
-                            [Pinv * i for i in crbc_dwdn_right_h[crbc_interface_right]]
+                        idxcopyP!(backend, T)(
+                            data,
+                            bulk_interface_right,
+                            crbc_dwdn_right,
+                            crbc_interface_right,
+                            Complex{FT}.(SA[0.5 0.5; 0.5 -0.5]);
+                            ndrange = size(crbc_interface_top,1)
+                        )
                     end
-                    #FIXME: end
                 end
 
 
@@ -1782,9 +1792,10 @@ function run(
             time += dt
             #data = Adapt.adapt(AT, data_h)
 
-            do_output(step, time, q, materialparams, grid)
-            energy_output(step, energy, q, grid)
+            #do_output(step, time, q, materialparams, grid)
+            #energy_output(step, energy, q, grid)
         end # time step for loop
+        end # cuda profile range
     end # elapsed time
 
     if rank == 0
@@ -1858,10 +1869,10 @@ end
 
 let
     FT = Float64
-    AT =
+    #AT =
         !(BC == :crbc_lr || BC == :crbc_tb) && CUDA.functional() && CUDA.has_cuda_gpu() ?
         CuArray : Array
-    #AT = CUDA.functional() && CUDA.has_cuda_gpu() ? CuArray : Array
+    AT = CUDA.functional() && CUDA.has_cuda_gpu() ? CuArray : Array
 
     if !MPI.Initialized()
         MPI.Init()
@@ -1872,7 +1883,7 @@ let
 
     if CUDA.functional()
         CUDA.device!(MPI.Comm_rank(comm) % length(CUDA.devices()))
-        CUDA.allowscalar(true) #FIXME: AHHHH need this for recursion!!
+        CUDA.allowscalar(false)
     end
 
     vtkdir = "vtk_semidg_dirac_2d$(K)x$(K)_L$(Lout)_$(String(BC))_$(timeend)"
