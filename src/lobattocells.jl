@@ -1869,6 +1869,63 @@ function materializedtoc(
     return dtoc, dtor
 end
 
+function renumberdtoc!(dtoc, cell::LobattoCell, localnumberofquadrants, part, dtop)
+    I = CartesianIndices(size(cell))
+
+    renumbering = Dict{Int,Int}()
+    count = Dict{Int,Int}()
+
+    parts = sort(unique(dtop))
+    otherparts = filter(p -> p != part, parts)
+
+    for p in parts
+        count[p] = 0
+    end
+
+    # continuously renumber owned cg nodes
+    for q = 1:localnumberofquadrants
+        for i in I
+            p = dtop[i, q]
+            _ = get!(renumbering, dtoc[i, q]) do
+                count[p] = count[p] + 1
+            end
+        end
+    end
+
+
+    runningcount = 0
+    offset = Dict{Int,Int}()
+    offset[part] = runningcount
+    runningcount += count[part]
+    for p in otherparts
+        offset[p] = runningcount
+        runningcount += count[p]
+    end
+
+    for j in eachindex(dtoc, dtop)
+        p = dtop[j]
+        c = dtoc[j]
+
+        newc = get!(renumbering, c) do
+            0
+        end
+
+        if newc == 0
+            newc = runningcount + 1
+        else
+            newc = offset[p] + newc
+        end
+
+        dtoc[j] = newc
+    end
+
+
+    if isdefined(Main, :Infiltrator)
+        Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+    end
+
+end
+
 function _indextoface(::Val{2}, i)
     degree3facelinearindices = ((5, 9), (8, 12), (2, 3), (14, 15))
     f = 0

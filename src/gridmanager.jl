@@ -552,6 +552,17 @@ function _get_quadrant_data(gm::GridManager)
         quadranttoglobalid,
     )
 
+    part = MPI.Comm_rank(comm(gm)) + 1
+    nparts = MPI.Comm_size(comm(gm))
+
+    renumberdtoc!(
+        discontinuoustocontinuous,
+        referencecell(gm),
+        localnumberofquadrants,
+        part,
+        discontinuoustopart,
+    )
+
     continuoustodiscontinuous = materializectod(discontinuoustocontinuous)
 
     nodecommpattern = materializenodecommpattern(
@@ -570,8 +581,6 @@ function _get_quadrant_data(gm::GridManager)
     communicatingquadrants, noncommunicatingquadrants =
         materializequadrantcommlists(localnumberofquadrants, quadrantcommpattern)
 
-    part = MPI.Comm_rank(comm(gm)) + 1
-    nparts = MPI.Comm_size(comm(gm))
     GC.@preserve gm begin
         global_first_quadrant = P4estTypes.unsafe_global_first_quadrant(forest(gm))
         offset = global_first_quadrant[part]
