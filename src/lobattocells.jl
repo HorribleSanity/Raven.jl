@@ -1715,16 +1715,25 @@ function materializebrickpoints(
     return points
 end
 
-function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_global)
+function materializedtoc(
+    cell::LobattoCell,
+    dtoc_degree3_local,
+    dtoc_degree3_global,
+    dtor_degree3,
+)
     cellsize = size(cell)
 
     dtoc = zeros(Int, cellsize..., last(size(dtoc_degree3_local)))
+    dtor = zeros(Int, cellsize..., last(size(dtoc_degree3_local)))
 
     if length(dtoc_degree3_global) > 0
         # Compute the offsets for the cell node numbering
-        offsets = zeros(Int, maximum(dtoc_degree3_local) + 1)
+        num_c_degree3 = maximum(dtoc_degree3_local)
+        offsets = zeros(Int, num_c_degree3 + 1)
+        ctor_degree3 = zeros(eltype(dtor_degree3), num_c_degree3)
         for i in eachindex(IndexCartesian(), dtoc_degree3_local)
             l = dtoc_degree3_local[i]
+            ctor_degree3[l] = dtor_degree3[i]
             I = Tuple(i)
             node = I[1:(end-1)]
 
@@ -1766,6 +1775,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
 
         for i in eachindex(IndexCartesian(), dtoc_degree3_local)
             l = dtoc_degree3_local[i]
+            r = ctor_degree3[l]
             offset = offsets[l]
             I = Tuple(i)
             node = I[1:(end-1)]
@@ -1795,6 +1805,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
             if numtwos == 0
                 for (j, k) in enumerate(unrotatedindices)
                     dtoc[k, quad] = j + offset
+                    dtor[k, quad] = r
                 end
 
             elseif numtwos == 1
@@ -1814,6 +1825,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                     pei = orientindex(p, edgedims, ei)
                     k = unrotatedindices[LinearIndices(edgedims)[pei]]
                     dtoc[k, quad] = j + offset
+                    dtor[k, quad] = r
                 end
             elseif numtwos == 2
                 # face
@@ -1840,11 +1852,13 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                     pfi = orientindex(p, facedims, fi)
                     k = unrotatedindices[LinearIndices(facedims)[pfi]]
                     dtoc[k, quad] = j + offset
+                    dtor[k, quad] = r
                 end
             elseif numtwos == 3
                 # volume
                 for (j, k) in enumerate(unrotatedindices)
                     dtoc[k, quad] = j + offset
+                    dtor[k, quad] = r
                 end
             else
                 error("Not implemented")
@@ -1852,7 +1866,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
         end
     end
 
-    return dtoc
+    return dtoc, dtor
 end
 
 function _indextoface(::Val{2}, i)

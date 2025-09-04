@@ -367,6 +367,17 @@ function materializedtoc(forest, ghost, nodes, quadrantcommpattern, comm)
     return (dtoc_local, dtoc_global)
 end
 
+function materializedtop(nodes, comm, dtoc_global)
+    # Produce the part (rank + 1) that owns each continuous node
+
+    firstid = P4estTypes.globalid(nodes, P4estTypes.p4est_locidx_t(0)) + 0x1
+    firstids = MPI.Allgather(firstid, comm)
+
+    dtop = searchsortedlast.(Ref(firstids), dtoc_global)
+
+    return dtop
+end
+
 function extrudedtoc(
     unextrudeddtoc::AbstractArray{T,3},
     columnnumberofquadrants,
@@ -403,6 +414,38 @@ function extrudedtoc(
 
     return reshape(
         dtoc,
+        s[1],
+        s[2],
+        columnnumberofcelldofs,
+        columnnumberofquadrants * s[end],
+    )
+end
+
+function extrudedtop(
+    unextrudeddtop::AbstractArray{T,3},
+    columnnumberofquadrants,
+    columnnumberofcelldofs,
+) where {T}
+    s = size(unextrudeddtop)
+    dtop = similar(
+        unextrudeddtop,
+        s[1],
+        s[2],
+        columnnumberofcelldofs,
+        columnnumberofquadrants,
+        s[end],
+    )
+
+    for q = 1:s[end], c = 1:columnnumberofquadrants
+        for k = 1:columnnumberofcelldofs
+            for j = 1:s[2], i = 1:s[1]
+                dtop[i, j, k, c, q] = unextrudeddtop[i, j, q]
+            end
+        end
+    end
+
+    return reshape(
+        dtop,
         s[1],
         s[2],
         columnnumberofcelldofs,
@@ -449,6 +492,8 @@ function _get_quadrant_data(gm::GridManager)
     (dtoc_degree3_local, dtoc_degree3_global) =
         materializedtoc(forest(gm), ghost, nodes, quadrantcommpattern, comm(gm))
 
+    dtop_degree3 = materializedtop(nodes, comm(gm), dtoc_degree3_global)
+
     quadranttofacecode = materializequadranttofacecode(nodes)
 
     if isextruded(coarsegrid(gm))
@@ -482,12 +527,18 @@ function _get_quadrant_data(gm::GridManager)
             last(isperiodic(coarsegrid(gm))),
         )
 
+        dtop_degree3 = extrudedtop(dtop_degree3, columnnumberofquadrants, 4)
+
         quadranttofacecode =
             extrudequadranttofacecode(quadranttofacecode, columnnumberofquadrants)
     end
 
-    discontinuoustocontinuous =
-        materializedtoc(referencecell(gm), dtoc_degree3_local, dtoc_degree3_global)
+    discontinuoustocontinuous, discontinuoustopart = materializedtoc(
+        referencecell(gm),
+        dtoc_degree3_local,
+        dtoc_degree3_global,
+        dtop_degree3,
+    )
 
     ctod_degree3_local = materializectod(dtoc_degree3_local)
 
