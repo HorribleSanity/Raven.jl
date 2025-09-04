@@ -118,6 +118,7 @@ let
 
     (dtoc_degree_3_local, dtoc_degree_3_global) =
         Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
+    dtop_degree_3 = Raven.materializedtop(nodes, MPI.COMM_WORLD, dtoc_degree_3_global)
 
     quadrantcommpattern_self = Raven.materializequadrantcommpattern(forest_self, ghost_self)
     (dtoc_degree_3_local_self, dtoc_degree_3_global_self) = Raven.materializedtoc(
@@ -160,8 +161,12 @@ let
     end
 
     cell_degree_3 = LobattoCell{Float64,Array}(4, 4)
-    dtoc_degree_3 =
-        Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
+    dtoc_degree_3, _ = Raven.materializedtoc(
+        cell_degree_3,
+        dtoc_degree_3_local,
+        dtoc_degree_3_global,
+        dtop_degree_3,
+    )
 
     if rank == 0
         @test isisomorphic(dtoc_degree_3[:, :, 1:1], dtoc_degree_3_global_self[:, :, 1:1])
@@ -321,6 +326,7 @@ let
 
     (dtoc_degree_3_local, dtoc_degree_3_global) =
         Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
+    dtop_degree_3 = Raven.materializedtop(nodes, MPI.COMM_WORLD, dtoc_degree_3_global)
 
     quadrantcommpattern_self = Raven.materializequadrantcommpattern(forest_self, ghost_self)
     (dtoc_degree_3_local_self, dtoc_degree_3_global_self) = Raven.materializedtoc(
@@ -363,8 +369,12 @@ let
     end
 
     cell_degree_3 = LobattoCell{Float64,Array}(4, 4, 4)
-    dtoc_degree_3 =
-        Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
+    dtoc_degree_3, _ = Raven.materializedtoc(
+        cell_degree_3,
+        dtoc_degree_3_local,
+        dtoc_degree_3_global,
+        dtop_degree_3,
+    )
     if rank == 0
         @test isisomorphic(
             dtoc_degree_3[:, :, :, 1:1],

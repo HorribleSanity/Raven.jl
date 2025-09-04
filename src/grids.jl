@@ -8,7 +8,8 @@ floattype(grid::AbstractGrid) = floattype(typeof(grid))
 arraytype(grid::AbstractGrid) = arraytype(typeof(grid))
 celltype(grid::AbstractGrid) = celltype(typeof(grid))
 
-struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CTOD,DTOC,CC,NCC,FM} <: AbstractGrid{C}
+struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CN,CTOD,DTOC,DTOP,CC,NCC,FM} <:
+       AbstractGrid{C}
     comm::MPI.Comm
     part::Int
     nparts::Int
@@ -24,8 +25,10 @@ struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CTOD,DTOC,CC,NCC,FM} <: AbstractG
     boundarycodes::B
     parentnodes::PN
     nodecommpattern::N
+    cnodecommpattern::CN
     continuoustodiscontinuous::CTOD
     discontinuoustocontinuous::DTOC
+    discontinuoustopart::DTOP
     communicatingcells::CC
     noncommunicatingcells::NCC
     facemaps::FM
@@ -58,6 +61,7 @@ boundarycodes(::Grid, ::Val{true}) =
     throw(error("Boundary codes are currently stored for local quadrants."))
 
 nodecommpattern(grid::Grid) = grid.nodecommpattern
+cnodecommpattern(grid::Grid) = grid.cnodecommpattern
 continuoustodiscontinuous(grid::Grid) = grid.continuoustodiscontinuous
 
 communicatingcells(grid::Grid) = grid.communicatingcells

@@ -112,13 +112,19 @@
         #  1   2   3     3  15  14
         (dtoc_degree_3_local, dtoc_degree_3_global) =
             Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
+        dtop_degree_3 = Raven.materializedtop(nodes, MPI.COMM_WORLD, dtoc_degree_3_global)
         @test dtoc_degree_3_local == dtoc_degree_3_global
         @test dtoc_degree_3_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
 
         cell_degree_3 = LobattoCell{Float64,Array}(4, 4)
-        dtoc_degree_3 =
-            Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
+        dtoc_degree_3, dtop_degree_3_cell = Raven.materializedtoc(
+            cell_degree_3,
+            dtoc_degree_3_local,
+            dtoc_degree_3_global,
+            dtop_degree_3,
+        )
         @test isisomorphic(dtoc_degree_3, dtoc_degree_3_global)
+        @test dtop_degree_3_cell == dtop_degree_3
 
         ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
         @test ctod_degree_3 isa AbstractSparseMatrix
@@ -234,13 +240,19 @@
 
         (dtoc_degree_3_local, dtoc_degree_3_global) =
             Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
+        dtop_degree_3 = Raven.materializedtop(nodes, MPI.COMM_WORLD, dtoc_degree_3_global)
         @test dtoc_degree_3_local == dtoc_degree_3_global
         @test dtoc_degree_3_local == P4estTypes.unsafe_element_nodes(nodes) .+ 0x1
 
         cell_degree_3 = LobattoCell{Float64,Array}(4, 4, 4)
-        dtoc_degree_3 =
-            Raven.materializedtoc(cell_degree_3, dtoc_degree_3_local, dtoc_degree_3_global)
+        dtoc_degree_3, dtop_degree_3_cell = Raven.materializedtoc(
+            cell_degree_3,
+            dtoc_degree_3_local,
+            dtoc_degree_3_global,
+            dtop_degree_3,
+        )
         @test isisomorphic(dtoc_degree_3, dtoc_degree_3_global)
+        @test dtop_degree_3_cell == dtop_degree_3
 
         ctod_degree_3 = Raven.materializectod(dtoc_degree_3)
         @test ctod_degree_3 isa AbstractSparseMatrix

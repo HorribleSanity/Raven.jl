@@ -1715,16 +1715,25 @@ function materializebrickpoints(
     return points
 end
 
-function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_global)
+function materializedtoc(
+    cell::LobattoCell,
+    dtoc_degree3_local,
+    dtoc_degree3_global,
+    dtor_degree3,
+)
     cellsize = size(cell)
 
     dtoc = zeros(Int, cellsize..., last(size(dtoc_degree3_local)))
+    dtor = zeros(Int, cellsize..., last(size(dtoc_degree3_local)))
 
     if length(dtoc_degree3_global) > 0
         # Compute the offsets for the cell node numbering
-        offsets = zeros(Int, maximum(dtoc_degree3_local) + 1)
+        num_c_degree3 = maximum(dtoc_degree3_local)
+        offsets = zeros(Int, num_c_degree3 + 1)
+        ctor_degree3 = zeros(eltype(dtor_degree3), num_c_degree3)
         for i in eachindex(IndexCartesian(), dtoc_degree3_local)
             l = dtoc_degree3_local[i]
+            ctor_degree3[l] = dtor_degree3[i]
             I = Tuple(i)
             node = I[1:(end-1)]
 
@@ -1766,6 +1775,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
 
         for i in eachindex(IndexCartesian(), dtoc_degree3_local)
             l = dtoc_degree3_local[i]
+            r = ctor_degree3[l]
             offset = offsets[l]
             I = Tuple(i)
             node = I[1:(end-1)]
@@ -1795,6 +1805,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
             if numtwos == 0
                 for (j, k) in enumerate(unrotatedindices)
                     dtoc[k, quad] = j + offset
+                    dtor[k, quad] = r
                 end
 
             elseif numtwos == 1
@@ -1814,6 +1825,7 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                     pei = orientindex(p, edgedims, ei)
                     k = unrotatedindices[LinearIndices(edgedims)[pei]]
                     dtoc[k, quad] = j + offset
+                    dtor[k, quad] = r
                 end
             elseif numtwos == 2
                 # face
@@ -1840,11 +1852,13 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
                     pfi = orientindex(p, facedims, fi)
                     k = unrotatedindices[LinearIndices(facedims)[pfi]]
                     dtoc[k, quad] = j + offset
+                    dtor[k, quad] = r
                 end
             elseif numtwos == 3
                 # volume
                 for (j, k) in enumerate(unrotatedindices)
                     dtoc[k, quad] = j + offset
+                    dtor[k, quad] = r
                 end
             else
                 error("Not implemented")
@@ -1852,7 +1866,68 @@ function materializedtoc(cell::LobattoCell, dtoc_degree3_local, dtoc_degree3_glo
         end
     end
 
-    return dtoc
+    return dtoc, dtor
+end
+
+function renumberdtocdtop!(dtoc, dtop, cell::LobattoCell, localnumberofquadrants, part)
+    I = CartesianIndices(size(cell))
+
+    ctop = Dict{Int,Int}()
+    renumbering = Dict{Int,Int}()
+    count = Dict{Int,Int}()
+    count[part] = 0
+
+    parts = filter(p -> p > 0, unique!(sort(vec(dtop))))
+    otherparts = filter(p -> p != part, parts)
+
+    for p in parts
+        count[p] = 0
+    end
+
+    for q = 1:localnumberofquadrants
+        for i in I
+            p = dtop[i, q]
+            _ = get!(renumbering, dtoc[i, q]) do
+                count[p] = count[p] + 1
+            end
+
+            # check to make sure that continuous nodes are only contained by
+            # in one part
+            cp = get!(ctop, dtoc[i, q]) do
+                p
+            end
+            @assert cp == p
+        end
+    end
+
+    runningcount = 0
+    offset = Dict{Int,Int}()
+    offset[part] = runningcount
+    runningcount += count[part]
+    for p in otherparts
+        offset[p] = runningcount
+        runningcount += count[p]
+    end
+
+    for j in eachindex(dtoc, dtop)
+        p = dtop[j]
+        c = dtoc[j]
+
+        newc = get!(renumbering, c) do
+            0
+        end
+
+        if newc == 0
+            newc = runningcount + 1
+            dtop[j] = 0
+        else
+            newc = offset[p] + newc
+        end
+
+        dtoc[j] = newc
+    end
+
+    return
 end
 
 function _indextoface(::Val{2}, i)
@@ -2323,6 +2398,107 @@ function materializenodecommpattern(cell::LobattoCell, ctod, quadrantcommpattern
         recvrankindices,
         sendindices,
         ghostranktompirank,
+        sendrankindices,
+    )
+end
+
+function materializecnodecommpattern(
+    cell::LobattoCell,
+    ctod,
+    dtoc,
+    dtop,
+    localnumberofquadrants,
+    part,
+    quadrantcommpattern,
+)
+    I = CartesianIndices(size(cell))
+
+    ghostranktompirank = quadrantcommpattern.recvranks
+    ghostranktorecvquad = quadrantcommpattern.recvrankindices
+    recvquadtoquad = quadrantcommpattern.recvindices
+
+    ranktype = eltype(ghostranktompirank)
+    indicestype = eltype(dtoc)
+
+    parttosenddofs = Dict{ranktype,Set{indicestype}}()
+    recvdofs = Set{indicestype}()
+
+    parttosendindices = Dict{ranktype,Vector{indicestype}}()
+    parttorecvindices = Dict{ranktype,Vector{indicestype}}()
+
+    # Collect cdofs to receive
+    for q = 1:localnumberofquadrants
+        for i in I
+            p = dtop[i, q]
+            if p > 0 && p != part
+                c = dtoc[i, q]
+                if c ∉ recvdofs
+                    recvvec = get!(parttorecvindices, p) do
+                        Vector{indicestype}(undef, 0)
+                    end
+                    push!(recvvec, c)
+                    push!(recvdofs, c)
+                end
+            end
+        end
+    end
+
+    # Collect cdofs to send
+    for gr in eachindex(ghostranktompirank, ghostranktorecvquad)
+        r = ghostranktompirank[gr]
+        for rq in ghostranktorecvquad[gr]
+            q = recvquadtoquad[rq]
+            for i in I
+                if dtop[i, q] == part
+                    c = dtoc[i, q]
+                    senddofs = get!(parttosenddofs, r + 0x1) do
+                        Set{indicestype}()
+                    end
+                    if c ∉ senddofs
+                        sendvec = get!(parttosendindices, r + 0x1) do
+                            Vector{indicestype}(undef, 0)
+                        end
+                        push!(sendvec, c)
+                        push!(senddofs, c)
+                    end
+                end
+            end
+        end
+    end
+
+    recvghostranktompirank = sort!(collect(keys(parttorecvindices))) .- 0x1
+    sendghostranktompirank = sort!(collect(keys(parttosendindices))) .- 0x1
+
+    recvindices = indicestype[]
+    sendindices = indicestype[]
+
+    recvrankindices = Vector{UnitRange{Int}}(undef, length(recvghostranktompirank))
+    sendrankindices = Vector{UnitRange{Int}}(undef, length(sendghostranktompirank))
+
+    recvoffset = 0
+    for gr in eachindex(recvghostranktompirank)
+        p = recvghostranktompirank[gr] + 0x1
+        rg = UnitRange(1, length(parttorecvindices[p])) .+ recvoffset
+        recvrankindices[gr] = rg
+        recvindices = vcat(recvindices, parttorecvindices[p])
+        recvoffset += length(parttorecvindices[p])
+    end
+
+    sendoffset = 0
+    for gr in eachindex(sendghostranktompirank)
+        p = sendghostranktompirank[gr] + 0x1
+        rg = UnitRange(1, length(parttosendindices[p])) .+ sendoffset
+        sendrankindices[gr] = rg
+        sendindices = vcat(sendindices, parttosendindices[p])
+        sendoffset += length(parttosendindices[p])
+    end
+
+    return CommPattern{Array}(
+        recvindices,
+        recvghostranktompirank,
+        recvrankindices,
+        sendindices,
+        sendghostranktompirank,
         sendrankindices,
     )
 end

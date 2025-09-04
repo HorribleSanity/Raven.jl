@@ -367,6 +367,17 @@ function materializedtoc(forest, ghost, nodes, quadrantcommpattern, comm)
     return (dtoc_local, dtoc_global)
 end
 
+function materializedtop(nodes, comm, dtoc_global)
+    # Produce the part (rank + 1) that owns each continuous node
+
+    firstid = P4estTypes.globalid(nodes, P4estTypes.p4est_locidx_t(0)) + 0x1
+    firstids = MPI.Allgather(firstid, comm)
+
+    dtop = searchsortedlast.(Ref(firstids), dtoc_global)
+
+    return dtop
+end
+
 function extrudedtoc(
     unextrudeddtoc::AbstractArray{T,3},
     columnnumberofquadrants,
@@ -403,6 +414,38 @@ function extrudedtoc(
 
     return reshape(
         dtoc,
+        s[1],
+        s[2],
+        columnnumberofcelldofs,
+        columnnumberofquadrants * s[end],
+    )
+end
+
+function extrudedtop(
+    unextrudeddtop::AbstractArray{T,3},
+    columnnumberofquadrants,
+    columnnumberofcelldofs,
+) where {T}
+    s = size(unextrudeddtop)
+    dtop = similar(
+        unextrudeddtop,
+        s[1],
+        s[2],
+        columnnumberofcelldofs,
+        columnnumberofquadrants,
+        s[end],
+    )
+
+    for q = 1:s[end], c = 1:columnnumberofquadrants
+        for k = 1:columnnumberofcelldofs
+            for j = 1:s[2], i = 1:s[1]
+                dtop[i, j, k, c, q] = unextrudeddtop[i, j, q]
+            end
+        end
+    end
+
+    return reshape(
+        dtop,
         s[1],
         s[2],
         columnnumberofcelldofs,
@@ -449,6 +492,8 @@ function _get_quadrant_data(gm::GridManager)
     (dtoc_degree3_local, dtoc_degree3_global) =
         materializedtoc(forest(gm), ghost, nodes, quadrantcommpattern, comm(gm))
 
+    dtop_degree3 = materializedtop(nodes, comm(gm), dtoc_degree3_global)
+
     quadranttofacecode = materializequadranttofacecode(nodes)
 
     if isextruded(coarsegrid(gm))
@@ -482,12 +527,18 @@ function _get_quadrant_data(gm::GridManager)
             last(isperiodic(coarsegrid(gm))),
         )
 
+        dtop_degree3 = extrudedtop(dtop_degree3, columnnumberofquadrants, 4)
+
         quadranttofacecode =
             extrudequadranttofacecode(quadranttofacecode, columnnumberofquadrants)
     end
 
-    discontinuoustocontinuous =
-        materializedtoc(referencecell(gm), dtoc_degree3_local, dtoc_degree3_global)
+    discontinuoustocontinuous, discontinuoustopart = materializedtoc(
+        referencecell(gm),
+        dtoc_degree3_local,
+        dtoc_degree3_global,
+        dtop_degree3,
+    )
 
     ctod_degree3_local = materializectod(dtoc_degree3_local)
 
@@ -501,11 +552,32 @@ function _get_quadrant_data(gm::GridManager)
         quadranttoglobalid,
     )
 
+    part = MPI.Comm_rank(comm(gm)) + 1
+    nparts = MPI.Comm_size(comm(gm))
+
+    renumberdtocdtop!(
+        discontinuoustocontinuous,
+        discontinuoustopart,
+        referencecell(gm),
+        localnumberofquadrants,
+        part,
+    )
+
     continuoustodiscontinuous = materializectod(discontinuoustocontinuous)
 
     nodecommpattern = materializenodecommpattern(
         referencecell(gm),
         continuoustodiscontinuous,
+        quadrantcommpattern,
+    )
+
+    cnodecommpattern = materializecnodecommpattern(
+        referencecell(gm),
+        continuoustodiscontinuous,
+        discontinuoustocontinuous,
+        discontinuoustopart,
+        localnumberofquadrants,
+        part,
         quadrantcommpattern,
     )
 
@@ -519,8 +591,6 @@ function _get_quadrant_data(gm::GridManager)
     communicatingquadrants, noncommunicatingquadrants =
         materializequadrantcommlists(localnumberofquadrants, quadrantcommpattern)
 
-    part = MPI.Comm_rank(comm(gm)) + 1
-    nparts = MPI.Comm_size(comm(gm))
     GC.@preserve gm begin
         global_first_quadrant = P4estTypes.unsafe_global_first_quadrant(forest(gm))
         offset = global_first_quadrant[part]
@@ -534,8 +604,10 @@ function _get_quadrant_data(gm::GridManager)
     quadranttoboundary = A(pin(A, quadranttoboundary))
     parentnodes = A(pin(A, parentnodes))
     nodecommpattern = Adapt.adapt(A, nodecommpattern)
+    cnodecommpattern = Adapt.adapt(A, cnodecommpattern)
     continuoustodiscontinuous = adaptsparse(A, continuoustodiscontinuous)
     discontinuoustocontinuous = Adapt.adapt(A, discontinuoustocontinuous)
+    discontinuoustopart = Adapt.adapt(A, discontinuoustopart)
     communicatingquadrants = Adapt.adapt(A, communicatingquadrants)
     noncommunicatingquadrants = Adapt.adapt(A, noncommunicatingquadrants)
     facemaps = Adapt.adapt(A, facemaps)
@@ -552,8 +624,10 @@ function _get_quadrant_data(gm::GridManager)
         quadranttoboundary,
         parentnodes,
         nodecommpattern,
+        cnodecommpattern,
         continuoustodiscontinuous,
         discontinuoustocontinuous,
+        discontinuoustopart,
         communicatingquadrants,
         noncommunicatingquadrants,
         facemaps,
@@ -786,6 +860,46 @@ function _get_connectivity_1d_brick(
         end
     end
 
+    discontinuoustopart = zeros(Int, points_per_quad, nquads)
+    if hasleftghost
+        for i = 1:points_per_quad
+            discontinuoustopart[i, lid] = pl
+        end
+    end
+    for e = 1:localnumberofquadrants
+        for i = 1:points_per_quad
+            discontinuoustopart[i, e] = part
+        end
+    end
+    if hasrightghost
+        for i = 1:points_per_quad
+            discontinuoustopart[i, rid] = pr
+        end
+    end
+
+    if localnumberofquadrants > 0 && hasleftghost && pl < part
+        discontinuoustopart[1, 1] = pl
+    end
+
+    if localnumberofquadrants > 0 && hasrightghost && part < pr
+        discontinuoustopart[1, rid] = part
+    end
+
+    if localnumberofquadrants > 0 && hasleftghost && part < pl
+        @assert periodic
+        discontinuoustopart[end, lid] = part
+    end
+
+    if localnumberofquadrants > 0 && hasrightghost && pr < part
+        @assert periodic
+        discontinuoustopart[end, localnumberofquadrants] = pr
+    end
+
+    # Fix continuous node numbering if there is only one rank with elements
+    if periodic && globalnumberofquadrants == localnumberofquadrants
+        discontinuoustocontinuous[end, end] = discontinuoustocontinuous[1, 1]
+    end
+
     return (
         quadranttoquadrant,
         quadranttoface,
@@ -795,6 +909,7 @@ function _get_connectivity_1d_brick(
         offset,
         localnumberofquadrants,
         discontinuoustocontinuous,
+        discontinuoustopart,
     )
 end
 
@@ -820,6 +935,7 @@ function _get_quadrant_data(gm::Any1DBrickGridManager)
         offset,
         localnumberofquadrants,
         discontinuoustocontinuous,
+        discontinuoustopart,
     ) = _get_connectivity_1d_brick(
         globalnumberofcoarsequadrants,
         globalnumberofquadrants,
@@ -856,11 +972,29 @@ function _get_quadrant_data(gm::Any1DBrickGridManager)
         end
     end
 
+    renumberdtocdtop!(
+        discontinuoustocontinuous,
+        discontinuoustopart,
+        referencecell(gm),
+        localnumberofquadrants,
+        part,
+    )
+
     continuoustodiscontinuous = materializectod(discontinuoustocontinuous)
 
     nodecommpattern = materializenodecommpattern(
         referencecell(gm),
         continuoustodiscontinuous,
+        quadrantcommpattern,
+    )
+
+    cnodecommpattern = materializecnodecommpattern(
+        referencecell(gm),
+        continuoustodiscontinuous,
+        discontinuoustocontinuous,
+        discontinuoustopart,
+        localnumberofquadrants,
+        part,
         quadrantcommpattern,
     )
 
@@ -931,8 +1065,10 @@ function _get_quadrant_data(gm::Any1DBrickGridManager)
         quadranttoboundary,
         parentnodes,
         nodecommpattern,
+        cnodecommpattern,
         continuoustodiscontinuous,
         discontinuoustocontinuous,
+        discontinuoustopart,
         communicatingquadrants,
         noncommunicatingquadrants,
         facemaps,
@@ -958,8 +1094,10 @@ function generate(warp::Function, gm::GridManager)
     quadranttoboundary = qd.quadranttoboundary
     parentnodes = qd.parentnodes
     nodecommpattern = qd.nodecommpattern
+    cnodecommpattern = qd.cnodecommpattern
     continuoustodiscontinuous = qd.continuoustodiscontinuous
     discontinuoustocontinuous = qd.discontinuoustocontinuous
+    discontinuoustopart = qd.discontinuoustopart
     communicatingquadrants = qd.communicatingquadrants
     noncommunicatingquadrants = qd.noncommunicatingquadrants
     facemaps = qd.facemaps
@@ -1051,8 +1189,10 @@ function generate(warp::Function, gm::GridManager)
         quadranttoboundary,
         parentnodes,
         nodecommpattern,
+        cnodecommpattern,
         continuoustodiscontinuous,
         discontinuoustocontinuous,
+        discontinuoustopart,
         communicatingquadrants,
         noncommunicatingquadrants,
         facemaps,
