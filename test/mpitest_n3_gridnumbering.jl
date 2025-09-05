@@ -118,7 +118,7 @@ let
 
     (dtoc_degree_3_local, dtoc_degree_3_global) =
         Raven.materializedtoc(forest, ghost, nodes, quadrantcommpattern, MPI.COMM_WORLD)
-    dtop_degree_3 = materializedtop(nodes, MPI.COMM_WORLD, dtoc_degree3_global)
+    dtop_degree_3 = Raven.materializedtop(nodes, MPI.COMM_WORLD, dtoc_degree3_global)
 
     quadrantcommpattern_self = Raven.materializequadrantcommpattern(forest_self, ghost_self)
     (dtoc_degree_3_local_self, dtoc_degree_3_global_self) = Raven.materializedtoc(
