@@ -249,7 +249,7 @@
             cell_degree_3,
             dtoc_degree_3_local,
             dtoc_degree_3_global,
-            dtoc_degree_3,
+            dtop_degree_3,
         )
         @test isisomorphic(dtoc_degree_3, dtoc_degree_3_global)
         @test dtop_degree_3_cell == dtop_degree_3
