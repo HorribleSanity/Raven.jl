@@ -699,8 +699,8 @@ function _get_connectivity_1d_brick(
         end
     end
 
-    # Fix connectivity if there is only one rank
-    if periodic && nparts == 1
+    # Fix connectivity if there is only one rank with elements
+    if periodic && globalnumberofquadrants == localnumberofquadrants
         quadranttoquadrant[1, 1] = mod1(quadranttoquadrant[1, 1], localnumberofquadrants)
         quadranttoquadrant[2, end] =
             mod1(quadranttoquadrant[2, end], localnumberofquadrants)
