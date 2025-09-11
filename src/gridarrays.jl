@@ -77,8 +77,19 @@ function GridArray{T}(
         end
     end
 
-    datawithghosts = A{E}(undef, insert(dimswithghosts, Val(fieldindex), L))
-    data = view(datawithghosts, (ntuple(_ -> Colon(), Val(N))..., Base.OneTo(dims[end]))...)
+    parentdims = insert(dims, Val(fieldindex), L)
+    parentdimswithghosts = insert(dimswithghosts, Val(fieldindex), L)
+
+    datawithghosts = A{E}(undef, parentdimswithghosts)
+    data = view(
+        datawithghosts,
+        (ntuple(
+            n ->
+                parentdims[n] == parentdimswithghosts[n] ? Colon() :
+                Base.OneTo(parentdims[n]),
+            Val(N + 1),
+        ))...,
+    )
 
     C = typeof(comm)
     D = typeof(data)
