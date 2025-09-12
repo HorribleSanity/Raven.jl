@@ -11,6 +11,8 @@ end
     return (I[1:(m-1)]..., i, I[m:end]...)::NTuple{N + 1,Int}
 end
 
+abstract type AbstractGridArray{T,N,A,G,F,L,C,D,W} <: AbstractArray{T,N} end
+
 """
     GridArray{T,N,A,G,F,L,C,D,W} <: AbstractArray{T,N}
 
@@ -24,7 +26,7 @@ indexed via index `F`.
 `GridArray` also stores values for the ghost cells of the grid which are
 accessible if `G==true`.
 """
-struct GridArray{T,N,A,G,F,L,C,D,W} <: AbstractArray{T,N}
+struct GridArray{T,N,A,G,F,L,C,D,W} <: AbstractGridArray{T,N,A,G,F,L,C,D,W}
     """MPI.Comm used for communication"""
     comm::C
     """View of the backing data array without the ghost cells"""
@@ -37,9 +39,10 @@ struct GridArray{T,N,A,G,F,L,C,D,W} <: AbstractArray{T,N}
     dimswithghosts::NTuple{N,Int}
 end
 
-const GridVecOrMat{T} = Union{GridArray{T,1},GridArray{T,2}}
+const GridVecOrMat{T} = Union{AbstractGridArray{T,1},AbstractGridArray{T,2}}
 
-AnyGridArray{T,N} = Union{GridArray{T,N},WrappedArray{T,N,GridArray,GridArray{T,N}}}
+AnyGridArray{T,N} =
+    Union{AbstractGridArray{T,N},WrappedArray{T,N,AbstractGridArray,AbstractGridArray{T,N}}}
 AnyGridVector{T} = AnyGridArray{T,1}
 AnyGridMatrix{T} = AnyGridArray{T,2}
 AnyGridVecOrMat{T} = Union{AnyGridVector{T},AnyGridMatrix{T}}
