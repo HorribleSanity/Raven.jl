@@ -16,6 +16,8 @@ struct Grid{C<:AbstractCell,P,V,S,L,T,F,B,PN,N,CN,CTOD,DTOC,DTOP,CC,NCC,FM} <:
     cell::C
     offset::Int
     locallength::Int
+    numcnodes::Int
+    numcnodeswithghosts::Int
     points::P
     volumemetrics::V
     surfacemetrics::S
@@ -79,6 +81,10 @@ offset(grid::Grid) = grid.offset
 numcells(grid::Grid) = numcells(grid, Val(false))
 numcells(grid::Grid, ::Val{false}) = grid.locallength
 numcells(grid::Grid, ::Val{true}) = length(grid.levels)
+
+numcnodes(grid::Grid) = numcnodes(grid, Val(false))
+numcnodes(grid::Grid, ::Val{false}) = grid.numcnodes
+numcnodes(grid::Grid, ::Val{true}) = grid.numcnodeswithghosts
 
 Base.length(grid::Grid) = grid.locallength
 partitionnumber(grid::Grid) = grid.part

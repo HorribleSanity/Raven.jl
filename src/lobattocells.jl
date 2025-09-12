@@ -1909,6 +1909,7 @@ function renumberdtocdtop!(dtoc, dtop, cell::LobattoCell, localnumberofquadrants
         runningcount += count[p]
     end
 
+    unusedghost = false
     for j in eachindex(dtoc, dtop)
         p = dtop[j]
         c = dtoc[j]
@@ -1918,6 +1919,7 @@ function renumberdtocdtop!(dtoc, dtop, cell::LobattoCell, localnumberofquadrants
         end
 
         if newc == 0
+            unusedghost = true
             newc = runningcount + 1
             dtop[j] = 0
         else
@@ -1927,7 +1929,10 @@ function renumberdtocdtop!(dtoc, dtop, cell::LobattoCell, localnumberofquadrants
         dtoc[j] = newc
     end
 
-    return
+    numcnodes = count[part]
+    numcnodeswithghosts = runningcount + unusedghost
+
+    return (numcnodes, numcnodeswithghosts)
 end
 
 function _indextoface(::Val{2}, i)

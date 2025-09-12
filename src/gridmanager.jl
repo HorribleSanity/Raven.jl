@@ -555,7 +555,7 @@ function _get_quadrant_data(gm::GridManager)
     part = MPI.Comm_rank(comm(gm)) + 1
     nparts = MPI.Comm_size(comm(gm))
 
-    renumberdtocdtop!(
+    numcnodes, numcnodeswithghosts = renumberdtocdtop!(
         discontinuoustocontinuous,
         discontinuoustopart,
         referencecell(gm),
@@ -622,6 +622,8 @@ function _get_quadrant_data(gm::GridManager)
         quadranttocoordinate,
         quadranttofacecode,
         quadranttoboundary,
+        numcnodes,
+        numcnodeswithghosts,
         parentnodes,
         nodecommpattern,
         cnodecommpattern,
@@ -972,7 +974,7 @@ function _get_quadrant_data(gm::Any1DBrickGridManager)
         end
     end
 
-    renumberdtocdtop!(
+    numcnodes, numcnodeswithghosts = renumberdtocdtop!(
         discontinuoustocontinuous,
         discontinuoustopart,
         referencecell(gm),
@@ -1063,6 +1065,8 @@ function _get_quadrant_data(gm::Any1DBrickGridManager)
         quadranttocoordinate,
         quadranttofacecode,
         quadranttoboundary,
+        numcnodes,
+        numcnodeswithghosts,
         parentnodes,
         nodecommpattern,
         cnodecommpattern,
@@ -1101,6 +1105,8 @@ function generate(warp::Function, gm::GridManager)
     communicatingquadrants = qd.communicatingquadrants
     noncommunicatingquadrants = qd.noncommunicatingquadrants
     facemaps = qd.facemaps
+    numcnodes = qd.numcnodes
+    numcnodeswithghosts = qd.numcnodeswithghosts
 
     if coarsegrid(gm) isa AbstractBrickGrid
         points = materializebrickpoints(
@@ -1180,6 +1186,8 @@ function generate(warp::Function, gm::GridManager)
         referencecell(gm),
         offset,
         convert(Int, localnumberofquadrants),
+        numcnodes,
+        numcnodeswithghosts,
         points,
         volumemetrics,
         surfacemetrics,
