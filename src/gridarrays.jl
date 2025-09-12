@@ -108,12 +108,15 @@ function GridArray{T}(
 end
 
 """
-    GridArray{T}(undef, grid::Grid)
+    GridArray{T}(undef, grid::Grid, continuous = Val(false))
 
 Create an array containing elements of type `T` for each point in the grid
-(including the ghost cells).  The dimensions of the array is
-`(size(referencecell(grid))..., length(grid))` as the ghost cells are hidden by
-default.
+(including the ghost cells).  When `continuous = Val(false)` the dimensions
+of the array is `(size(referencecell(grid))..., length(grid))` as the
+ghost cells are hidden by default.
+When `continuous = Val(true)` the dimensions
+of the array is `(numcnodes(grid,)`. as the
+ghost cells are hidden by default.
 
 The type `T` is assumed to be able to be interpreted into an `NTuple{M,L}`.
 Some example types (some using `StructArrays`) are:
@@ -162,7 +165,11 @@ For a `GridArray` the indices before the ones associated with `T` (the first
 two in the example above) are associated with the degrees-of-freedoms of the
 cells.  The one after is associated with the number of cells.
 """
-function GridArray{T}(::UndefInitializer, grid::Grid) where {T}
+function GridArray{T}(::UndefInitializer, grid::Grid, continuous = Val(false)) where {T}
+    GridArray{T}(undef, grid, continuous)
+end
+
+function GridArray{T}(::UndefInitializer, grid::Grid, ::Val{false}) where {T}
     A = arraytype(grid)
     dims = (size(referencecell(grid))..., Int(numcells(grid, Val(false))))
     dimswithghosts = (size(referencecell(grid))..., Int(numcells(grid, Val(true))))
@@ -171,7 +178,18 @@ function GridArray{T}(::UndefInitializer, grid::Grid) where {T}
     return GridArray{T}(undef, A, dims, dimswithghosts, comm(grid), false, F)
 end
 
-GridArray(::UndefInitializer, grid::Grid) = GridArray{Float64}(undef, grid)
+function GridArray{T}(::UndefInitializer, grid::Grid, ::Val{true}) where {T}
+
+    A = arraytype(grid)
+    dims = (numcnodes(grid, Val(false)),)
+    dimswithghosts = (numcnodes(grid, Val(true)),)
+    F = length(dims) + 1
+
+    return GridArray{T}(undef, A, dims, dimswithghosts, comm(grid), false, F)
+end
+
+GridArray(::UndefInitializer, grid::Grid, continuous = Val(false)) =
+    GridArray{Float64}(undef, grid, continuous)
 
 function Base.showarg(io::IO, a::GridArray{T,N,A,G,F}, toplevel) where {T,N,A,G,F}
     !toplevel && print(io, "::")
