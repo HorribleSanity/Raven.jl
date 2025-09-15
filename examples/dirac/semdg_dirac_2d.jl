@@ -14,17 +14,15 @@
 #       - data trasfer kernel
 #jl     - recursion kernel
 #jl #FIXME: add introduction to dirac equation latex
-#   #FIXME: LR implementation
-#   #FIXME: compute error on GPU
+#   #FIXME: (!) compute error on GPU
 #   #FIXME: is async Kernel launch hurting me??
-#   #FIXME: stupid thread count convention
+#   #FIXME: (!) stupid thread count convention
 #   #FIXME: homaginize recursion kernels
 #   #FIXME: reduce crbc memory model
-#   #FIXME: bounds check unsafe_indices & inline everything & inbounds
+#   #FIXME: (!) bounds check unsafe_indices & inline everything & inbounds
 #   #FIXME: cli flags
-#   #FIXME: tic toc pregress
 #   #FIXME: realify dirac
-#   #FIXME: num dofs in report
+#   #FIXME: (!) num dofs in report
 #--------------------------------Markdown Language Header-----------------------
 using Base: sign_mask, specializations
 using Adapt
@@ -39,12 +37,9 @@ using StaticArrays
 using WriteVTK
 
 using MAT
-using NVTX
 using SpecialFunctions
 
 #https://github.com/guiyrt/MLinJulia/blob/5b0cf79258848e2723dc270b550066cac07af5a9/src/calodiffusion/profile_cuda.jl#L3
-NVTX.enable_gc_hooks(; gc=true, alloc=true, free=true)
-NVTX.enable_inference_hook()
 import Base.abs2
 
 const convergetest = false
@@ -69,7 +64,7 @@ const f(x, y) = m * x
 const K = 16
 const delta_x = 1.0
 const delta_y = 1.0
-const timeend = 5.0
+const timeend = 1.0
 const polydegree = 4
 const N = (polydegree, polydegree)
 
@@ -99,7 +94,7 @@ end
 
 @kernel function gaussian!(q, mesh, ::Val{N}) where {N}
     i, j, _ = @index(Local, NTuple)
-    _, _, c = @index(Global, NTuple)
+    _, _, c = @index(Group, NTuple)
 
     x = mesh[i, j, c]
     qvec = SVector{2,eltype(eltype(q))}(1, -im) # vert (1, -im), horz (1, 1)
@@ -159,7 +154,7 @@ end
 end
 
 # ∂ₜψ = -σ₁∂ₓψ-im(y)σ₃ψ
-@kernel function crbc_tangent_kernel_tb!(
+@kernel function crbc_tangent_tb!(
     dq,
     q,
     dRdX,
@@ -169,9 +164,11 @@ end
     materialparams,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    i, j, c1 = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
-    _, _, c = @index(Global, NTuple) # global cell numbering
+    ::Val{S}
+) where {N,C,S}
+    i, j, cl = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
+    cg = @index(Group, Linear) # global cell numbering
+    c = (cg - 1) * C + cl
 
     # C compile time data corrisponding to cells per workgroup
     lDT1 = @localmem eltype(eltype(q)) (N[1], N[1])
@@ -183,31 +180,33 @@ end
     σ₂ = SA[0.0 -im; im 0.0]
     σ₃ = SA[1.0 0.0; 0.0 -1.0]
 
-    @inbounds begin
+    if c <= S
         for sj = 0x0:N[2]:(N[1]-0x1) # Sets stride in j
-            if j + sj <= N[1] && c1 == 0x1 # localmemory is shared amongst a workgroup so only c1 needs to work
+            if j + sj <= N[1] && cl == 0x1 # localmemory is shared amongst a workgroup so only cl needs to work
                 lDT1[i, j+sj] = DT[1][i, j+sj]
             end
         end
 
         for si = 0x0:N[1]:(N[2]-0x1)
-            if i + si <= N[2] && c1 == 0x1
+            if i + si <= N[2] && cl == 0x1
                 lDT2[i+si, j] = DT[2][i+si, j]
             end
         end
 
         # data (i, j) in global index cell c
         qijc = q[i, j, c]
-        lU[i, j, c1] = qijc
+        lU[i, j, cl] = qijc
     end
 
     @synchronize
 
+    c = (cg - 1) * C + cl
+
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
     σ₃ = SA[1.0 0.0; 0.0 -1.0]
-    # Here a thread will compute the (i,j)th component of the dq matrix where i,j is the dof and c is the global cell index
-    @inbounds begin
+
+    if c <= S
         dqijc_update = -zero(eltype(dq))
         invwJijc = invwJ[i, j, c]
 
@@ -217,19 +216,19 @@ end
         matparamijc = materialparams[i, j, c]
 
         @unroll for m = 0x1:N[1]
-            dqijc_update -= wJdRdXijc[1] * lDT1[i, m] * σ₁ * lU[m, j, c1] # -rₓDᵣσ₁u
+            dqijc_update -= wJdRdXijc[1] * lDT1[i, m] * σ₁ * lU[m, j, cl] # -rₓDᵣσ₁u
         end
 
         @unroll for n = 0x1:N[2]
-            dqijc_update -= wJdRdXijc[2] * lDT2[j, n] * σ₁ * lU[i, n, c1] # -sₓDₛσ₁u
+            dqijc_update -= wJdRdXijc[2] * lDT2[j, n] * σ₁ * lU[i, n, cl] # -sₓDₛσ₁u
         end
 
-        dq[i, j, c] = invwJijc * dqijc_update - im * matparamijc * σ₃ * lU[i, j, c1]
+        dq[i, j, c] = invwJijc * dqijc_update - im * matparamijc * σ₃ * lU[i, j, cl]
     end
 end
 
 # ∂ₜψ = -σ₂∂ᵥψ -im(y)σ₃ψ
-@kernel function crbc_tangent_kernel_lr!(
+@kernel inbounds=true unsafe_indices=true function crbc_tangent_lr!(
     dq,
     q,
     dRdX,
@@ -239,45 +238,49 @@ end
     materialparams,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    i, j, c1 = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
-    _, _, c = @index(Global, NTuple) # global cell numbering
+    ::Val{S}
+) where {N,C,S}
+    i, j, cl = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
+    cg = @index(Group, Linear) # global cell numbering
+    c = (cg - 1) * C + cl
 
     # C compile time data corrisponding to cells per workgroup
     lDT1 = @localmem eltype(eltype(q)) (N[1], N[1])
     lDT2 = @localmem eltype(eltype(q)) (N[2], N[2])
     lU = @localmem eltype(q) (N..., C) # local solution at prod(N) dofs in C cells of domain
 
-    # Pauli Matrices: SA denotes StaticArrays
-    σ₁ = SA[0.0 1.0; 1.0 0.0]
-    σ₂ = SA[0.0 -im; im 0.0]
-    σ₃ = SA[1.0 0.0; 0.0 -1.0]
+    if c <= S
+        # Pauli Matrices: SA denotes StaticArrays
+        σ₁ = SA[0.0 1.0; 1.0 0.0]
+        σ₂ = SA[0.0 -im; im 0.0]
+        σ₃ = SA[1.0 0.0; 0.0 -1.0]
 
-    @inbounds begin
         for sj = 0x0:N[2]:(N[1]-0x1) # Sets stride in j
-            if j + sj <= N[1] && c1 == 0x1 # localmemory is shared amongst a workgroup so only c1 needs to work
+            if j + sj <= N[1] && cl == 0x1 # localmemory is shared amongst a workgroup so only c1 needs to work
                 lDT1[i, j+sj] = DT[1][i, j+sj]
             end
         end
 
         for si = 0x0:N[1]:(N[2]-0x1)
-            if i + si <= N[2] && c1 == 0x1
+            if i + si <= N[2] && cl == 0x1
                 lDT2[i+si, j] = DT[2][i+si, j]
             end
         end
 
         # data (i, j) in global index cell c
         qijc = q[i, j, c]
-        lU[i, j, c1] = qijc
+        lU[i, j, cl] = qijc
     end
 
     @synchronize
 
-    σ₁ = SA[0.0 1.0; 1.0 0.0]
-    σ₂ = SA[0.0 -im; im 0.0]
-    σ₃ = SA[1.0 0.0; 0.0 -1.0]
+    c = (cg - 1) * C + cl
+
+    if c <= S
+        σ₁ = SA[0.0 1.0; 1.0 0.0]
+        σ₂ = SA[0.0 -im; im 0.0]
+        σ₃ = SA[1.0 0.0; 0.0 -1.0]
     # Here a thread will compute the (i,j)th component of the dq matrix where i,j is the dof and c is the global cell index
-    @inbounds begin
         dqijc_update = -zero(eltype(dq))
         invwJijc = invwJ[i, j, c]
 
@@ -288,74 +291,80 @@ end
 
 
         @unroll for m = 0x1:N[1]
-            dqijc_update -= wJdRdXijc[3] * lDT1[i, m] * σ₂ * lU[m, j, c1] # -rᵥDᵣσ₂u
+            dqijc_update -= wJdRdXijc[3] * lDT1[i, m] * σ₂ * lU[m, j, cl] # -rᵥDᵣσ₂u
         end
 
         @unroll for n = 0x1:N[2]
-            dqijc_update -= wJdRdXijc[4] * lDT2[j, n] * σ₂ * lU[i, n, c1] # -sᵥDₛσ₂u
+            dqijc_update -= wJdRdXijc[4] * lDT2[j, n] * σ₂ * lU[i, n, cl] # -sᵥDₛσ₂u
         end
 
-        dq[i, j, c] = invwJijc * dqijc_update - im * matparamijc * σ₃ * lU[i, j, c1]
+        dq[i, j, c] = invwJijc * dqijc_update - im * matparamijc * σ₃ * lU[i, j, cl]
     end
 end
 
 
 # ∂ₜψ = dqdtan-σ₂∂ᵥψ
-@kernel function crbc_volume_kernel_top!(
+@kernel inbounds=true unsafe_indices=true function crbc_volume_top!(
     dq,
     q,
     dqdtan,
     dwdn,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    i, j, c1 = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
-    _, _, c = @index(Global, NTuple) # global cell numbering
+    ::Val{S},
+) where {N,C,S}
+    i, j, cl = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
+    cg = @index(Group, Linear) # global cell numbering
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
     σ₃ = SA[1.0 0.0; 0.0 -1.0]
-    @inbounds begin
-        P = SA[0.5 0.5; 0.5im -0.5im]
+    P = SA[0.5 0.5; 0.5im -0.5im]
+    c = (cg - 1) * C + cl
 
+    if c <= S
         dq[i, j, c] += dqdtan[i, j, c] - σ₂ * P * dwdn[i, j, c]
     end
 end
 
-@kernel function crbc_volume_kernel_bottom!(
+@kernel inbounds=true unsafe_indices=true function crbc_volume_bottom!(
     dq,
     q,
     dqdtan,
     dwdn,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    i, j, c1 = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
-    _, _, c = @index(Global, NTuple) # global cell numbering
+    ::Val{S}
+) where {N,C,S}
+    i, j, cl = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
+    cg = @index(Group, Linear) # global cell numbering
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
     σ₃ = SA[1.0 0.0; 0.0 -1.0]
-    @inbounds begin
-        P = SA[0.5 0.5; -0.5im 0.5im]
+    P = SA[0.5 0.5; -0.5im 0.5im]
+    c = (cg - 1) * C + cl
 
+    if c <= S
         dq[i, j, c] += dqdtan[i, j, c] - σ₂ * P * dwdn[i, j, c]
     end
 end
 
-@kernel function crbc_volume_kernel_left!(
+@kernel function crbc_volume_left!(
     dq,
     q,
     dqdtan,
     dwdn,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    i, j, c1 = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
-    _, _, c = @index(Global, NTuple) # global cell numbering
+    ::Val{S}
+) where {N,C,S}
+    i, j, cl = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
+    cg = @index(Group, Linear) # global cell numbering
+    c = (cg - 1) * C + cl
 
-    σ₁ = SA[0.0 1.0; 1.0 0.0]
-    @inbounds begin
+    if c <= S
+        σ₁ = SA[0.0 1.0; 1.0 0.0]
         P = SA[0.5 0.5; -0.5 0.5]
 
         dq[i, j, c] += dqdtan[i, j, c] - σ₁ * P * dwdn[i, j, c]
@@ -363,19 +372,20 @@ end
 end
 
 
-@kernel function crbc_volume_kernel_right!(
+@kernel inbounds=true unsafe_indices=true function crbc_volume_right!(
     dq,
     q,
     dqdtan,
     dwdn,
     ::Val{N},
     ::Val{C},
-) where {N,C}
+    ::Val{S},
+) where {N,C,S}
     i, j, c1 = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
-    _, _, c = @index(Global, NTuple) # global cell numbering
+    c = @index(Group, Linear) # global cell numbering
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
-    @inbounds begin
+    if c <= S
         P = SA[0.5 0.5; 0.5 -0.5]
 
         dq[i, j, c] += dqdtan[i, j, c] - σ₁ * P * dwdn[i, j, c]
@@ -385,7 +395,7 @@ end
 
 
 # ∂ₜψ = -σ₁∂ₓψ-σ₂∂ᵥψ-im(y)σ₃ψ
-@kernel function rhs_volume_kernel!(
+@kernel inbounds=true unsafe_indices=true function rhs_volume!(
     dq,
     q,
     dRdX,
@@ -395,45 +405,47 @@ end
     materialparams,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    i, j, c1 = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
-    _, _, c = @index(Global, NTuple) # global cell numbering
+    ::Val{S},
+) where {N,C,S}
+    i, j, cl  = @index(Local, NTuple) # (i,j) dof in cell c1 local cell index within workgroup
+    cg = @index(Group, Linear) # global cell numbering
+    c = (cg-1) * C + cl
 
-    # C compile time data corrisponding to cells per workgroup
     lDT1 = @localmem eltype(eltype(q)) (N[1], N[1])
     lDT2 = @localmem eltype(eltype(q)) (N[2], N[2])
     lU = @localmem eltype(q) (N..., C) # local solution at prod(N) dofs in C cells of domain
 
-    # Pauli Matrices: SA denotes StaticArrays
-    σ₁ = SA[0.0 1.0; 1.0 0.0]
-    σ₂ = SA[0.0 -im; im 0.0]
-    σ₃ = SA[1.0 0.0; 0.0 -1.0]
+    if c <= S
+        # Pauli Matrices: SA denotes StaticArrays
+        σ₁ = SA[0.0 1.0; 1.0 0.0]
+        σ₂ = SA[0.0 -im; im 0.0]
+        σ₃ = SA[1.0 0.0; 0.0 -1.0]
 
-    @inbounds begin
         for sj = 0x0:N[2]:(N[1]-0x1) # Sets stride in j
-            if j + sj <= N[1] && c1 == 0x1 # localmemory is shared amongst a workgroup so only c1 needs to work
+            if j + sj <= N[2] && cl == 0x1 # localmemory is shared amongst a workgroup so only cl needs to work
                 lDT1[i, j+sj] = DT[1][i, j+sj]
             end
         end
 
         for si = 0x0:N[1]:(N[2]-0x1)
-            if i + si <= N[2] && c1 == 0x1
+            if i + si <= N[2] && cl == 0x1
                 lDT2[i+si, j] = DT[2][i+si, j]
             end
         end
 
-        # data (i, j) in global index cell c
+            # data (i, j) in global index cell c
         qijc = q[i, j, c]
-        lU[i, j, c1] = qijc
+        lU[i, j, cl] = qijc
     end
 
     @synchronize
+    c = (cg-1) * C + cl
 
-    σ₁ = SA[0.0 1.0; 1.0 0.0]
-    σ₂ = SA[0.0 -im; im 0.0]
-    σ₃ = SA[1.0 0.0; 0.0 -1.0]
-    # Here a thread will compute the (i,j)th component of the dq matrix where i,j is the dof and c is the global cell index
-    @inbounds begin
+    if c <= S
+        σ₁ = SA[0.0 1.0; 1.0 0.0]
+        σ₂ = SA[0.0 -im; im 0.0]
+        σ₃ = SA[1.0 0.0; 0.0 -1.0]
+        # Here a thread will compute the (i,j)th component of the dq matrix where i,j is the dof and c is the global cell index
         dqijc_update = -zero(eltype(dq))
         invwJijc = invwJ[i, j, c]
 
@@ -444,19 +456,19 @@ end
 
 
         @unroll for m = 0x1:N[1]
-            dqijc_update -= wJdRdXijc[1] * lDT1[i, m] * σ₁ * lU[m, j, c1] # -rₓDᵣσ₁u
-            dqijc_update -= wJdRdXijc[3] * lDT1[i, m] * σ₂ * lU[m, j, c1] # -rᵥDᵣσ₂u
+            dqijc_update -= wJdRdXijc[1] * lDT1[i, m] * σ₁ * lU[m, j, cl] # -rₓDᵣσ₁u
+            dqijc_update -= wJdRdXijc[3] * lDT1[i, m] * σ₂ * lU[m, j, cl] # -rᵥDᵣσ₂u
         end
 
         @unroll for n = 0x1:N[2]
-            dqijc_update -= wJdRdXijc[2] * lDT2[j, n] * σ₁ * lU[i, n, c1] # -sₓDₛσ₁u
-            dqijc_update -= wJdRdXijc[4] * lDT2[j, n] * σ₂ * lU[i, n, c1] # -sᵥDₛσ₂u
+            dqijc_update -= wJdRdXijc[2] * lDT2[j, n] * σ₁ * lU[i, n, cl] # -sₓDₛσ₁u
+            dqijc_update -= wJdRdXijc[4] * lDT2[j, n] * σ₂ * lU[i, n, cl] # -sᵥDₛσ₂u
         end
-        dq[i, j, c] += invwJijc * dqijc_update - im * matparamijc * σ₃ * lU[i, j, c1]
+        dq[i, j, c] += invwJijc * dqijc_update - im * matparamijc * σ₃ * lU[i, j, cl]
     end
 end
 
-@kernel function crbc_surface_kernel_tb!(
+@kernel inbounds=true unsafe_indices=true function crbc_surface_tb!(
     dq,
     q,
     vmapM,
@@ -466,26 +478,29 @@ end
     invwJ,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    ij, c1 = @index(Local, NTuple)
-    _, c = @index(Global, NTuple)
+    ::Val{S}
+) where {N,C,S}
+    ij, cl = @index(Local, NTuple)
+    cg = @index(Group, Linear)
     lqflux = @localmem eltype(dq) (N..., C)
+    c = (cg - 1) * C + cl
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
 
-    @inbounds if ij <= N[1]
+    if ij <= N[1] && c <= S
         i = ij
         @unroll for j = 1:N[2]
-            lqflux[i, j, c1] = zero(eltype(lqflux))
+            lqflux[i, j, cl] = zero(eltype(lqflux))
         end
     end
 
     @synchronize
 
+    c = (cg - 1) * C + cl
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
-    @inbounds if ij <= N[2]
+    if ij <= N[2] && c <= S
         # Faces with r=-1 : West
         i = 1
         j = ij
@@ -509,7 +524,7 @@ end
         else
             numflux = nf[1] * σ₁ * (qM + qP) / 2 + nf[2] * σ₂ * (qM + qP) / 2
         end
-        lqflux[i, j, c1] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
+        lqflux[i, j, cl] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
 
         # Faces with r=1 : East
         i = N[1]
@@ -535,21 +550,23 @@ end
         else
             numflux = nf[1] * σ₁ * (qM + qP) / 2 + nf[2] * σ₂ * (qM + qP) / 2
         end
-        lqflux[i, j, c1] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
+        lqflux[i, j, cl] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
     end
 
     @synchronize
 
     # RHS update
     i = ij
-    @inbounds if i <= N[1]
+    c = (cg - 1) * C + cl
+    if i <= N[1] && c <= S
         @unroll for j = 1:N[2]
-            dq[i, j, c] += lqflux[i, j, c1]
+            dq[i, j, c] += lqflux[i, j, cl]
         end
     end
 end
 
-@kernel function crbc_surface_kernel_lr!(
+#TODO: clean this
+@kernel inbounds=true unsafe_indices=true function crbc_surface_lr!(
     dq,
     q,
     vmapM,
@@ -559,18 +576,20 @@ end
     invwJ,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    ij, c1 = @index(Local, NTuple)
-    _, c = @index(Global, NTuple)
+    ::Val{S}
+) where {N,C,S}
+    ij, cl = @index(Local, NTuple)
+    cg = @index(Group, Linear)
     lqflux = @localmem eltype(dq) (N..., C)
+    c = (cg - 1) * C + cl
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
 
-    @inbounds if ij <= N[1]
+    if ij <= N[1] && c <= S
         i = ij
         @unroll for j = 1:N[2]
-            lqflux[i, j, c1] = zero(eltype(lqflux))
+            lqflux[i, j, cl] = zero(eltype(lqflux))
         end
     end
 
@@ -578,7 +597,8 @@ end
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
-    @inbounds if ij <= N[1]
+    c = (cg - 1) * C + cl
+    if ij <= N[1] && c <= S
         # Faces with s=-1 : South
         i = ij
         j = 1
@@ -595,9 +615,6 @@ end
 
         invwJijc = invwJ[idM]
 
-        σ₁ = SA[0.0 1.0; 1.0 0.0]
-        σ₂ = SA[0.0 -im; im 0.0]
-
         fscale = invwJijc * wsJf
         # nx σ₁ (u_- u*) + ny σ₂ (u_- u*)
         A = SA[0 nf[1]-im*nf[2]; nf[1]+im*nf[2] 0]
@@ -606,7 +623,7 @@ end
         else
             numflux = nf[1] * σ₁ * (qM + qP) / 2 + nf[2] * σ₂ * (qM + qP) / 2
         end
-        lqflux[i, j, c1] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
+        lqflux[i, j, cl] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
 
         # Faces with s=1 : North
         i = ij
@@ -631,22 +648,23 @@ end
         else
             numflux = nf[1] * σ₁ * (qM + qP) / 2 + nf[2] * σ₂ * (qM + qP) / 2
         end
-        lqflux[i, j, c1] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
+        lqflux[i, j, cl] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
     end
 
     @synchronize
 
     # RHS update
     i = ij
-    @inbounds if i <= N[1]
+    c = (cg - 1) * C + cl
+    if i <= N[1] && c <= S
         @unroll for j = 1:N[2]
-            dq[i, j, c] += lqflux[i, j, c1]
+            dq[i, j, c] += lqflux[i, j, cl]
         end
     end
 end
 
 
-@kernel function rhs_surface_kernel!(
+@kernel inbounds=true unsafe_indices=true function rhs_surface!(
     dq,
     q,
     data,
@@ -658,18 +676,21 @@ end
     invwJ,
     ::Val{N},
     ::Val{C},
-) where {N,C}
-    ij, c1 = @index(Local, NTuple)
-    _, c = @index(Global, NTuple)
+    ::Val{S}
+) where {N,C,S}
+    ij, cl = @index(Local, NTuple)
+    cg = @index(Group, Linear)
     lqflux = @localmem eltype(dq) (N..., C)
+    @infiltrate
+    c = (cg - 1) * C + cl
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
 
-    @inbounds if ij <= N[1]
+    if ij <= N[1] && c <= S
         i = ij
         @unroll for j = 1:N[2]
-            lqflux[i, j, c1] = zero(eltype(lqflux))
+            lqflux[i, j, cl] = zero(eltype(lqflux))
         end
     end
 
@@ -677,7 +698,8 @@ end
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
-    @inbounds if ij <= N[2]
+    c = (cg - 1) * C + cl
+    if ij <= N[2] && c <= S
         # Faces with r=-1 : West
         i = 1
         j = ij
@@ -708,7 +730,7 @@ end
         else
             numflux = nf[1] * σ₁ * (qM + qP) / 2 + nf[2] * σ₂ * (qM + qP) / 2
         end
-        lqflux[i, j, c1] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
+        lqflux[i, j, cl] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
 
         # Faces with r=1 : East
         i = N[1]
@@ -741,14 +763,15 @@ end
         else
             numflux = nf[1] * σ₁ * (qM + qP) / 2 + nf[2] * σ₂ * (qM + qP) / 2
         end
-        lqflux[i, j, c1] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
+        lqflux[i, j, cl] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
     end
 
     @synchronize
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
     σ₂ = SA[0.0 -im; im 0.0]
-    @inbounds if ij <= N[1]
+    c = (cg - 1) * C + cl
+    if ij <= N[1] && c <= S
         # Faces with s=-1 : South
         i = ij
         j = 1
@@ -787,7 +810,7 @@ end
         else
             numflux = nf[1] * σ₁ * (qM + qP) / 2 + nf[2] * σ₂ * (qM + qP) / 2
         end
-        lqflux[i, j, c1] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
+        lqflux[i, j, cl] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
 
         # Faces with s=1 : North
         i = ij
@@ -823,16 +846,17 @@ end
         else
             numflux = nf[1] * σ₁ * (qM + qP) / 2 + nf[2] * σ₂ * (qM + qP) / 2
         end
-        lqflux[i, j, c1] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
+        lqflux[i, j, cl] += fscale * (nf[1] * σ₁ * qM + nf[2] * σ₂ * qM - numflux)
     end
 
     @synchronize
 
     # RHS update
     i = ij
-    @inbounds if i <= N[1]
+    c = (cg - 1) * C + cl
+    if i <= N[1] && c <= S
         @unroll for j = 1:N[2]
-            dq[i, j, c] += lqflux[i, j, c1]
+            dq[i, j, c] += lqflux[i, j, cl]
         end
     end
 end
@@ -861,7 +885,7 @@ function coefmap!(materialparams, gridpoints, f)
     end
 end
 
-@kernel function crbc_recursion_bottom_kernel!(
+@kernel inbounds=true unsafe_indices=true function crbc_recursion_bottom!(
     dw1dn,
     dw2dn,
     dq1dtan,
@@ -874,10 +898,10 @@ end
     ::Val{I},
     ::Val{Q},
 ) where {I, Q}
-    i, _ = @index(Local, NTuple)
-    _, c = @index(Global, NTuple)
+    i = @index(Local, Linear)
+    c = @index(Group, Linear)
 
-    @inbounds if i <= I
+    if i <= I
         @unroll for j = Q:1
             aodd = a[2*(j-1)-1]
             aeven = a[2*(j-1)]
@@ -913,7 +937,7 @@ end
     end
 end
 
-@kernel function crbc_recursion_top_kernel!(
+@kernel function crbc_recursion_top!(
     dw1dn,
     dw2dn,
     dq1dtan,
@@ -926,10 +950,10 @@ end
     ::Val{I},
     ::Val{Q},
 ) where {I, Q}
-    i, _ = @index(Local, NTuple)
-    _, c = @index(Global, NTuple)
+    i = @index(Local, Linear)
+    c = @index(Group, Linear)
 
-    @inbounds if i <= I
+    if i <= I
         @unroll for j = 2:Q+1
             aodd = a[2*(j-1)-1]
             aeven = a[2*(j-1)]
@@ -961,7 +985,7 @@ end
     end
 end
 
-@kernel function crbc_recursion_left_kernel!(
+@kernel inbounds=true unsafe_indices=true function crbc_recursion_left!(
     dw1dn,
     dw2dn,
     dq1dtan,
@@ -974,10 +998,10 @@ end
     ::Val{J},
     ::Val{Q},
 ) where {J, Q}
-    j, _ = @index(Local, NTuple)
-    _, c = @index(Global, NTuple)
+    j = @index(Local, Linear)
+    c = @index(Group, Linear)
 
-    @inbounds if j <= J
+    if j <= J
         @unroll for itmp = Q:1
             i = Q + 2 - j
             aodd = a[2*(i-1)-1]
@@ -1012,7 +1036,7 @@ end
     end
 end
 
-@kernel function crbc_recursion_right_kernel!(
+@kernel inbounds=true unsafe_indices=true function crbc_recursion_right!(
     dw1dn,
     dw2dn,
     dq1dtan,
@@ -1025,10 +1049,10 @@ end
     ::Val{J},
     ::Val{Q},
 ) where {J, Q}
-    j, _ = @index(Local, NTuple)
-    _, c = @index(Global, NTuple)
+    j = @index(Local, Linear)
+    c = @index(Group, Linear)
 
-    @inbounds if j <= J
+    if j <= J
         @unroll for i = 2:Q+1
             aodd = a[2*(i-1)-1]
             aeven = a[2*(i-1)]
@@ -1083,7 +1107,10 @@ function crbc_rhs!(
 
     if BC == :crbc_tb
         C = max(512 ÷ prod(size(cell)), 1)
-        crbc_tangent_kernel_tb!(backend, (size(cell)..., C))(
+        workgroup = (size(cell)..., C)
+        block = (last(size(dq)), 1, 1)
+        #FIXME: waist of threads!!
+        crbc_tangent_tb!(backend, workgroup)(
             dqdtan,
             q,
             dRdX,
@@ -1092,13 +1119,16 @@ function crbc_rhs!(
             DT,
             materialparams,
             Val(size(cell)),
-            Val(C);
-            ndrange = size(dq),
+            Val(C),
+            Val(last(size(dq)));
+            ndrange = workgroup .* block,
         )
 
         J = maximum(size(cell))
         C = max(128 ÷ J, 1)
-        crbc_surface_kernel_tb!(backend, (J, C))(
+        workgroup = (J, C)
+        block = (1, cld(last(size(dq)),C))
+        crbc_surface_tb!(backend, workgroup)(
             dqdtan,
             q,
             fm.vmapM,
@@ -1107,12 +1137,15 @@ function crbc_rhs!(
             wsJ,
             invwJ,
             Val(size(cell)),
-            Val(C);
-            ndrange = (J, last(size(dq))),
+            Val(C),
+            Val(last(size(dq)));
+            ndrange = workgroup .* block,
         )
     elseif BC == :crbc_lr
         C = max(512 ÷ prod(size(cell)), 1)
-        crbc_tangent_kernel_lr!(backend, (size(cell)..., C))(
+        workgroup = (size(cell)..., C)
+        blocks = (last(size(dq)), 1, 1)
+        crbc_tangent_lr!(backend, workgroup)(
             dqdtan,
             q,
             dRdX,
@@ -1121,12 +1154,15 @@ function crbc_rhs!(
             DT,
             materialparams,
             Val(size(cell)),
-            Val(C);
-            ndrange = size(dq),
+            Val(C),
+            Val(last(size(dq)));
+            ndrange = workgroup .* blocks,
         )
         J = maximum(size(cell))
         C = max(128 ÷ J, 1)
-        crbc_surface_kernel_lr!(backend, (J, C))(
+        workgroup = (J, C)
+        blocks = (1, cld(last(size(dq)),C))
+        crbc_surface_lr!(backend, workgroup)(
             dqdtan,
             q,
             fm.vmapM,
@@ -1135,8 +1171,9 @@ function crbc_rhs!(
             wsJ,
             invwJ,
             Val(size(cell)),
-            Val(C);
-            ndrange = (J, last(size(dq))),
+            Val(C),
+            Val(last(size(dq)));
+            ndrange = workgroup .* blocks,
         )
     end
 
@@ -1144,7 +1181,7 @@ function crbc_rhs!(
         @assert BC == :crbc_tb
 
         I = first(size(cell))
-        crbc_recursion_top_kernel!(backend, (I, 1))(
+        crbc_recursion_top!(backend, I)(
             components(dwdn)[1],
             components(dwdn)[2],
             components(dqdtan)[1],
@@ -1156,23 +1193,26 @@ function crbc_rhs!(
             sig,
             Val(size(cell,1)),
             Val(size(cell, 2) - 1);
-            ndrange = (I, last(size(dq))),
+            ndrange = I*last(size(dq)),
         )
 
         C = max(512 ÷ prod(size(cell)), 1)
-        crbc_volume_kernel_top!(backend, (size(cell)..., C))(
+        workgroup = (size(cell)..., C)
+        blocks = (cld(last(size(dq)), C), 1, 1)
+        crbc_volume_top!(backend, workgroup)(
             dq,
             q,
             dqdtan,
             dwdn,
             Val(size(cell)),
-            Val(C);
-            ndrange = size(dq),
+            Val(C),
+            Val(last(size(dq)));
+            ndrange = workgroup .* blocks,
         )
     elseif orient == "bottom"
         @assert BC == :crbc_tb
         I = first(size(cell))
-        crbc_recursion_bottom_kernel!(backend, (I, 1))(
+        crbc_recursion_bottom!(backend, I)(
             components(dwdn)[1],
             components(dwdn)[2],
             components(dqdtan)[1],
@@ -1184,23 +1224,26 @@ function crbc_rhs!(
             sig,
             Val(size(cell,1)),
             Val(size(cell, 2) - 1);
-            ndrange = (I, last(size(dq))),
+            ndrange = I*last(size(dq)),
         )
 
         C = max(512 ÷ prod(size(cell)), 1)
-        crbc_volume_kernel_bottom!(backend, (size(cell)..., C))(
+        workgroup = (size(cell)..., C)
+        blocks = (cld(last(size(dq)), C), 1, 1)
+        crbc_volume_bottom!(backend, workgroup)(
             dq,
             q,
             dqdtan,
             dwdn,
             Val(size(cell)),
-            Val(C);
-            ndrange = size(dq),
+            Val(C),
+            Val(last(size(dq)));
+            ndrange = workgroup .* blocks,
         )
     elseif orient == "left"
         @assert BC == :crbc_lr
         J = size(cell,2)
-        crbc_recursion_left_kernel!(backend, (J, 1))(
+        crbc_recursion_left!(backend, J)(
             components(dwdn)[1],
             components(dwdn)[2],
             components(dqdtan)[1],
@@ -1212,24 +1255,27 @@ function crbc_rhs!(
             sig,
             Val(size(cell,2)),
             Val(size(cell, 1) - 1);
-            ndrange = (J, last(size(dq))),
+            ndrange = last(size(dq)),
         )
 
         C = max(512 ÷ prod(size(cell)), 1)
-        crbc_volume_kernel_left!(backend, (size(cell)..., C))(
+        workgroup = (size(cell)..., C)
+        blocks = (last(size(dq)), 1, 1)
+        crbc_volume_left!(backend, workgroup)(
             dq,
             q,
             dqdtan,
             dwdn,
             Val(size(cell)),
-            Val(C);
-            ndrange = size(dq),
+            Val(C),
+            Val(last(size(dq)));
+            ndrange = workgroup .* blocks,
         )
 
     elseif orient == "right"
         @assert BC == :crbc_lr
         J = size(cell,2)
-        crbc_recursion_right_kernel!(backend, (J, 1))(
+        crbc_recursion_right!(backend, (J, 1))(
             components(dwdn)[1],
             components(dwdn)[2],
             components(dqdtan)[1],
@@ -1245,14 +1291,17 @@ function crbc_rhs!(
         )
 
         C = max(512 ÷ prod(size(cell)), 1)
-        crbc_volume_kernel_right!(backend, (size(cell)..., C))(
+        workgroup = (size(cell)..., C)
+        blocks = (last(size(dq)), 1, 1)
+        crbc_volume_right!(backend, workgroup)(
             dq,
             q,
             dqdtan,
             dwdn,
             Val(size(cell)),
-            Val(C);
-            ndrange = size(dq),
+            Val(C),
+            Val(last(size(dq)));
+            ndrange = workgroup .* blocks,
         )
     end
 end
@@ -1267,9 +1316,9 @@ function rhs!(dq, q, grid, data, invwJ, DT, materialparams, bc, cm)
     start!(q, cm)
 
     C = max(512 ÷ prod(size(cell)), 1)
-    #workgroup = (size(cell)..., C)
-    #blocks = (size(dq,4), 1, 1,1)
-    rhs_volume_kernel!(backend, (size(cell)..., C))(
+    workgroup = (size(cell)..., C)
+    blocks = (cld(last(size(dq)), C), 1, 1)
+    rhs_volume!(backend, workgroup)(
         dq,
         q,
         dRdX,
@@ -1278,8 +1327,9 @@ function rhs!(dq, q, grid, data, invwJ, DT, materialparams, bc, cm)
         DT,
         materialparams,
         Val(size(cell)),
-        Val(C);
-        ndrange = size(dq),
+        Val(C),
+        Val(last(size(dq)));
+        ndrange = workgroup .* blocks,
     )
 
 
@@ -1288,7 +1338,9 @@ function rhs!(dq, q, grid, data, invwJ, DT, materialparams, bc, cm)
     J = maximum(size(cell))
     C = max(128 ÷ J, 1)
     # J  x C workgroup sizes to evaluate  multiple elements on one wg.
-    rhs_surface_kernel!(backend, (J, C))(
+    workgroup = (J, C)
+    blocks = (1, cld(last(size(dq)),C))
+    rhs_surface!(backend, workgroup)(
         dq,
         viewwithghosts(q),
         data,
@@ -1299,8 +1351,9 @@ function rhs!(dq, q, grid, data, invwJ, DT, materialparams, bc, cm)
         wsJ,
         invwJ,
         Val(size(cell)),
-        Val(C);
-        ndrange = (J, last(size(dq))),
+        Val(C),
+        Val(last(size(dq)));
+        ndrange = workgroup .* blocks,
     )
 end
 
@@ -1629,21 +1682,9 @@ function run(
     #do_output(step, time, crbc_dwdn_left, crbc_q_left, crbc_grid_left)
 
     progress_stepwidth = cld(numberofsteps, progresswidth)
-    elapsed_time = @elapsed begin
-
-        NVTX.@range "timestep" begin
+        elapsed = @elapsed begin
         for step = 1:numberofsteps
-            if rank == 0 && progress && mod(step, progress_stepwidth) == 0
-                print(
-                    "\r" *
-                    raw"-\|/"[cld(step, progress_stepwidth)%4+1] *
-                    "="^cld(step, progress_stepwidth) *
-                    " "^(progresswidth - cld(step, progress_stepwidth)) *
-                    "|",
-                )
-                @printf "%.1f%%" step / numberofsteps * 100
-            end
-
+            elapsed_per_step = @elapsed begin
             if time + dt > timeend
                 dt = timeend - time
             end
@@ -1657,7 +1698,6 @@ function run(
                     @. crbc_dq_right *= RKA[stage]
 
                     if BC == :crbc_tb
-                        NVTX.@range "copy 1" begin
                             T = 256
                             idxcopyP!(backend, T)(
                                 crbc_dwdn_top,
@@ -1676,7 +1716,6 @@ function run(
                                 Complex{FT}.(SA[-1 -im; -1 im]);
                                 ndrange = size(crbc_interface_bottom,1)
                             )
-                        end # copy 1
                     elseif BC == :crbc_lr
                         T = 256
                         idxcopyP!(backend, T)(
@@ -1699,7 +1738,6 @@ function run(
                     end
 
                     if BC == :crbc_tb
-                     NVTX.@range "crbc rhs" begin
                         crbc_rhs!(
                             crbc_dq_top,
                             crbc_q_top,
@@ -1729,7 +1767,6 @@ function run(
                             cm;
                             orient = "bottom",
                         )
-                        end # crbc rhs
                     elseif BC == :crbc_lr
                         crbc_rhs!(
                             crbc_dq_left,
@@ -1763,7 +1800,6 @@ function run(
                     end
 
                     if BC == :crbc_tb
-                         NVTX.@range "copy 2" begin
                             idxcopyP!(backend, T)(
                                 data,
                                 bulk_interface_top,
@@ -1781,7 +1817,6 @@ function run(
                                 Complex{FT}.(SA[-0.5 -0.5; 0.5*im -0.5*im]);
                                 ndrange = size(crbc_interface_bottom,1)
                             )
-                        end # copy 2
                     elseif BC == :crbc_lr
                         idxcopyP!(backend, T)(
                             data,
@@ -1834,17 +1869,36 @@ function run(
             #do_output(step, time, crbc_dwdn_left, crbc_q_left, crbc_grid_left)
 
             energy_output(step, energy, q, grid)
-        end # time step for loop
-        end # cuda profile range
-    end # elapsed time
+        end # elapsed time
+        if rank == 0 && progress && mod(step, progress_stepwidth) == 0
+            print(
+                "\r" *
+                raw"-\|/"[cld(step, progress_stepwidth)%4+1] *
+                "="^cld(step, progress_stepwidth) *
+                " "^(progresswidth - cld(step, progress_stepwidth)) *
+                "|",
+            )
+
+            timerem = elapsed_per_step*(numberofsteps-step)
+            hours = div(timerem, 60*60)
+            min = div(timerem, 60)-hours*60
+            sec = timerem-hours*60^2-min*60
+            @printf "%02i:%02i:%02i (time remaining)" hours min sec
+        end
+    end # time step for loop
+    end #total elapsed time
 
     if rank == 0
         println(
             "\r" *
             raw"-\|/"[cld(step, progress_stepwidth)%4+1] *
             "="^progresswidth *
-            "|100.0% | runtime: $(elapsed_time) sec.",
+            "|",
         )
+        hours = div(elapsed, 60*60)
+        min = div(elapsed, 60)-hours*60
+        sec = elapsed-hours*60^2-min*60
+        @printf "Run complete: %02i:%02i:%02i (total time)\n" hours min sec
     end
 
     do_output(numberofsteps, timeend, q, materialparams, grid)
