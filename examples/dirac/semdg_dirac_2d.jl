@@ -9,17 +9,10 @@
 #    url = {arXiv:1709.00605v2},
 # }
 # ```
-#
-#jl #FIXME: optimize kernels
-#       - data trasfer kernel
-#jl     - recursion kernel
-#jl #FIXME: add introduction to dirac equation latex
 #   #FIXME: (!) compute error on GPU
 #   #FIXME: is async Kernel launch hurting me??
-#   #FIXME: (!) stupid thread count convention
-#   #FIXME: homaginize recursion kernels
+#   #FIXME: homoginize recursion kernels
 #   #FIXME: reduce crbc memory model
-#   #FIXME: (!) bounds check unsafe_indices & inline everything & inbounds
 #   #FIXME: cli flags
 #   #FIXME: realify dirac
 #   #FIXME: (!) num dofs in report
@@ -49,15 +42,15 @@ const bigrun = true
 const numlevels = 4
 const Lout = 0
 const m = -35.0 # -70.0
-const BC = :crbc_lr # options:crbc_tb :crbc_lr :forbc :reflect :periodic
+const BC = :crbc_tb # options:crbc_tb :crbc_lr :forbc :reflect :periodic
 const flux = :upwind    # options: :upwind :central
 const datatype = :crbc  # options: :crbc :synthetic :none
 const matcoef = :smooth  # options: :constant :disc :smooth
 #const f(x, y) = y > 0 ? m : -m                   # disc_h
 #const f(x,y) = x > 0 ? m : -m                  # disc_v
 #const f(x,y) = -m*(erf(m*y+5)-erf(m*y)+erf(m*y-5))   # double
-#const f(x, y) = m * y                             # y
-const f(x, y) = m * x
+const f(x, y) = m * y                             # y
+#const f(x, y) = m * x
 #const f(x,y) = voidscatter(x,y)
 #const f(x,y) = m*erf(m*y)                      # erf in y
 #const f(x,y) = m*erf(m*x)                      # erf in x
@@ -681,7 +674,6 @@ end
     ij, cl = @index(Local, NTuple)
     cg = @index(Group, Linear)
     lqflux = @localmem eltype(dq) (N..., C)
-    @infiltrate
     c = (cg - 1) * C + cl
 
     σ₁ = SA[0.0 1.0; 1.0 0.0]
@@ -1317,7 +1309,7 @@ function rhs!(dq, q, grid, data, invwJ, DT, materialparams, bc, cm)
 
     C = max(512 ÷ prod(size(cell)), 1)
     workgroup = (size(cell)..., C)
-    blocks = (cld(last(size(dq)), C), 1, 1)
+    blocks = (1, 1, cld(last(size(dq)), C))
     rhs_volume!(backend, workgroup)(
         dq,
         q,
@@ -1963,8 +1955,7 @@ end
 
 let
     FT = Float64
-    #AT = CUDA.functional() && CUDA.has_cuda_gpu() ? CuArray : Array
-    AT = Array
+    AT = CUDA.functional() && CUDA.has_cuda_gpu() ? CuArray : Array
 
     if !MPI.Initialized()
         MPI.Init()
