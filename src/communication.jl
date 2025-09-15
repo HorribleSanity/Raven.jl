@@ -371,6 +371,7 @@ function finish!(A, cm::CommManagerTripleBuffered)
     end
 
     if !isempty(cm.recvrequests)
+        backend = get_backend(cm)
         MPI.Waitall(cm.recvrequests)
         copyto!(cm.recvbufferhost, cm.recvbuffercomm)
         stream!(backend, cm.recvstream) do
