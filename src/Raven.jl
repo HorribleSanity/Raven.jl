@@ -44,6 +44,8 @@ export GridArray, components, sizewithghosts, viewwithghosts, parentwithghosts
 
 export adapt!
 
+export gather!, scatter!
+
 include("orientation.jl")
 include("fileio.jl")
 include("arrays.jl")
@@ -61,6 +63,7 @@ include("grids.jl")
 include("gridmanager.jl")
 include("gridarrays.jl")
 include("kron.jl")
+include("gatherscatter.jl")
 
 include("balancelaws/BalanceLaws.jl")
 

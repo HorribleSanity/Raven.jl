@@ -65,6 +65,7 @@ boundarycodes(::Grid, ::Val{true}) =
 nodecommpattern(grid::Grid) = grid.nodecommpattern
 cnodecommpattern(grid::Grid) = grid.cnodecommpattern
 continuoustodiscontinuous(grid::Grid) = grid.continuoustodiscontinuous
+discontinuoustocontinuous(grid::Grid) = grid.discontinuoustocontinuous
 
 communicatingcells(grid::Grid) = grid.communicatingcells
 noncommunicatingcells(grid::Grid) = grid.noncommunicatingcells
