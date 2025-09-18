@@ -21,6 +21,20 @@ const outputvtk = false
 const bigrun = true
 const convergetest = false
 
+struct TypeWrap{T} end
+TypeWrap(T) = TypeWrap{T}()
+Base.:*(x::Number, ::TypeWrap{T}) where T = T(x)
+
+const u8 = TypeWrap(UInt8)
+const u16 = TypeWrap(UInt16)
+const u32 = TypeWrap(UInt32)
+const u64 = TypeWrap(UInt64)
+
+const i8 = TypeWrap(Int8)
+const i16 = TypeWrap(Int16)
+const i32 = TypeWrap(Int32)
+const i64 = TypeWrap(Int64)
+
 
 function solution(x::SVector{3}, t)
     FT = eltype(x)
@@ -50,7 +64,7 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
 ) where {N, C, S}
     ijk, cl = @index(Local, NTuple)
     _, wg_idx = @index(Group, NTuple)
-    c = (wg_idx-0x1)*C + cl
+    c = (wg_idx-1u8)*C + cl
 
     Hxflux = @localmem eltype(dq) (N..., C)
     Hyflux = @localmem eltype(dq) (N..., C)
@@ -60,11 +74,11 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
     Eyflux = @localmem eltype(dq) (N..., C)
     Ezflux = @localmem eltype(dq) (N..., C)
 
-    if ijk <= N[0x1] * N[0x2] && c <= S
+    if ijk <= N[1u8] * N[2u8] && c <= S
         ij = ijk
-        j, i = fldmod1(ij, N[0x1])
+        j, i = fldmod1(ij, N[1u8])
 
-        for k = 1:N[0x3]
+        for k = 1:N[3u8]
             z = zero(eltype(Hxflux))
             Hxflux[i, j, k, cl] = z
             Hyflux[i, j, k, cl] = z
@@ -77,47 +91,47 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
     end
     @synchronize
 
-    c = (wg_idx-0x1)*C + cl
-    if ijk <= N[0x2]*N[0x3] && c <= S
+    c = (wg_idx-1u8)*C + cl
+    if ijk <= N[2u8]*N[3u8] && c <= S
         alpha = 1.0
         # face with r = -1
         jk = ijk
         i = 1
-        k, j = fldmod1(jk, N[0x2])
+        k, j = fldmod1(jk, N[2u8])
 
         fid = jk
 
         idP = vmapP[fid, c]
-        idB = mapB[0x1, c]
+        idB = mapB[1u8, c]
 
-        if idB == 0x1
+        if idB == 1u8
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 0x4, c]
-            dEy = -2 * q[i, j, k, 0x5, c]
-            dEz = -2 * q[i, j, k, 0x6, c]
+            dEx = -2 * q[i, j, k, 4u8, c]
+            dEy = -2 * q[i, j, k, 5u8, c]
+            dEz = -2 * q[i, j, k, 6u8, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
-            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
-            Pj, Pi   = fldmod1(Pij,  N[0x1])
+            Pc, Pijk = fldmod1(idP,  N[1u8]*N[2u8]*N[3u8])
+            Pk, Pij  = fldmod1(Pijk, N[1u8]*N[2u8])
+            Pj, Pi   = fldmod1(Pij,  N[1u8])
 
-            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
-            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
-            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
+            dHx = q[Pi, Pj, Pk, 1u8, Pc] - q[i, j, k, 1u8, c]
+            dHy = q[Pi, Pj, Pk, 2u8, Pc] - q[i, j, k, 2u8, c]
+            dHz = q[Pi, Pj, Pk, 3u8, Pc] - q[i, j, k, 3u8, c]
 
-            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
-            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
-            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
+            dEx = q[Pi, Pj, Pk, 4u8, Pc] - q[i, j, k, 4u8, c]
+            dEy = q[Pi, Pj, Pk, 5u8, Pc] - q[i, j, k, 5u8, c]
+            dEz = q[Pi, Pj, Pk, 6u8, Pc] - q[i, j, k, 6u8, c]
         end
 
-        nx = n[0x1, fid, c]
-        ny = n[0x2, fid, c]
-        nz = n[0x3, fid, c]
-        wsJf = wsJ[0x1, fid, c]
+        nx = n[1u8, fid, c]
+        ny = n[2u8, fid, c]
+        nz = n[3u8, fid, c]
+        wsJf = wsJ[1u8, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 0x1, c]
+        invwJijkc = invwJ[i, j, k, 1u8, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -132,41 +146,41 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
         Ezflux[i, j, k, cl] += fscale * ( nx * dHy - ny*dHx + alpha*(dEz - ndotdE*nz))
 
         # face with r = 1
-        i = N[0x1]
-        fid = N[0x2]*N[0x3] + jk
+        i = N[1u8]
+        fid = N[2u8]*N[3u8] + jk
 
         idP = vmapP[fid, c]
-        idB = mapB[0x2, c]
+        idB = mapB[2u8, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 0x4, c]
-            dEy = -2 * q[i, j, k, 0x5, c]
-            dEz = -2 * q[i, j, k, 0x6, c]
+            dEx = -2 * q[i, j, k, 4u8, c]
+            dEy = -2 * q[i, j, k, 5u8, c]
+            dEz = -2 * q[i, j, k, 6u8, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
-            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
-            Pj, Pi   = fldmod1(Pij,  N[0x1])
+            Pc, Pijk = fldmod1(idP,  N[1u8]*N[2u8]*N[3u8])
+            Pk, Pij  = fldmod1(Pijk, N[1u8]*N[2u8])
+            Pj, Pi   = fldmod1(Pij,  N[1u8])
 
-            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
-            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
-            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
+            dHx = q[Pi, Pj, Pk, 1u8, Pc] - q[i, j, k, 1u8, c]
+            dHy = q[Pi, Pj, Pk, 2u8, Pc] - q[i, j, k, 2u8, c]
+            dHz = q[Pi, Pj, Pk, 3u8, Pc] - q[i, j, k, 3u8, c]
 
-            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
-            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
-            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
+            dEx = q[Pi, Pj, Pk, 4u8, Pc] - q[i, j, k, 4u8, c]
+            dEy = q[Pi, Pj, Pk, 5u8, Pc] - q[i, j, k, 5u8, c]
+            dEz = q[Pi, Pj, Pk, 6u8, Pc] - q[i, j, k, 6u8, c]
 
         end
 
-        nx = n[0x1, fid, c]
-        ny = n[0x2, fid, c]
-        nz = n[0x3, fid, c]
-        wsJf = wsJ[0x1, fid, c]
+        nx = n[1u8, fid, c]
+        ny = n[2u8, fid, c]
+        nz = n[3u8, fid, c]
+        wsJf = wsJ[1u8, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 0x1, c]
+        invwJijkc = invwJ[i, j, k, 1u8, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -183,48 +197,48 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
 
     @synchronize
 
-    c = (wg_idx-0x1)*C + cl
-    if ijk <= N[0x1]*N[0x3] && c <= S
+    c = (wg_idx-1u8)*C + cl
+    if ijk <= N[1u8]*N[3u8] && c <= S
         alpha = 1.0
         # face with s = -1
         ik = ijk
         j = 1
-        k, i = fldmod1(ik, N[0x1])
+        k, i = fldmod1(ik, N[1u8])
 
-        fid = 2 * N[0x2] * N[0x3] + ik
+        fid = 2 * N[2u8] * N[3u8] + ik
 
         idP = vmapP[fid, c]
-        idB = mapB[0x3, c]
+        idB = mapB[3u8, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 0x4, c]
-            dEy = -2 * q[i, j, k, 0x5, c]
-            dEz = -2 * q[i, j, k, 0x6, c]
+            dEx = -2 * q[i, j, k, 4u8, c]
+            dEy = -2 * q[i, j, k, 5u8, c]
+            dEz = -2 * q[i, j, k, 6u8, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
-            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
-            Pj, Pi   = fldmod1(Pij,  N[0x1])
+            Pc, Pijk = fldmod1(idP,  N[1u8]*N[2u8]*N[3u8])
+            Pk, Pij  = fldmod1(Pijk, N[1u8]*N[2u8])
+            Pj, Pi   = fldmod1(Pij,  N[1u8])
 
-            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
-            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
-            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
+            dHx = q[Pi, Pj, Pk, 1u8, Pc] - q[i, j, k, 1u8, c]
+            dHy = q[Pi, Pj, Pk, 2u8, Pc] - q[i, j, k, 2u8, c]
+            dHz = q[Pi, Pj, Pk, 3u8, Pc] - q[i, j, k, 3u8, c]
 
-            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
-            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
-            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
+            dEx = q[Pi, Pj, Pk, 4u8, Pc] - q[i, j, k, 4u8, c]
+            dEy = q[Pi, Pj, Pk, 5u8, Pc] - q[i, j, k, 5u8, c]
+            dEz = q[Pi, Pj, Pk, 6u8, Pc] - q[i, j, k, 6u8, c]
 
         end
 
-        nx = n[0x1, fid, c]
-        ny = n[0x2, fid, c]
-        nz = n[0x3, fid, c]
-        wsJf = wsJ[0x1, fid, c]
+        nx = n[1u8, fid, c]
+        ny = n[2u8, fid, c]
+        nz = n[3u8, fid, c]
+        wsJf = wsJ[1u8, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 0x1, c]
+        invwJijkc = invwJ[i, j, k, 1u8, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -239,41 +253,41 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
         Ezflux[i, j, k, cl] += fscale * ( nx * dHy - ny*dHx + alpha*(dEz - ndotdE*nz))
 
         # face with s = 1
-        j = N[0x2]
-        fid = 2*N[0x2]*N[0x3] + N[0x1]*N[0x3]  + ik
+        j = N[2u8]
+        fid = 2*N[2u8]*N[3u8] + N[1u8]*N[3u8]  + ik
 
         idP = vmapP[fid, c]
-        idB = mapB[0x4, c]
+        idB = mapB[4u8, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 0x4, c]
-            dEy = -2 * q[i, j, k, 0x5, c]
-            dEz = -2 * q[i, j, k, 0x6, c]
+            dEx = -2 * q[i, j, k, 4u8, c]
+            dEy = -2 * q[i, j, k, 5u8, c]
+            dEz = -2 * q[i, j, k, 6u8, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
-            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
-            Pj, Pi   = fldmod1(Pij,  N[0x1])
+            Pc, Pijk = fldmod1(idP,  N[1u8]*N[2u8]*N[3u8])
+            Pk, Pij  = fldmod1(Pijk, N[1u8]*N[2u8])
+            Pj, Pi   = fldmod1(Pij,  N[1u8])
 
-            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
-            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
-            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
+            dHx = q[Pi, Pj, Pk, 1u8, Pc] - q[i, j, k, 1u8, c]
+            dHy = q[Pi, Pj, Pk, 2u8, Pc] - q[i, j, k, 2u8, c]
+            dHz = q[Pi, Pj, Pk, 3u8, Pc] - q[i, j, k, 3u8, c]
 
-            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
-            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
-            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
+            dEx = q[Pi, Pj, Pk, 4u8, Pc] - q[i, j, k, 4u8, c]
+            dEy = q[Pi, Pj, Pk, 5u8, Pc] - q[i, j, k, 5u8, c]
+            dEz = q[Pi, Pj, Pk, 6u8, Pc] - q[i, j, k, 6u8, c]
 
         end
 
-        nx = n[0x1, fid, c]
-        ny = n[0x2, fid, c]
-        nz = n[0x3, fid, c]
-        wsJf = wsJ[0x1, fid, c]
+        nx = n[1u8, fid, c]
+        ny = n[2u8, fid, c]
+        nz = n[3u8, fid, c]
+        wsJf = wsJ[1u8, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 0x1, c]
+        invwJijkc = invwJ[i, j, k, 1u8, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -290,48 +304,48 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
 
     @synchronize
 
-    c = (wg_idx-0x1)*C + cl
-    if ijk <= N[0x1]*N[0x2] && c <= S
+    c = (wg_idx-1u8)*C + cl
+    if ijk <= N[1u8]*N[2u8] && c <= S
         alpha = 1.0
         # face with t = -1
         ij = ijk
 
-        j, i = fldmod1(ij, N[0x1])
+        j, i = fldmod1(ij, N[1u8])
         k = 1
 
-        fid = 2 * (N[0x2] * N[0x3] + N[0x1] * N[0x3]) + ij
+        fid = 2 * (N[2u8] * N[3u8] + N[1u8] * N[3u8]) + ij
 
         idP = vmapP[fid, c]
-        idB = mapB[0x5, c]
+        idB = mapB[5u8, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 0x4, c]
-            dEy = -2 * q[i, j, k, 0x5, c]
-            dEz = -2 * q[i, j, k, 0x6, c]
+            dEx = -2 * q[i, j, k, 4u8, c]
+            dEy = -2 * q[i, j, k, 5u8, c]
+            dEz = -2 * q[i, j, k, 6u8, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
-            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
-            Pj, Pi   = fldmod1(Pij,  N[0x1])
+            Pc, Pijk = fldmod1(idP,  N[1u8]*N[2u8]*N[3u8])
+            Pk, Pij  = fldmod1(Pijk, N[1u8]*N[2u8])
+            Pj, Pi   = fldmod1(Pij,  N[1u8])
 
-            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
-            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
-            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
+            dHx = q[Pi, Pj, Pk, 1u8, Pc] - q[i, j, k, 1u8, c]
+            dHy = q[Pi, Pj, Pk, 2u8, Pc] - q[i, j, k, 2u8, c]
+            dHz = q[Pi, Pj, Pk, 3u8, Pc] - q[i, j, k, 3u8, c]
 
-            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
-            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
-            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
+            dEx = q[Pi, Pj, Pk, 4u8, Pc] - q[i, j, k, 4u8, c]
+            dEy = q[Pi, Pj, Pk, 5u8, Pc] - q[i, j, k, 5u8, c]
+            dEz = q[Pi, Pj, Pk, 6u8, Pc] - q[i, j, k, 6u8, c]
         end
 
-        nx = n[0x1, fid, c]
-        ny = n[0x2, fid, c]
-        nz = n[0x3, fid, c]
-        wsJf = wsJ[0x1, fid, c]
+        nx = n[1u8, fid, c]
+        ny = n[2u8, fid, c]
+        nz = n[3u8, fid, c]
+        wsJf = wsJ[1u8, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 0x1, c]
+        invwJijkc = invwJ[i, j, k, 1u8, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -346,40 +360,40 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
         Ezflux[i, j, k, cl] += fscale * ( nx * dHy - ny*dHx + alpha*(dEz - ndotdE*nz))
 
         # face with t = 1
-        k = N[0x3]
-        fid = 2 * (N[0x2] * N[0x3] + N[0x1] * N[0x3]) + N[0x1] * N[0x2]  + ij
+        k = N[3u8]
+        fid = 2 * (N[2u8] * N[3u8] + N[1u8] * N[3u8]) + N[1u8] * N[2u8]  + ij
 
         idP = vmapP[fid, c]
-        idB = mapB[0x6, c]
+        idB = mapB[6u8, c]
 
         if idB == 1
             dHx = zero(eltype(Hxflux))
             dHy = zero(eltype(Hyflux))
             dHz = zero(eltype(Hzflux))
 
-            dEx = -2 * q[i, j, k, 0x4, c]
-            dEy = -2 * q[i, j, k, 0x5, c]
-            dEz = -2 * q[i, j, k, 0x6, c]
+            dEx = -2 * q[i, j, k, 4u8, c]
+            dEy = -2 * q[i, j, k, 5u8, c]
+            dEz = -2 * q[i, j, k, 6u8, c]
         else
-            Pc, Pijk = fldmod1(idP,  N[0x1]*N[0x2]*N[0x3])
-            Pk, Pij  = fldmod1(Pijk, N[0x1]*N[0x2])
-            Pj, Pi   = fldmod1(Pij,  N[0x1])
+            Pc, Pijk = fldmod1(idP,  N[1u8]*N[2u8]*N[3u8])
+            Pk, Pij  = fldmod1(Pijk, N[1u8]*N[2u8])
+            Pj, Pi   = fldmod1(Pij,  N[1u8])
 
-            dHx = q[Pi, Pj, Pk, 0x1, Pc] - q[i, j, k, 0x1, c]
-            dHy = q[Pi, Pj, Pk, 0x2, Pc] - q[i, j, k, 0x2, c]
-            dHz = q[Pi, Pj, Pk, 0x3, Pc] - q[i, j, k, 0x3, c]
+            dHx = q[Pi, Pj, Pk, 1u8, Pc] - q[i, j, k, 1u8, c]
+            dHy = q[Pi, Pj, Pk, 2u8, Pc] - q[i, j, k, 2u8, c]
+            dHz = q[Pi, Pj, Pk, 3u8, Pc] - q[i, j, k, 3u8, c]
 
-            dEx = q[Pi, Pj, Pk, 0x4, Pc] - q[i, j, k, 0x4, c]
-            dEy = q[Pi, Pj, Pk, 0x5, Pc] - q[i, j, k, 0x5, c]
-            dEz = q[Pi, Pj, Pk, 0x6, Pc] - q[i, j, k, 0x6, c]
+            dEx = q[Pi, Pj, Pk, 4u8, Pc] - q[i, j, k, 4u8, c]
+            dEy = q[Pi, Pj, Pk, 5u8, Pc] - q[i, j, k, 5u8, c]
+            dEz = q[Pi, Pj, Pk, 6u8, Pc] - q[i, j, k, 6u8, c]
         end
 
-        nx = n[0x1, fid, c]
-        ny = n[0x2, fid, c]
-        nz = n[0x3, fid, c]
-        wsJf = wsJ[0x1, fid, c]
+        nx = n[1u8, fid, c]
+        ny = n[2u8, fid, c]
+        nz = n[3u8, fid, c]
+        wsJf = wsJ[1u8, fid, c]
 
-        invwJijkc = invwJ[i, j, k, 0x1, c]
+        invwJijkc = invwJ[i, j, k, 1u8, c]
         fscale = invwJijkc * wsJf / 2
 
         ndotdH = nx*dHx + ny*dHy + nz*dHz
@@ -396,18 +410,18 @@ initialcondition(x::SVector{3}) = solution(x,0.0)
 
     @synchronize
 
-    c = (wg_idx-0x1)*C + cl
+    c = (wg_idx-1u8)*C + cl
     ij = ijk
-    if ij <= N[0x1] * N[0x2] && c <= S
-        j, i = fldmod1(ij, N[0x1])
+    if ij <= N[1u8] * N[2u8] && c <= S
+        j, i = fldmod1(ij, N[1u8])
 
-        for k = 1:N[0x3]
-            dq[i, j, k, 0x1, c] += Hxflux[i, j, k, cl]
-            dq[i, j, k, 0x2, c] += Hyflux[i, j, k, cl]
-            dq[i, j, k, 0x3, c] += Hzflux[i, j, k, cl]
-            dq[i, j, k, 0x4, c] += Exflux[i, j, k, cl]
-            dq[i, j, k, 0x5, c] += Eyflux[i, j, k, cl]
-            dq[i, j, k, 0x6, c] += Ezflux[i, j, k, cl]
+        for k = 1:N[3u8]
+            dq[i, j, k, 1u8, c] += Hxflux[i, j, k, cl]
+            dq[i, j, k, 2u8, c] += Hyflux[i, j, k, cl]
+            dq[i, j, k, 3u8, c] += Hzflux[i, j, k, cl]
+            dq[i, j, k, 4u8, c] += Exflux[i, j, k, cl]
+            dq[i, j, k, 5u8, c] += Eyflux[i, j, k, cl]
+            dq[i, j, k, 6u8, c] += Ezflux[i, j, k, cl]
         end
     end
 end
@@ -425,37 +439,44 @@ end
 ) where {G, N, ISTRIDE}
     il, j, k = @index(Local, NTuple)
     iblockidx, c, _ = @index(Group, NTuple)
-    i = (iblockidx-0x1)*ISTRIDE + il
+    i = (iblockidx-1u8)*ISTRIDE + il
 
-    lDT3 = @localmem eltype(dq) (N[0x3], N[0x3])
+    il = Int32(il)
+    i = Int32(i)
+    j = Int32(j)
+    k = Int32(k)
+    iblockidx = Int32(iblockidx)
+    c = Int32(c)
 
-    lHˣ = @localmem eltype(dq) (ISTRIDE, N[0x2], N[0x3])
-    lHʸ = @localmem eltype(dq) (ISTRIDE, N[0x2], N[0x3])
-    lHᶻ = @localmem eltype(dq) (ISTRIDE, N[0x2], N[0x3])
+    lDT3 = @localmem eltype(dq) (N[3u8], N[3u8])
 
-    lEˣ = @localmem eltype(dq) (ISTRIDE, N[0x2], N[0x3])
-    lEʸ = @localmem eltype(dq) (ISTRIDE, N[0x2], N[0x3])
-    lEᶻ = @localmem eltype(dq) (ISTRIDE, N[0x2], N[0x3])
+    lHˣ = @localmem eltype(dq) (ISTRIDE, N[2u8], N[3u8])
+    lHʸ = @localmem eltype(dq) (ISTRIDE, N[2u8], N[3u8])
+    lHᶻ = @localmem eltype(dq) (ISTRIDE, N[2u8], N[3u8])
 
-    if i <= G[0x1]
-        for sj = 0x0:N[0x2]:(N[0x3]-0x1)
-            if j+sj <= N[0x3] && il == 1
-                lDT3[j+sj, k] = DT[0x3][j+sj, k]
+    lEˣ = @localmem eltype(dq) (ISTRIDE, N[2u8], N[3u8])
+    lEʸ = @localmem eltype(dq) (ISTRIDE, N[2u8], N[3u8])
+    lEᶻ = @localmem eltype(dq) (ISTRIDE, N[2u8], N[3u8])
+
+    if i <= G[1u8]
+        for sj = 0u8:N[2u8]:(N[3u8]-1u8)
+            if j+sj <= N[3u8] && il == 1
+                lDT3[j+sj, k] = DT[3u8][j+sj, k]
             end
         end
 
-        lHˣ[il, j, k] = q[i, j, k, 0x1, c]
-        lHʸ[il, j, k] = q[i, j, k, 0x2, c]
-        lHᶻ[il, j, k] = q[i, j, k, 0x3, c]
-        lEˣ[il, j, k] = q[i, j, k, 0x4, c]
-        lEʸ[il, j, k] = q[i, j, k, 0x5, c]
-        lEᶻ[il, j, k] = q[i, j, k, 0x6, c]
+        lHˣ[il, j, k] = q[i, j, k, 1u8, c]
+        lHʸ[il, j, k] = q[i, j, k, 2u8, c]
+        lHᶻ[il, j, k] = q[i, j, k, 3u8, c]
+        lEˣ[il, j, k] = q[i, j, k, 4u8, c]
+        lEʸ[il, j, k] = q[i, j, k, 5u8, c]
+        lEᶻ[il, j, k] = q[i, j, k, 6u8, c]
     end
 
     @synchronize
 
-    i = (iblockidx-0x1)*ISTRIDE + il
-     if i <= G[0x1]
+    i = (iblockidx-1u8)*ISTRIDE + il
+     if i <= G[1u8]
         dHˣijkc_update = -zero(eltype(dq))
         dHʸijkc_update = -zero(eltype(dq))
         dHᶻijkc_update = -zero(eltype(dq))
@@ -463,14 +484,14 @@ end
         dEʸijkc_update = -zero(eltype(dq))
         dEᶻijkc_update = -zero(eltype(dq))
 
-        invwJijkc = invwJ[i, j, k, 0x1, c]
-        wJijkc = wJ[i, j, k, 0x1, c]
+        invwJijkc = invwJ[i, j, k, 1u8, c]
+        wJijkc = wJ[i, j, k, 1u8, c]
 
-        wJdRdXijkc_3 = wJijkc * dRdX[i, j, k, 0x3, c]
-        wJdRdXijkc_6 = wJijkc * dRdX[i, j, k, 0x6, c]
-        wJdRdXijkc_9 = wJijkc * dRdX[i, j, k, 0x9, c]
+        wJdRdXijkc_3 = wJijkc * dRdX[i, j, k, 3u8, c]
+        wJdRdXijkc_6 = wJijkc * dRdX[i, j, k, 6u8, c]
+        wJdRdXijkc_9 = wJijkc * dRdX[i, j, k, 9u8, c]
 
-        @unroll for m = 0x1:N[0x3]
+        @unroll for m = 1u8:N[3u8]
             lDT3km = lDT3[k, m]
             dHˣijkc_update -= wJdRdXijkc_6 * lDT3km * lEᶻ[il, j, m]
             dHˣijkc_update += wJdRdXijkc_9 * lDT3km * lEʸ[il, j, m]
@@ -490,12 +511,12 @@ end
             dEᶻijkc_update -= wJdRdXijkc_6 * lDT3km * lHˣ[il, j, m]
         end
 
-        dq[i, j, k, 0x1, c] += invwJijkc * dHˣijkc_update
-        dq[i, j, k, 0x2, c] += invwJijkc * dHʸijkc_update
-        dq[i, j, k, 0x3, c] += invwJijkc * dHᶻijkc_update
-        dq[i, j, k, 0x4, c] += invwJijkc * dEˣijkc_update
-        dq[i, j, k, 0x5, c] += invwJijkc * dEʸijkc_update
-        dq[i, j, k, 0x6, c] += invwJijkc * dEᶻijkc_update
+        dq[i, j, k, 1u8, c] += invwJijkc * dHˣijkc_update
+        dq[i, j, k, 2u8, c] += invwJijkc * dHʸijkc_update
+        dq[i, j, k, 3u8, c] += invwJijkc * dHᶻijkc_update
+        dq[i, j, k, 4u8, c] += invwJijkc * dEˣijkc_update
+        dq[i, j, k, 5u8, c] += invwJijkc * dEʸijkc_update
+        dq[i, j, k, 6u8, c] += invwJijkc * dEᶻijkc_update
     end
 end
 
@@ -512,44 +533,51 @@ end
 ) where {G, N, KSTRIDE}
     i, j, kl = @index(Local, NTuple)
     c, kblockidx = @index(Group, NTuple)
-    k = (kblockidx - 0x1) * KSTRIDE + kl
+    k = (kblockidx - 1u8) * KSTRIDE + kl
 
-    lDT1 = @localmem eltype(dq) (N[0x1], N[0x1])
-    lDT2 = @localmem eltype(dq) (N[0x2], N[0x2])
+    kl = Int32(kl)
+    i = Int32(i)
+    j = Int32(j)
+    k = Int32(k)
+    kblockidx = Int32(kblockidx)
+    c = Int32(c)
 
-    lHˣ = @localmem eltype(dq) (N[0x1], N[0x2], KSTRIDE)
-    lHʸ = @localmem eltype(dq) (N[0x1], N[0x2], KSTRIDE)
-    lHᶻ = @localmem eltype(dq) (N[0x1], N[0x2], KSTRIDE)
+    lDT1 = @localmem eltype(dq) (N[1u8], N[1u8])
+    lDT2 = @localmem eltype(dq) (N[2u8], N[2u8])
 
-    lEˣ = @localmem eltype(dq) (N[0x1], N[0x2], KSTRIDE)
-    lEʸ = @localmem eltype(dq) (N[0x1], N[0x2], KSTRIDE)
-    lEᶻ = @localmem eltype(dq) (N[0x1], N[0x2], KSTRIDE)
+    lHˣ = @localmem eltype(dq) (N[1u8], N[2u8], KSTRIDE)
+    lHʸ = @localmem eltype(dq) (N[1u8], N[2u8], KSTRIDE)
+    lHᶻ = @localmem eltype(dq) (N[1u8], N[2u8], KSTRIDE)
 
-    if k <= G[0x3]
-        @unroll for sj = 0x0:N[0x2]:(N[0x1]-0x1)
-            if j+sj <= N[0x1]
-                lDT1[i, j+sj] = DT[0x1][i, j+sj]
+    lEˣ = @localmem eltype(dq) (N[1u8], N[2u8], KSTRIDE)
+    lEʸ = @localmem eltype(dq) (N[1u8], N[2u8], KSTRIDE)
+    lEᶻ = @localmem eltype(dq) (N[1u8], N[2u8], KSTRIDE)
+
+    if k <= G[3u8]
+        @unroll for sj = 0u8:N[2u8]:(N[1u8]-1u8)
+            if j+sj <= N[1u8]
+                lDT1[i, j+sj] = DT[1u8][i, j+sj]
             end
         end
 
-        @unroll for si = 0x0:N[0x1]:(N[0x2]-0x1)
-            if i+si <= N[0x2]
-                lDT2[i+si, j] = DT[0x2][i+si, j]
+        @unroll for si = 0u8:N[1u8]:(N[2u8]-1u8)
+            if i+si <= N[2u8]
+                lDT2[i+si, j] = DT[2u8][i+si, j]
             end
         end
 
-        lHˣ[i, j, kl] = q[i, j, k, 0x1, c]
-        lHʸ[i, j, kl] = q[i, j, k, 0x2, c]
-        lHᶻ[i, j, kl] = q[i, j, k, 0x3, c]
-        lEˣ[i, j, kl] = q[i, j, k, 0x4, c]
-        lEʸ[i, j, kl] = q[i, j, k, 0x5, c]
-        lEᶻ[i, j, kl] = q[i, j, k, 0x6, c]
+        lHˣ[i, j, kl] = q[i, j, k, 1u8, c]
+        lHʸ[i, j, kl] = q[i, j, k, 2u8, c]
+        lHᶻ[i, j, kl] = q[i, j, k, 3u8, c]
+        lEˣ[i, j, kl] = q[i, j, k, 4u8, c]
+        lEʸ[i, j, kl] = q[i, j, k, 5u8, c]
+        lEᶻ[i, j, kl] = q[i, j, k, 6u8, c]
     end
 
     @synchronize
 
-    k = (kblockidx - 0x1) * KSTRIDE + kl
-    if k <= G[0x3]
+    k = (kblockidx - 1u8) * KSTRIDE + kl
+    if k <= G[3u8]
         dHˣijkc_update = -zero(eltype(dq))
         dHʸijkc_update = -zero(eltype(dq))
         dHᶻijkc_update = -zero(eltype(dq))
@@ -557,15 +585,15 @@ end
         dEʸijkc_update = -zero(eltype(dq))
         dEᶻijkc_update = -zero(eltype(dq))
 
-        invwJijkc = invwJ[i, j, k, 0x1, c]
-        wJijkc = wJ[i, j, k, 0x1, c]
+        invwJijkc = invwJ[i, j, k, 1u8, c]
+        wJijkc = wJ[i, j, k, 1u8, c]
 
-        wJdRdXijkc_1 = wJijkc * dRdX[i, j, k, 0x1, c]
-        wJdRdXijkc_4 = wJijkc * dRdX[i, j, k, 0x4, c]
-        wJdRdXijkc_7 = wJijkc * dRdX[i, j, k, 0x7, c]
+        wJdRdXijkc_1 = wJijkc * dRdX[i, j, k, 1u8, c]
+        wJdRdXijkc_4 = wJijkc * dRdX[i, j, k, 4u8, c]
+        wJdRdXijkc_7 = wJijkc * dRdX[i, j, k, 7u8, c]
 
 
-        @unroll for l = 0x1:N[0x1]
+        @unroll for l = 1u8:N[1u8]
             lDT1il = lDT1[i, l]
             dHˣijkc_update -= wJdRdXijkc_4 * lDT1il * lEᶻ[l, j, kl]
             dHˣijkc_update += wJdRdXijkc_7 * lDT1il * lEʸ[l, j, kl]
@@ -586,11 +614,11 @@ end
             dEᶻijkc_update -= wJdRdXijkc_4 * lDT1il * lHˣ[l, j, kl]
         end
 
-        wJdRdXijkc_2 = wJijkc * dRdX[i, j, k, 0x2, c]
-        wJdRdXijkc_5 = wJijkc * dRdX[i, j, k, 0x5, c]
-        wJdRdXijkc_8 = wJijkc * dRdX[i, j, k, 0x8, c]
+        wJdRdXijkc_2 = wJijkc * dRdX[i, j, k, 2u8, c]
+        wJdRdXijkc_5 = wJijkc * dRdX[i, j, k, 5u8, c]
+        wJdRdXijkc_8 = wJijkc * dRdX[i, j, k, 8u8, c]
 
-        @unroll for n = 0x1:N[0x2]
+        @unroll for n = 1u8:N[2u8]
             lDT2jn = lDT2[j,n]
             dHˣijkc_update -= wJdRdXijkc_5 * lDT2jn * lEᶻ[i, n, kl]
             dHˣijkc_update += wJdRdXijkc_8 * lDT2jn * lEʸ[i, n, kl]
@@ -611,12 +639,12 @@ end
             dEᶻijkc_update -= wJdRdXijkc_5 * lDT2jn * lHˣ[i, n, kl]
         end
 
-        dq[i, j, k, 0x1, c] += invwJijkc * dHˣijkc_update
-        dq[i, j, k, 0x2, c] += invwJijkc * dHʸijkc_update
-        dq[i, j, k, 0x3, c] += invwJijkc * dHᶻijkc_update
-        dq[i, j, k, 0x4, c] += invwJijkc * dEˣijkc_update
-        dq[i, j, k, 0x5, c] += invwJijkc * dEʸijkc_update
-        dq[i, j, k, 0x6, c] += invwJijkc * dEᶻijkc_update
+        dq[i, j, k, 1u8, c] += invwJijkc * dHˣijkc_update
+        dq[i, j, k, 2u8, c] += invwJijkc * dHʸijkc_update
+        dq[i, j, k, 3u8, c] += invwJijkc * dHᶻijkc_update
+        dq[i, j, k, 4u8, c] += invwJijkc * dEˣijkc_update
+        dq[i, j, k, 5u8, c] += invwJijkc * dEʸijkc_update
+        dq[i, j, k, 6u8, c] += invwJijkc * dEᶻijkc_update
     end
 end
 
