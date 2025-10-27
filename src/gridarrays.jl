@@ -555,6 +555,7 @@ end
     end
 end
 
+# sizeof type-unstable
 @inline function ncomponents(::Type{T}, ::Type{E}) where {T,E}
     return Int(sizeof(T) ÷ sizeof(E))
 end

@@ -14,7 +14,7 @@
 #
 using Adapt
 using MPI
-using CUDA
+# using CUDA
 using KernelAbstractions
 using KernelAbstractions.Extras: @unroll
 using LinearAlgebra
@@ -224,15 +224,10 @@ end
     end
 end
 
-function rhs!(dq, q, grid, invwJ, DT, cm)
+function rhs!(dq, q, (cell, dRdX, wJ, n, wsJ, fm), invwJ, DT, cm)
     backend = Raven.get_backend(dq)
-    cell = referencecell(grid)
 
-    dRdX, _, wJ = components(first(volumemetrics(grid)))
-    n, _, wsJ = components(first(surfacemetrics(grid)))
-    fm = facemaps(grid)
-
-    start!(q, cm)
+    # start!(q, cm)
 
     C = max(512 ÷ prod(size(cell)), 1)
     rhs_volume_kernel!(backend, (size(cell)..., C))(
@@ -248,7 +243,7 @@ function rhs!(dq, q, grid, invwJ, DT, cm)
         ndrange = size(dq),
     )
 
-    finish!(q, cm)
+    # finish!(q, cm)
 
     J = maximum(size(cell))
     C = max(512 ÷ J, 1)
@@ -382,71 +377,71 @@ function run(
     return errf
 end
 
-let
-    if !MPI.Initialized()
-        MPI.Init()
-    end
+# let
+#     if !MPI.Initialized()
+#         MPI.Init()
+#     end
 
-    comm = MPI.COMM_WORLD
-    rank = MPI.Comm_rank(comm)
+#     comm = MPI.COMM_WORLD
+#     rank = MPI.Comm_rank(comm)
 
-    if CUDA.functional()
-        CUDA.device!(MPI.Comm_rank(comm) % length(CUDA.devices()))
-        CUDA.allowscalar(false)
-    end
+#     if CUDA.functional()
+#         CUDA.device!(MPI.Comm_rank(comm) % length(CUDA.devices()))
+#         CUDA.allowscalar(false)
+#     end
 
-    FT = Float64
-    N = (4, 5)
+#     FT = Float64
+#     N = (4, 5)
 
-    # run on the GPU if possible
-    AT = CUDA.functional() && CUDA.has_cuda_gpu() ? CuArray : Array
+#     # run on the GPU if possible
+#     AT = CUDA.functional() && CUDA.has_cuda_gpu() ? CuArray : Array
 
-    if rank == 0
-        @info """Configuration:
-            precision        = $FT
-            polynomial order = $N
-            array type       = $AT
-        """
-    end
+#     if rank == 0
+#         @info """Configuration:
+#             precision        = $FT
+#             polynomial order = $N
+#             array type       = $AT
+#         """
+#     end
 
-    # visualize solution of advected Gaussian
-    K = 2
-    L = 2
-    vtkdir = "vtk_semdg_advection_2d$(K)x$(K)_L$(L)"
-    if rank == 0
-        @info """Starting Gaussian advection with:
-            ($K, $K) coarse grid
-            $L refinement level
-        """
-    end
+#     # visualize solution of advected Gaussian
+#     K = 2
+#     L = 2
+#     vtkdir = "vtk_semdg_advection_2d$(K)x$(K)_L$(L)"
+#     if rank == 0
+#         @info """Starting Gaussian advection with:
+#             ($K, $K) coarse grid
+#             $L refinement level
+#         """
+#     end
 
-    run(gaussian, FT, AT, N, K, L; outputvtk = true, vtkdir, comm)
-    rank == 0 && @info "Finished, vtk output written to $vtkdir"
+#     run(gaussian, FT, AT, N, K, L; outputvtk = true, vtkdir, comm)
+#     rank == 0 && @info "Finished, vtk output written to $vtkdir"
 
-    # run convergence study using a simple sine field
-    rank == 0 && @info "Starting convergence study"
-    numlevels = @isdefined(_testing) ? 2 : 5
-    err = zeros(FT, numlevels)
-    for l = 1:numlevels
-        L = l - 1
-        K = 4
-        totalcells = (K * 2^L, K * 2^L)
-        err[l] = run(sineproduct, FT, AT, N, K, L; comm)
-        if rank == 0
-            @info @sprintf(
-                "Level %d, cells = (%2d, %2d), error = %.16e",
-                l,
-                totalcells...,
-                err[l]
-            )
-        end
-    end
-    rates = log2.(err[1:(numlevels-1)] ./ err[2:numlevels])
-    if rank == 0
-        @info "Convergence rates:\n" * join(
-            ["rate for levels $l → $(l + 1) = $(rates[l])" for l = 1:(numlevels-1)],
-            "\n",
-        )
-    end
+#     # run convergence study using a simple sine field
+#     rank == 0 && @info "Starting convergence study"
+#     numlevels = @isdefined(_testing) ? 2 : 5
+#     err = zeros(FT, numlevels)
+#     for l = 1:numlevels
+#         L = l - 1
+#         K = 4
+#         totalcells = (K * 2^L, K * 2^L)
+#         err[l] = run(sineproduct, FT, AT, N, K, L; comm)
+#         if rank == 0
+#             @info @sprintf(
+#                 "Level %d, cells = (%2d, %2d), error = %.16e",
+#                 l,
+#                 totalcells...,
+#                 err[l]
+#             )
+#         end
+#     end
+#     rates = log2.(err[1:(numlevels-1)] ./ err[2:numlevels])
+#     if rank == 0
+#         @info "Convergence rates:\n" * join(
+#             ["rate for levels $l → $(l + 1) = $(rates[l])" for l = 1:(numlevels-1)],
+#             "\n",
+#         )
+#     end
 
-end
+# end
