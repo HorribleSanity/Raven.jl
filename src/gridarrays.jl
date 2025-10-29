@@ -56,6 +56,31 @@ function GridArray{T}(
     withghosts::Bool,
     fieldindex::Integer,
 ) where {T,A,N}
+    types = flatten(recursive_fieldtypes(T), DataType)
+
+    L = length(types)::Int
+    if L == 0
+        E = eltype(T)
+    else
+        E = first(types)
+        if !allequal(types)
+            throw(ArgumentError("Type T has different field types: $types"))
+        end
+    end
+
+    parentdimswithghosts = insert(dimswithghosts, Val(fieldindex), L)
+    datawithghosts = A{E}(undef, parentdimswithghosts)
+    return GridArray{T}(datawithghosts, dims, dimswithghosts, comm, withghosts, fieldindex)
+end
+
+function GridArray{T}(
+    datawithghosts::A,
+    dims::NTuple{N,Int},
+    dimswithghosts::NTuple{N,Int},
+    comm,
+    withghosts::Bool,
+    fieldindex::Integer,
+) where {T,A,N}
     if !(
         all(dims[1:(end-1)] .== dimswithghosts[1:(end-1)]) &&
         dims[end] <= dimswithghosts[end]
@@ -83,7 +108,10 @@ function GridArray{T}(
     parentdims = insert(dims, Val(fieldindex), L)
     parentdimswithghosts = insert(dimswithghosts, Val(fieldindex), L)
 
-    datawithghosts = A{E}(undef, parentdimswithghosts)
+    if size(datawithghosts) != parentdimswithghosts
+        datawithghosts = reshape(datawithghosts, parentdimswithghosts)
+    end
+
     data = view(
         datawithghosts,
         (ntuple(
@@ -98,7 +126,7 @@ function GridArray{T}(
     D = typeof(data)
     W = typeof(datawithghosts)
 
-    return GridArray{T,N,A,withghosts,fieldindex,L,C,D,W}(
+    return GridArray{T,N,arraytype(A),withghosts,fieldindex,L,C,D,W}(
         comm,
         data,
         datawithghosts,
