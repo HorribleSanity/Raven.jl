@@ -758,4 +758,8 @@ function LinearAlgebra.dot(x::GridVectorView, y::GridVectorView)
     @assert comm(x.data) == comm(y.data)
     return MPI.Allreduce(dot(parent(x.data), parent(y.data)), +, comm(x.data))
 end
-Base.fill!(v::GridVectorView, val) = fill!(parent(v).data, val)
+function Base.fill!(v::GridVectorView, val)
+    fill!(parent(v).data, val)
+    return v
+end
+Base.zero(v::GridVectorView) = fill!(similar(v), zero(eltype(v)))
