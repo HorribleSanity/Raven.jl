@@ -737,3 +737,25 @@ end
 # Base.sort!(x::AnyGridArray; kwargs...) = (AK.sort!(x; kwargs...); return x)
 # Base.sortperm!(ix::AnyGridArray, x::AnyGridArray; kwargs...) =
 #     (AK.sortperm!(ix, x; kwargs...); return ix)
+
+struct GridVectorView{T,A<:GridArray} <: AbstractArray{T,1}
+    data::A
+end
+GridVectorView(A::GridArray) = GridVectorView{eltype(A.data),typeof(A)}(A)
+
+Base.parent(v::GridVectorView) = v.data
+Base.length(v::GridVectorView) = length(parent(v).data)
+Base.size(v::GridVectorView) = (length(v),)
+@inline function Base.getindex(v::GridVectorView, i::Int)
+    return parent(v).data[i]
+end
+@inline function Base.setindex!(v::GridVectorView, val, i::Int)
+    return parent(v).data[i] = val
+end
+LinearAlgebra.norm(v::GridVectorView) = norm(v.data)
+Base.similar(v::GridVectorView) = GridVectorView(similar(parent(v)))
+function LinearAlgebra.dot(x::GridVectorView, y::GridVectorView)
+    @assert comm(x.data) == comm(y.data)
+    return MPI.Allreduce(dot(parent(x.data), parent(y.data)), +, comm(x.data))
+end
+Base.fill!(v::GridVectorView, val) = fill!(parent(v).data, val)
