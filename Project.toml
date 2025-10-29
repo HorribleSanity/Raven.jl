@@ -23,10 +23,12 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 
 [extensions]
 RavenCUDAExt = "CUDA"
 RavenWriteVTKExt = "WriteVTK"
+RavenSciMLBaseExt = "SciMLBase"
 
 [compat]
 AcceleratedKernels = "0.4.3"
@@ -46,8 +48,10 @@ SparseArrays = "1"
 StaticArrays = "1"
 UnPack = "1.0.2"
 WriteVTK = "1.16"
-julia = "1.6"
+SciMLBase = "2"
+julia = "1.10"
 
 [extras]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"

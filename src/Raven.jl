@@ -88,4 +88,11 @@ function __init__()
     end
 end
 
+"""
+    semidiscretize(dg, tspan)
+
+Note: SciMLBase must be imported. 
+"""
+function semidiscretize end
+
 end # module Raven
