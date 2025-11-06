@@ -124,7 +124,7 @@ mutable struct CommManagerTripleBuffered{CP,RBC,RBH,RBD,RB,RS,SBC,SBH,SBD,SB,SS}
     recvbuffercomm::RBC
     recvbufferhost::RBH
     recvbufferdevice::RBD
-    recvbufferes::RB
+    recvbuffers::RB
     recvrequests::MPI.UnsafeMultiRequest
     recvstream::RS
     sendbuffercomm::SBC
