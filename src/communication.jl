@@ -192,28 +192,6 @@ function commmanager(
     recvbuffers = _get_mpi_buffers(recvbuffercomm, pattern.recvrankindices)
     sendbuffers = _get_mpi_buffers(sendbuffercomm, pattern.sendrankindices)
 
-    for i in eachindex(pattern.recvranks)
-        #@info "Recv" pattern.recvranks[i] pattern.recvrankindices[i] recvbuffers[i]
-        MPI.Recv_init(
-            recvbuffers[i],
-            comm,
-            recvrequests[i];
-            source = pattern.recvranks[i],
-            tag = ctag,
-        )
-    end
-
-    for i in eachindex(pattern.sendranks)
-        #@info "Send" pattern.sendranks[i] pattern.sendrankindices[i] sendbuffers[i]
-        MPI.Send_init(
-            sendbuffers[i],
-            comm,
-            sendrequests[i];
-            dest = pattern.sendranks[i],
-            tag = ctag,
-        )
-    end
-
     cm = if triplebuffer
         backend = get_backend(arraytype(pattern))
         recvstream = Stream(backend)
@@ -307,24 +285,38 @@ function start!(A, cm::CommManagerBuffered)
         KernelAbstractions.synchronize(get_backend(cm))
     end
 
-    if !isempty(cm.recvrequests)
-        MPI.Startall(cm.recvrequests)
+    for i in eachindex(cm.pattern.recvranks)
+        MPI.Irecv!(
+            cm.recvbuffers[i],
+            cm.comm,
+            cm.recvrequests[i];
+            source = cm.pattern.recvranks[i],
+            tag = cm.tag,
+        )
     end
 
-    if !isempty(cm.sendrequests)
-        MPI.Startall(cm.sendrequests)
+    for i in eachindex(cm.pattern.sendranks)
+        MPI.Isend(
+            cm.sendbuffers[i],
+            cm.comm,
+            cm.sendrequests[i];
+            dest = cm.pattern.sendranks[i],
+            tag = cm.tag,
+        )
     end
 
     return
 end
 
 function finish!(A, cm::CommManagerBuffered)
-    if !isempty(cm.recvrequests)
-        MPI.Waitall(cm.recvrequests)
+    # Not using MPI.Waitall for Enzyme
+    for req in cm.recvrequests
+        MPI.Wait(req)
     end
 
-    if !isempty(cm.sendrequests)
-        MPI.Waitall(cm.sendrequests)
+    # Not using MPI.Waitall for Enzyme
+    for req in cm.sendrequests
+        MPI.Wait(req)
     end
 
     if !isempty(cm.recvrequests)
@@ -342,8 +334,14 @@ function start!(A, cm::CommManagerTripleBuffered)
     # <https://developer.nvidia.com/blog/introduction-cuda-aware-mpi/> for more
     # details.
 
-    if !isempty(cm.recvrequests)
-        MPI.Startall(cm.recvrequests)
+    for i in eachindex(cm.pattern.recvranks)
+        MPI.Irecv!(
+            cm.recvbuffers[i],
+            cm.comm,
+            cm.recvrequests[i];
+            source = cm.pattern.recvranks[i],
+            tag = cm.tag,
+        )
     end
 
     if !isempty(cm.sendrequests)
@@ -367,12 +365,24 @@ function finish!(A, cm::CommManagerTripleBuffered)
         backend = get_backend(cm)
         synchronize(backend, cm.sendstream)
         copyto!(cm.sendbuffercomm, cm.sendbufferhost)
-        MPI.Startall(cm.sendrequests)
+        for i in eachindex(cm.pattern.sendranks)
+            MPI.Isend(
+                cm.sendbuffers[i],
+                cm.comm,
+                cm.sendrequests[i];
+                dest = cm.pattern.sendranks[i],
+                tag = cm.tag,
+            )
+        end
     end
 
     if !isempty(cm.recvrequests)
         backend = get_backend(cm)
-        MPI.Waitall(cm.recvrequests)
+        # Not using MPI.Waitall for Enzyme
+        for req in cm.recvrequests
+            MPI.Wait(req)
+        end
+
         copyto!(cm.recvbufferhost, cm.recvbuffercomm)
         stream!(backend, cm.recvstream) do
             KernelAbstractions.copyto!(backend, cm.recvbufferdevice, cm.recvbufferhost)
@@ -381,8 +391,9 @@ function finish!(A, cm::CommManagerTripleBuffered)
         end
     end
 
-    if !isempty(cm.sendrequests)
-        MPI.Waitall(cm.sendrequests)
+    # Not using MPI.Waitall for Enzyme
+    for req in cm.sendrequests
+        MPI.Wait(req)
     end
 
     return
