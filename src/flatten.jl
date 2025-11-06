@@ -103,17 +103,11 @@ end
     constructorof(T::Type) -> constructor
 
 Return an object `constructor` that can be used to construct objects of
-type `T` from their field values. Typically, `constructor` will be the
-type `T` with all parameters removed:
+type `T` from their field values.
 
 ```jldoctest
-julia> struct T{A,B}
-           a::A
-           b::B
-       end
-
-julia> Raven.constructorof(T{Int,Int})
-T
+julia> Raven.constructorof(Tuple{Int,Int})
+tuple (built-in function)
 
 ```
 
