@@ -110,10 +110,10 @@ mutable struct CommManagerBuffered{CP,RBD,RB,SBD,SB} <: AbstractCommManager
     tag::Cint
     recvbufferdevice::RBD
     recvbuffers::RB
-    recvrequests::MPI.UnsafeMultiRequest
+    recvrequests::Vector{MPI.Request}
     sendbufferdevice::SBD
     sendbuffers::SB
-    sendrequests::MPI.UnsafeMultiRequest
+    sendrequests::Vector{MPI.Request}
 end
 
 mutable struct CommManagerTripleBuffered{CP,RBC,RBH,RBD,RB,RS,SBC,SBH,SBD,SB,SS} <:
@@ -125,13 +125,13 @@ mutable struct CommManagerTripleBuffered{CP,RBC,RBH,RBD,RB,RS,SBC,SBH,SBD,SB,SS}
     recvbufferhost::RBH
     recvbufferdevice::RBD
     recvbuffers::RB
-    recvrequests::MPI.UnsafeMultiRequest
+    recvrequests::Vector{MPI.Request}
     recvstream::RS
     sendbuffercomm::SBC
     sendbufferhost::SBH
     sendbufferdevice::SBD
     sendbuffers::SB
-    sendrequests::MPI.UnsafeMultiRequest
+    sendrequests::Vector{MPI.Request}
     sendstream::SS
 end
 
@@ -175,8 +175,11 @@ function commmanager(
     recvbufferdevice = AT{T}(undef, recvsize)
     sendbufferdevice = AT{T}(undef, sendsize)
 
-    recvrequests = MPI.UnsafeMultiRequest(length(pattern.recvranks))
-    sendrequests = MPI.UnsafeMultiRequest(length(pattern.sendranks))
+    recvrequests = Vector{MPI.Request}(undef, length(pattern.recvranks))
+    sendrequests = Vector{MPI.Request}(undef, length(pattern.sendranks))
+
+    fill!(recvrequests, MPI.REQUEST_NULL)
+    fill!(sendrequests, MPI.REQUEST_NULL)
 
     if triplebuffer
         recvbufferhost = Array{T}(undef, recvsize)
@@ -225,14 +228,6 @@ function commmanager(
             sendbuffers,
             sendrequests,
         )
-    end
-
-    finalizer(cm) do cm
-        for reqs in (cm.recvrequests, cm.sendrequests)
-            for req in reqs
-                MPI.free(req)
-            end
-        end
     end
 
     push!(COMM_MANAGERS, WeakRef(cm))
@@ -286,20 +281,18 @@ function start!(A, cm::CommManagerBuffered)
     end
 
     for i in eachindex(cm.pattern.recvranks)
-        MPI.Irecv!(
+        cm.recvrequests[i] = MPI.Irecv!(
             cm.recvbuffers[i],
-            cm.comm,
-            cm.recvrequests[i];
+            cm.comm;
             source = cm.pattern.recvranks[i],
             tag = cm.tag,
         )
     end
 
     for i in eachindex(cm.pattern.sendranks)
-        MPI.Isend(
+        cm.sendrequests[i] = MPI.Isend(
             cm.sendbuffers[i],
-            cm.comm,
-            cm.sendrequests[i];
+            cm.comm;
             dest = cm.pattern.sendranks[i],
             tag = cm.tag,
         )
@@ -335,10 +328,9 @@ function start!(A, cm::CommManagerTripleBuffered)
     # details.
 
     for i in eachindex(cm.pattern.recvranks)
-        MPI.Irecv!(
+        cm.recvrequests[i] = MPI.Irecv!(
             cm.recvbuffers[i],
             cm.comm,
-            cm.recvrequests[i];
             source = cm.pattern.recvranks[i],
             tag = cm.tag,
         )
@@ -366,10 +358,9 @@ function finish!(A, cm::CommManagerTripleBuffered)
         synchronize(backend, cm.sendstream)
         copyto!(cm.sendbuffercomm, cm.sendbufferhost)
         for i in eachindex(cm.pattern.sendranks)
-            MPI.Isend(
+            cm.sendrequests[i] = MPI.Isend(
                 cm.sendbuffers[i],
                 cm.comm,
-                cm.sendrequests[i];
                 dest = cm.pattern.sendranks[i],
                 tag = cm.tag,
             )
