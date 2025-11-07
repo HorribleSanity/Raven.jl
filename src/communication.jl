@@ -140,11 +140,12 @@ function _get_mpi_buffers(buffer, rankindices)
     @assert eltype(rankindices) == UnitRange{eltype(eltype(rankindices))}
     T = typeof(view(buffer, 1:length(rankindices)))
 
-    bufs = Array{MPI.Buffer{T}}(undef, length(rankindices))
+#=     bufs = Array{MPI.Buffer{T}}(undef, length(rankindices))
     for i in eachindex(rankindices)
         bufs[i] = MPI.Buffer(view(buffer, rankindices[i]))
-    end
-    return bufs
+    end =#
+    return [view(buffer, rankindices[i]) for i in eachindex(rankindices)]
+    # return bufs
 end
 
 usetriplebuffer(::Type{Array}) = false
