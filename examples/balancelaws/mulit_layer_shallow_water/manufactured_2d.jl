@@ -6,6 +6,11 @@ using Printf
 using StaticArrays: SVector
 using LinearAlgebra: norm
 using MPI
+import KernelAbstractions as KA
+
+using OrdinaryDiffEqTsit5
+using OrdinaryDiffEqLowStorageRK
+using Theseus
 
 function manufacturedstate(law, x, t)
     FT = eltype(law)
@@ -408,10 +413,14 @@ function build(
     ode = Raven.semidiscretize(dg, tspan)
     parent(ode.u0) .= manufacturedstate.(Ref(law), points(grid), FT(0))
 
-    return ode, dt
+    qexact = GridArray(undef, law, grid)
+    qexact .= manufacturedstate.(Ref(law), points(grid), timeend)
+
+    return ode, dt, qexact
 end
 
 
+begin
     if !MPI.Initialized()
         MPI.Init(threadlevel = :multiple)
     end
@@ -419,30 +428,124 @@ end
     comm = MPI.COMM_WORLD
     rank = MPI.Comm_rank(comm)
 
+    A = Array
+    FT = Float64
+    N = 4
+    nlevels = 1
+    volume_form = FluxDifferencingForm(EntropyConservativeFlux())
 
-A = Array
-FT = Float64
-N = 1
-K = 16
+    errors = zeros(FT, nlevels)
+    for l = 1:nlevels
+        K = 2 * 2^(l)
 
-using OrdinaryDiffEqTsit5
-using Theseus
+        global ode, dt, qexact = build(A, FT, N, K; volume_form, comm)
 
-ode, dt = build(A, FT, N, K)
+        dg = ode.p
 
-sol_tsit5 = solve(
-    ode, Tsit5();
-    dt
-    # dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize_callback
-    # ode_default_options()..., callback = callbacks,
-    # adaptive = false
-);
+        normq = weightednorm(dg, parent(ode.u0))
 
-# TODO: CFL and other callbacks
-sol = solve(
-    ode, Theseus.ROS2();
-    dt, 
-    # verbose=1,
-    krylov_algo = :gmres,
-    assume_p_const = false,
-);
+        if rank == 0
+            @info @sprintf """Starting
+            N                   = %d
+            K                   = %d
+            FT                  = %s
+            A                   = %s
+            backend             = %s
+            integration_testing = %s
+            norm(q)             = %.16e
+        """ N K FT A KA.get_backend(parent(ode.u0)) volume_form normq
+        end
+
+
+        global sol_lsrk = solve(
+            ode, CarpenterKennedy2N54();
+            dt,
+            save_everystep=true,
+            # callback = callbacks,
+            adaptive=false
+        )
+
+        q = parent(last(sol_lsrk.u))
+        errf = weightednorm(dg, q .- qexact)
+        normq = weightednorm(dg, q)
+
+        if rank == 0
+            @info @sprintf """CarpenterKennedy2N54
+            norm(q)      = %.16e
+            norm(q - qe) = %.16e
+            """ normq errf
+        end
+
+        global sol_tsit5 = solve(
+            ode, Tsit5();
+            dt,
+            save_everystep=true,
+            # callback = callbacks,
+            adaptive=false
+        )
+
+        q = parent(last(sol_tsit5.u))
+        errf = weightednorm(dg, q .- qexact)
+        normq = weightednorm(dg, q)
+
+        if rank == 0
+            @info @sprintf """Tsit5
+            norm(q)      = %.16e
+            norm(q - qe) = %.16e
+            """ normq errf
+        end
+
+        # TODO: CFL and other callbacks
+        global sol = solve(
+            ode, Theseus.TRBDF2();
+            dt=100dt,
+            #verbose=1,
+            krylov_algo=:gmres,
+            assume_p_const=false,
+        )
+
+        q = parent(last(sol.u))
+        errf = weightednorm(dg, q .- qexact)
+        normq = weightednorm(dg, q)
+
+        if rank == 0
+            @info @sprintf """Theseus
+            norm(q)      = %.16e
+            norm(q - qe) = %.16e
+            """ normq errf
+        end
+
+
+
+        q = parent(ode.u0)
+        odesolver = LSRK54(dg, q, dt)
+        timeend = last(ode.tspan)
+        Raven.BalanceLaws.solve!(q, timeend, odesolver)
+
+        errf = weightednorm(dg, q .- qexact)
+        normq = weightednorm(dg, q)
+
+        if rank == 0
+            @info @sprintf """Raven LSRK54
+            norm(q)      = %.16e
+            norm(q - qe) = %.16e
+            """ normq errf
+        end
+
+        errors[l] = errf
+    end
+
+    @show errors
+
+    if nlevels > 1
+        rates = log2.(errors[1:(nlevels-1)] ./ errors[2:nlevels])
+        if rank == 0
+            @info "Convergence rates\n" * join(
+                ["rate for levels $l → $(l + 1) = $(rates[l])" for l = 1:(nlevels-1)],
+                "\n",
+            )
+        end
+    end
+
+
+end
