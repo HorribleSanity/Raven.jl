@@ -22,19 +22,21 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 
 [extensions]
 RavenCUDAExt = "CUDA"
 RavenWriteVTKExt = "WriteVTK"
-RavenSciMLBaseExt = "SciMLBase"
+RavenDiffEqBaseExt = ["SciMLBase", "DiffEqBase"]
 
 [compat]
 AcceleratedKernels = "0.4.3"
 Adapt = "3, 4"
 CUDA = "5.3"
 Compat = "3.42, 4"
+DiffEqBase = "6"
 GPUArraysCore = "0.2"
 KernelAbstractions = "0.9"
 LinearAlgebra = "1"
