@@ -752,9 +752,14 @@ end
 @inline function Base.setindex!(v::GridVectorView, val, i::Int)
     return parent(v).data[i] = val
 end
-LinearAlgebra.norm(v::GridVectorView) = norm(v.data)
+function LinearAlgebra.norm(v::GridVectorView)
+    @assert !showingghosts(v.data)
+    return norm(v.data)
+end
 Base.similar(v::GridVectorView) = GridVectorView(similar(parent(v)))
 function LinearAlgebra.dot(x::GridVectorView, y::GridVectorView)
+    @assert !showingghosts(x.data)
+    @assert !showingghosts(y.data)
     @assert comm(x.data) == comm(y.data)
     return MPI.Allreduce(dot(parent(x.data), parent(y.data)), +, comm(x.data))
 end
