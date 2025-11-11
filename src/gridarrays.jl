@@ -768,3 +768,22 @@ function Base.fill!(v::GridVectorView, val)
     return v
 end
 Base.zero(v::GridVectorView) = fill!(similar(v), zero(eltype(v)))
+
+function Base.copyto!(dest::GridVectorView, src::GridVectorView)
+    copyto!(dest.data, src.data)
+    return dest
+end
+
+Base.BroadcastStyle(::Type{<:GridVectorView}) = Broadcast.ArrayStyle{GridArray}()
+
+function Base.copyto!(dest::GridVectorView, bc::Broadcast.Broadcasted{Nothing})
+    copyto!(vec(parent(dest.data)), bc)
+    return dest
+end
+
+Adapt.adapt_structure(to, v::GridVectorView) = GridVectorView(adapt(to, v.data))
+
+function LinearAlgebra.axpy!(a, x::Raven.GridVectorView, y::Raven.GridVectorView)
+    parent(y.data) .+= a .* parent(x.data)
+    return y
+end
