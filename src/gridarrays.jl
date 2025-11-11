@@ -787,3 +787,5 @@ function LinearAlgebra.axpy!(a, x::Raven.GridVectorView, y::Raven.GridVectorView
     parent(y.data) .+= a .* parent(x.data)
     return y
 end
+
+Raven.get_backend(v::GridVectorView) = Raven.get_backend(v.data)
