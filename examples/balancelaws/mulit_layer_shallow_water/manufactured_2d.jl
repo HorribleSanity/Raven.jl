@@ -6,6 +6,7 @@ using Printf
 using StaticArrays: SVector
 using LinearAlgebra: norm
 using MPI
+using CUDA
 import KernelAbstractions as KA
 
 using OrdinaryDiffEqTsit5
@@ -434,6 +435,19 @@ begin
     nlevels = 1
     volume_form = FluxDifferencingForm(EntropyConservativeFlux())
 
+    if CUDA.functional() && CUDA.has_cuda_gpu()
+        CUDA.allowscalar(false)
+        A = CUDA.CuArray
+    end
+
+    backend = Raven.get_backend(A)
+
+    if backend isa KA.GPU
+        local_comm = MPI.Comm_split_type(comm, MPI.COMM_TYPE_SHARED, rank)
+        local_rank = MPI.Comm_rank(local_comm)
+        KA.device!(backend, (local_rank % KA.ndevices(backend)) + 1)
+    end
+
     errors = zeros(FT, nlevels)
     for l = 1:nlevels
         K = 2 * 2^(l)
@@ -497,7 +511,7 @@ begin
 
         # TODO: CFL and other callbacks
         global sol = solve(
-            ode, Theseus.TRBDF2();
+            ode, Theseus.ROS2();
             dt=100dt,
             #verbose=1,
             krylov_algo=:gmres,
