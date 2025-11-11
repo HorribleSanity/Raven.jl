@@ -39,7 +39,7 @@ parenttype(@nospecialize T::Type{<:Base.ReshapedArray}) = fieldtype(T, :parent)
 parenttype(@nospecialize T::Type{<:Union{Base.Slice,Base.IdentityUnitRange}}) =
     fieldtype(T, :indices)
 parenttype(::Type{Diagonal{T,V}}) where {T,V} = V
-parenttype(T::Type) = T
+parenttype(T::Type) = error("Must implement parenttype for $T")
 
 """
     get_backend(::Type{T}) -> Type
