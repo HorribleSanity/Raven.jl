@@ -42,25 +42,25 @@ const empericalconvergetest = false
 const outputvtk = true
 const outputprogress = true
 const bigrun = true
-const numlevels = 3
-const Lout = 1
-const mtemp = -10.0 #, -75.0
+const numlevels = 2
+const Lout = 3
+const mtemp = 35.0 #, -75.0
 const BC = :rbc # options: :rbc :forbc
 const flux = :upwind    # options: :upwind :central
 const matcoef = :smooth  # options: :constant :disc :smooth
 
-const K = 16
-const delta_x = 1.0
-const delta_y = 1.0
+const K = 10
+const delta_x = 2.0
+const delta_y = 2.0
 const pulsewidth = 0.9
 const xcenter = 0.0
-const ycenter = 0.0
+const ycenter = -delta_y*0.5
 #const f(x, y) = y - ycenter > 0 ? mtemp : -mtemp
 #const f(x, y) = x - xcenter > 0 ? mtemp : -mtemp
-#const f(x, y) = mtemp*y
-f(x,y) = track(x, y)
-const timeend = 1.5
-const polydegree = 4
+const f(x, y) = -mtemp*(y-ycenter)
+#f(x,y) = track(x, y)
+const timeend = 0.5
+const polydegree = 5
 const N = (polydegree, polydegree)
 const xperiodic = false
 const yperiodic = false
@@ -72,12 +72,12 @@ function abs2(v::SVector{2,ComplexF64})
 end
 
 function track(x, y)
+    l = delta_x * 0.6
+    w = delta_y * 0.5
     sigma = mtemp
-    length = 0.8
-    width = 0.5
     s = sqrt(pi)/(2.0*sigma)
-    X = max(abs(x) - length/2, 0.0)
-    return sigma * erf(s*(sqrt(X^2+y^2)-width/2))
+    X = max(abs(x) - l/2, 0.0)
+    return sigma^2 * erf(s*(sqrt(X^2+y^2)-w/2))
 end
 
 @kernel function exactwithinterface!(q, mesh, matparam, t, ::Val{N}) where {N}
@@ -175,7 +175,7 @@ function assembleb!(b_gpu, ynormaldata, xnormaldata, q, idx, param, m, n)
     backend = KernelAbstractions.get_backend(b_gpu)
     ynormalidx, xnormalidx = idx
     a, sig, Q = param
-    KernelAbstractions.synchronize(backend)
+    #KernelAbstractions.synchronize(backend)
     # [[inc 1] [inc 2] [recursion 1] [recursion 2] [term 1] [term 2]]
     eqn = 1
     setcornerrhs_incomming!(backend)(b_gpu, xnormaldata, xnormalidx, n[1], 1, eqn; ndrange=Q+1)
@@ -186,55 +186,6 @@ function assembleb!(b_gpu, ynormaldata, xnormaldata, q, idx, param, m, n)
     eqn += 2*Q*(Q+1)
     setcornerrhs_recursion_k!(backend)(b_gpu, q, a, sig, Q, m, eqn; ndrange=Q*(Q+1))
 end
-
-function assembleb_cpu!(bb, data1, data2, qq, idx, param, m, n)
-    backend = KernelAbstractions.get_backend(bb)
-    idx1, idx2 = idx
-    a, sig, Q = param
-    # [[inc 1] [inc 2] [recursion 1] [recursion 2] [term 1] [term 2]]
-    eqn = 1
-    # incomming data (Q+1 equations) x-normal-data
-    j = 1
-    # lefts-right | dwdx = (dudx + nx*dvdx)^- = (nx * u + v)^+ | x-normal-data
-    for k = 1:Q+1
-        bb[eqn] = n[1] * first(data2[idx2[k]]) + last(data2[idx2[k]])
-        eqn = eqn + 1
-    end
-
-    # top-bottom | dwdy = (dudy - ny*i*dvdy)^- = (ny * u - i*v)^+ | y-normal-data
-    # incomming data (Q+1 equations) y-normal-data
-    k = 1
-        for j = 1:Q+1
-        bb[eqn] = n[2] * first(data1[idx1[j]]) - im * last(data1[idx1[j]])
-        eqn = eqn + 1
-    end
-
-    # dir j recursions (2Q(Q+1) equations) | x-normal recursion
-    for k = 1:Q+1, j = 2:Q+1
-        aeven = a[2*(j-1)]
-        aodd = a[2*(j-1)-1]
-        bb[eqn] = (-aeven * im * m + sig[2*(j-1)]) * first(qq[j, k])
-        bb[eqn] += (aodd * im * m - sig[2*(j-1)-1]) * first(qq[j-1, k])
-        eqn = eqn + 1
-        bb[eqn] = (-aodd * im * m - sig[2*(j-1)-1]) * last(qq[j-1, k])
-        bb[eqn] += (aeven * im * m + sig[2*(j-1)]) * last(qq[j, k])
-        eqn = eqn + 1
-    end
-
-    # dir k recursions (2Q(Q+1) equations) | y-normal recursion
-    for j = 1:Q+1, k = 2:Q+1
-        aeven = a[2*(k-1)]
-        aodd = a[2*(k-1)-1]
-        bb[eqn] = (-aeven * im * m + sig[2*(k-1)]) * first(qq[j, k])
-        bb[eqn] += (aodd * im * m - sig[2*(k-1)-1]) * first(qq[j, k-1])
-        eqn = eqn + 1
-        bb[eqn] = (-aodd * im * m - sig[2*(k-1)-1]) * last(qq[j, k-1])
-        bb[eqn] += (aeven * im * m + sig[2*(k-1)]) * last(qq[j, k])
-        eqn = eqn + 1
-   end
-end
-
-
 
 function assemblecornersystem!(A, param)
     # dof ordering:
@@ -340,7 +291,13 @@ function assemblecornersystem!(A, param)
     end
 end
 
-@kernel function datafromcorner!(qto, qto_idx, qfrom, qfrom_idx, P)
+@kernel inbounds = true unsafe_indices = true function datafromcorner!(
+    qto,
+    qto_idx,
+    qfrom,
+    qfrom_idx,
+    P
+)
     i = @index(Global, Linear)
 
     if i <= length(qto_idx)
@@ -1441,7 +1398,7 @@ function crbc_face_rhs!(
     n, _, wsJ = components(first(surfacemetrics(grid)))
     fm = facemaps(grid)
 
-    KernelAbstractions.synchronize(backend)
+    #KernelAbstractions.synchronize(backend)
     if orient == "top"
         C = max(512 ÷ prod(size(cell)), 1)
         workgroup = (size(cell)..., C)
@@ -1459,7 +1416,7 @@ function crbc_face_rhs!(
             Val(last(size(dq)));
             ndrange = workgroup .* blocks,
         )
-        KernelAbstractions.synchronize(backend)
+        #KernelAbstractions.synchronize(backend)
 
         J = maximum(size(cell))
         C = max(128 ÷ J, 1)
@@ -1495,7 +1452,7 @@ function crbc_face_rhs!(
             Val(size(cell, 2) - 1);
             ndrange = I * last(size(dq)),
         )
-        KernelAbstractions.synchronize(backend)
+        #KernelAbstractions.synchronize(backend)
 
         C = max(512 ÷ prod(size(cell)), 1)
         workgroup = (size(cell)..., C)
@@ -1528,7 +1485,7 @@ function crbc_face_rhs!(
             Val(last(size(dq)));
             ndrange = workgroup .* blocks,
         )
-        KernelAbstractions.synchronize(backend)
+        #KernelAbstractions.synchronize(backend)
 
         J = maximum(size(cell))
         C = max(128 ÷ J, 1)
@@ -1564,7 +1521,7 @@ function crbc_face_rhs!(
             Val(size(cell, 2) - 1);
             ndrange = I * last(size(dq)),
         )
-        KernelAbstractions.synchronize(backend)
+        #KernelAbstractions.synchronize(backend)
 
         C = max(512 ÷ prod(size(cell)), 1)
         workgroup = (size(cell)..., C)
@@ -1597,7 +1554,7 @@ function crbc_face_rhs!(
             Val(last(size(dq)));
             ndrange = workgroup .* blocks,
         )
-        KernelAbstractions.synchronize(backend)
+        #KernelAbstractions.synchronize(backend)
 
         J = maximum(size(cell))
         C = max(128 ÷ J, 1)
@@ -1633,7 +1590,7 @@ function crbc_face_rhs!(
             Val(size(cell, 1) - 1);
             ndrange = J * last(size(dq)),
         )
-        KernelAbstractions.synchronize(backend)
+        #KernelAbstractions.synchronize(backend)
 
         C = max(512 ÷ prod(size(cell)), 1)
         workgroup = (size(cell)..., C)
@@ -1666,7 +1623,7 @@ function crbc_face_rhs!(
             Val(last(size(dq)));
             ndrange = workgroup .* blocks,
         )
-        KernelAbstractions.synchronize(backend)
+        #KernelAbstractions.synchronize(backend)
 
         J = maximum(size(cell))
         C = max(128 ÷ J, 1)
@@ -1702,7 +1659,7 @@ function crbc_face_rhs!(
             Val(size(cell, 1) - 1);
             ndrange = J * last(size(dq)),
         )
-        KernelAbstractions.synchronize(backend)
+        #KernelAbstractions.synchronize(backend)
 
         C = max(512 ÷ prod(size(cell)), 1)
         workgroup = (size(cell)..., C)
@@ -1804,7 +1761,11 @@ function run(
 
     #jl # crude dt estimate
     cfl = 1 // 20
-    dx = Base.step(first(coordinates)) / 2^(numlevels)
+    if empericalconvergetest
+        dx = Base.step(first(coordinates)) / 2^(numlevels)
+    else
+        dx = Base.step(first(coordinates)) / 2^(Lout)
+    end
     dt = cfl * dx / (maximum(N) + 1)^2
     @info "dt = $(dt) w/ dx = $(dx)"
 
@@ -1938,9 +1899,9 @@ function run(
     q = GridArray{SVector{2,ComplexF64}}(undef, grid)
 
     backend = Raven.get_backend(q)
-    bump!(backend, (size(cell)..., 1))(q, points(grid), Val(size(cell)); ndrange = size(q))
+    #bump!(backend, (size(cell)..., 1))(q, points(grid), Val(size(cell)); ndrange = size(q))
 
-    #gaussian!(backend, (size(cell)..., 1))(q, points(grid), Val(size(cell)); ndrange = size(q))
+    gaussian!(backend, (size(cell)..., 1))(q, points(grid), Val(size(cell)); ndrange = size(q))
     #=
     exactwithinterface!(backend, (size(cell)..., 1))(
         q,
@@ -2282,7 +2243,7 @@ function run(
                     dt = timeend - time
                 end
 
-                NVTX.@range "RK stage" begin
+                NVTX.@range "timestep" begin
                 for stage in eachindex(RKA, RKB)
                     @. dq *= RKA[stage]
                     if BC == :rbc
@@ -2403,6 +2364,7 @@ function run(
                             )
                             end
 
+                            NVTX.@range "corner to face copy" begin
                             corner_copy_data!(
                                 crbc_data_left,
                                 crbc_data_bottom,
@@ -2438,8 +2400,11 @@ function run(
                                 Q,
                                 (1, 1),
                             )
+                            end #NVTX: corner to face copy
                         end
 
+
+                        NVTX.@range "bulk to face copy" begin
                         L = size(crbc_interface_top,1)
                         workgroup = 32
                         blocks = cld(L, workgroup)
@@ -2495,8 +2460,8 @@ function run(
                             Val(L);
                             ndrange = workgroup * blocks,
                         )
-
-                        KernelAbstractions.synchronize(backend)
+                        end #NVTX: bulk to face copy
+                        #KernelAbstractions.synchronize(backend)
 
                         NVTX.@range "face rhs" begin
                         crbc_face_rhs!(
@@ -2568,8 +2533,9 @@ function run(
                         )
                         end
 
-                        KernelAbstractions.synchronize(backend)
+                        #KernelAbstractions.synchronize(backend)
 
+                        NVTX.@range "face copy to bulk" begin
                         L = size(crbc_interface_left, 1)
                         workgroup = 32
                         blocks = cld(L, workgroup)
@@ -2625,15 +2591,16 @@ function run(
                             Val(L);
                             ndrange = workgroup * blocks,
                         )
+                        end #NVTX: face copy to bulk
                     end
 
-                    KernelAbstractions.synchronize(backend)
+                    #KernelAbstractions.synchronize(backend)
 
                     NVTX.@range "bulk rhs" begin
                     rhs!(dq, q, grid, data_lr, data_tb, invwJ, DT, materialparams, bc, cm)
                     end
 
-                    KernelAbstractions.synchronize(backend)
+                    #KernelAbstractions.synchronize(backend)
                     @. q += RKB[stage] * dt * dq
 
                     if BC == :rbc
