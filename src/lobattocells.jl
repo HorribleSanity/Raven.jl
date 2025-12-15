@@ -1917,6 +1917,8 @@ function materializefacemaps(
     dtoc_degree3_global,
     quadranttolevel,
     quadranttoglobalid,
+    quadranttotreeid,
+    quadrantboundarylabels=Nothing,
 ) where {T,A,N}
     numcells = last(size(dtoc_degree3_local))
     cellindices = LinearIndices(size(cell))
@@ -2005,7 +2007,14 @@ function materializefacemaps(
             kind = length(nzrange(ctod_degree3_local, facefirstindex))
 
             if kind == 1
-                quadranttoboundary[f, q] = 1
+                # Meshes imported from Abaqus files ship with boundary
+                # labels. Otherwise resort to default boundary labels.
+                if quadrantboundarylabels == Nothing
+                    quadranttoboundary[f, q] = 1
+                else
+                    label = quadrantboundarylabels[quadranttotreeid[q]][f]
+                    quadranttoboundary[f, q] = label
+                end
             elseif kind == 1 + numchildfaces
                 # Get the canonical orientation of the global face indices
                 fg, _ = fldmod1(f, 2)

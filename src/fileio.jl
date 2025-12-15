@@ -14,6 +14,8 @@ dimensions(a::AbaqusMeshImport) = length(a.nodes[1])
 interpolation_degree(a::AbaqusMeshImport) = a.face_degree
 interpolation(a::AbaqusMeshImport) = a.face_interpolation
 interpolationdegree(a::AbaqusMeshImport) = a.face_degree
+typeboundary(a::AbaqusMeshImport) = a.type_boundary
+typeboundarymap(a::AbaqusMeshImport) = a.type_boundary_map
 
 function abaqusmeshimport(
     nodes,

@@ -1,4 +1,3 @@
-
 """
     linearpartition(n, p, np)
 
@@ -491,6 +490,7 @@ function _get_quadrant_data(gm::GridManager)
 
     ctod_degree3_local = materializectod(dtoc_degree3_local)
 
+    cg = coarsegrid(gm)
     facemaps, quadranttoboundary = materializefacemaps(
         referencecell(gm),
         localnumberofquadrants,
@@ -499,6 +499,8 @@ function _get_quadrant_data(gm::GridManager)
         dtoc_degree3_global,
         quadranttolevel,
         quadranttoglobalid,
+        quadranttotreeid,
+        cg isa MeshImportCoarseGrid ? typeboundary(meshimport(cg)) : Nothing
     )
 
     continuoustodiscontinuous = materializectod(discontinuoustocontinuous)

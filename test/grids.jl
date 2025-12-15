@@ -859,4 +859,35 @@ function grids_testsuite(AT, FT)
         err = norm(parent(points(grid)) - parent(points(grid2)), Inf)
         @test err < 1 // 5
     end
+
+    let
+        #Insist structure of imported boundary codes matches default
+        #structure.
+        cell = LobattoCell{FT,AT}(4, 4)
+        cg1 = coarsegrid("GingerbreadMan.inp")
+        gm1 = GridManager(cell, cg1)
+        grid1 = generate(gm1)
+        bc1 = boundarycodes(grid1)
+
+        cg2 = coarsegrid(cg1.vertices, cg1.cells)
+        gm2 = GridManager(cell, cg2)
+        grid2 = generate(gm2)
+        bc2 = boundarycodes(grid2)
+
+        bc1[bc1 .!== 0] .= 1
+        @test bc2 == bc1
+
+        cg = coarsegrid("GingerbreadMan.inp")
+        L = 1
+        gm = GridManager(LobattoCell{FT,AT}(N...), cg, min_level = L)
+        grid = generate(gm)
+        bc = boundarycodes(grid)
+        @test sum(bc[2,:] .== 1) == 160*2^L
+        @test sum(bc[4,:] .== 1) == 0
+        @test sum(bc[4,:] .== 2) == 26*2^L
+        @test sum(bc[4,:] .== 3) == 20*2^L
+        @test sum(bc[4,:] .== 4) == 36*2^L
+        @test sum(bc[4,:] .== 5) == 70*2^L
+        @test sum(bc[4,:] .== 6) == 50*2^L
+    end
 end
