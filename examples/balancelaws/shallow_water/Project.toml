@@ -12,7 +12,7 @@ Raven = {path = "../../.."}
 
 [compat]
 Adapt = "4"
-CUDA = "5.3"
+CUDA = "5.3, 6"
 KernelAbstractions = "0.9"
 MPI = "0.20"
 StaticArrays = "1"

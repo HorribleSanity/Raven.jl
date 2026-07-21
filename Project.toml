@@ -34,7 +34,7 @@ RavenDiffEqBaseExt = ["SciMLBase", "DiffEqBase"]
 [compat]
 AcceleratedKernels = "0.4.3"
 Adapt = "3, 4"
-CUDA = "5.3"
+CUDA = "5.3, 6"
 Compat = "3.42, 4"
 DiffEqBase = "6"
 GPUArraysCore = "0.2"
