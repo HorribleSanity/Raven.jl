@@ -1,5 +1,4 @@
 using CUDA
-using CUDA.CUDAKernels
 using MPI
 using Pkg
 using Raven

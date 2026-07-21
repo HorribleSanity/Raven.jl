@@ -1,5 +1,4 @@
 using CUDA
-using CUDA.CUDAKernels
 using MPI
 using Test
 using Raven

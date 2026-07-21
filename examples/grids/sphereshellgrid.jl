@@ -6,7 +6,6 @@ const comm = MPI.COMM_WORLD
 
 if false
     using CUDA
-    using CUDA.CUDAKernels
 
     if CUDA.functional()
         const AT = CuArray

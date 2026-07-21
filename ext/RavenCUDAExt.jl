@@ -6,7 +6,11 @@ import MPI
 import StaticArrays
 
 isdefined(Base, :get_extension) ? (using CUDA) : (using ..CUDA)
-isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAKernels)
+## if isdefined(CUDA, :CUDAKernels)
+## isdefined(Base, :get_extension) ? (using CUDA.CUDAKernels) : (using ..CUDA.CUDAKernels)
+## else
+## isdefined(Base, :get_extension) ? (using CUDA.CUDACore.CUDAKernels) : (using ..CUDA.CUDACore.CUDAKernels)
+## end
 
 Raven.get_backend(::Type{T}) where {T<:CuArray} = CUDABackend(; always_inline = true)
 Raven.arraytype(::Type{T}) where {T<:CuArray} = CuArray
